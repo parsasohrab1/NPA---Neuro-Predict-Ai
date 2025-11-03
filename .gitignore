@@ -53,8 +53,11 @@ models/*.pth
 models/*.h5
 synthetic_mri_images/
 synthetic_neuro_dataset.csv
-*.csv
-*.npy
+
+# Ignore large generated data but keep sample data
+!data/csv/*.csv
+!data/images/*.npy
+!data/*.csv
 
 # Node
 node_modules/
