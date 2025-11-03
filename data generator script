@@ -317,3 +317,33 @@ if __name__ == "__main__":
     print("- mri_data.csv (ویژگی‌های MRI)")
     print("- labels.csv (لیبل‌ها)")
     print("- پوشه synthetic_mri_images/ (تصاویر مصنوعی)")
+
+
+import kaggle
+import zipfile
+import os
+
+def download_real_datasets():
+    """دانلود مجموعه داده‌های واقعی از Kaggle"""
+    
+    # نیاز به نصب Kaggle API و تنظیم توکن دارد
+    datasets = {
+        'alzheimer': 'turhancan96/alzheimer-mri-dataset',
+        'parkinson': 'nidaguler/parkinsons-disease-data-set',
+        'mri_normal': 'msarmi9/brain-mri-images-for-brain-tumor-detection'
+    }
+    
+    output_dir = 'real_datasets'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    for disease, dataset in datasets.items():
+        try:
+            print(f"دانلود مجموعه داده {disease}...")
+            kaggle.api.dataset_download_files(dataset, path=f'{output_dir}/{disease}', unzip=True)
+            print(f"دانلود {disease} کامل شد!")
+        except Exception as e:
+            print(f"خطا در دانلود {disease}: {e}")
+
+# اگر می‌خواهید از داده‌های واقعی استفاده کنید، این تابع را اجرا کنید
+# download_real_datasets()
