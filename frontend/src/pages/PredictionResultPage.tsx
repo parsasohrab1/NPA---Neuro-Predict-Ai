@@ -1,0 +1,185 @@
+import { useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { predictionsApi, patientsApi } from '../services/api'
+
+export default function PredictionResultPage() {
+  const { id } = useParams<{ id: string }>()
+  
+  const { data: prediction, isLoading } = useQuery({
+    queryKey: ['prediction', id],
+    queryFn: () => predictionsApi.getById(Number(id)),
+    enabled: !!id,
+  })
+
+  const { data: patient } = useQuery({
+    queryKey: ['patient', prediction?.patient_id],
+    queryFn: () => patientsApi.getById(prediction!.patient_id),
+    enabled: !!prediction?.patient_id,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent"></div>
+        <p className="mt-2 text-gray-600">Loading prediction results...</p>
+      </div>
+    )
+  }
+
+  if (!prediction) {
+    return <div className="text-center py-12">Prediction not found</div>
+  }
+
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case 'high': return 'danger'
+      case 'medium': return 'yellow'
+      case 'low': return 'success'
+      default: return 'gray'
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-8">
+        <Link to={patient ? `/patients/${patient.id}` : '/patients'} className="text-primary-600 hover:text-primary-700 text-sm font-medium mb-4 inline-block">
+          ← Back to Patient
+        </Link>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Prediction Results</h1>
+        <p className="text-gray-600">
+          {patient && `${patient.first_name} ${patient.last_name} • `}
+          {new Date(prediction.created_at).toLocaleString()}
+        </p>
+      </div>
+
+      {/* Risk Assessment Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Alzheimer's Risk */}
+        {prediction.alzheimer_prediction && (
+          <div className={`card border-2 border-${getRiskColor(prediction.alzheimer_prediction.risk_level)}-300`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">🧠 Alzheimer's Risk</h2>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium bg-${getRiskColor(prediction.alzheimer_prediction.risk_level)}-100 text-${getRiskColor(prediction.alzheimer_prediction.risk_level)}-700 capitalize`}>
+                {prediction.alzheimer_prediction.risk_level} Risk
+              </span>
+            </div>
+            
+            <div className="mb-4">
+              <div className="flex justify-between items-end mb-2">
+                <span className="text-sm text-gray-600">Risk Score</span>
+                <span className={`text-3xl font-bold text-${getRiskColor(prediction.alzheimer_prediction.risk_level)}-600`}>
+                  {(prediction.alzheimer_prediction.risk_score * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className={`bg-${getRiskColor(prediction.alzheimer_prediction.risk_level)}-500 h-3 rounded-full transition-all`}
+                  style={{ width: `${prediction.alzheimer_prediction.risk_score * 100}%` }}
+                ></div>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-sm text-gray-600">Confidence</span>
+              <div className="flex items-center mt-1">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-primary-500 h-2 rounded-full"
+                    style={{ width: `${prediction.alzheimer_prediction.confidence * 100}%` }}
+                  ></div>
+                </div>
+                <span className="ml-3 text-sm font-medium">
+                  {(prediction.alzheimer_prediction.confidence * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Parkinson's Risk */}
+        {prediction.parkinson_prediction && (
+          <div className={`card border-2 border-${getRiskColor(prediction.parkinson_prediction.risk_level)}-300`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">🤝 Parkinson's Risk</h2>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium bg-${getRiskColor(prediction.parkinson_prediction.risk_level)}-100 text-${getRiskColor(prediction.parkinson_prediction.risk_level)}-700 capitalize`}>
+                {prediction.parkinson_prediction.risk_level} Risk
+              </span>
+            </div>
+            
+            <div className="mb-4">
+              <div className="flex justify-between items-end mb-2">
+                <span className="text-sm text-gray-600">Risk Score</span>
+                <span className={`text-3xl font-bold text-${getRiskColor(prediction.parkinson_prediction.risk_level)}-600`}>
+                  {(prediction.parkinson_prediction.risk_score * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className={`bg-${getRiskColor(prediction.parkinson_prediction.risk_level)}-500 h-3 rounded-full transition-all`}
+                  style={{ width: `${prediction.parkinson_prediction.risk_score * 100}%` }}
+                ></div>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-sm text-gray-600">Confidence</span>
+              <div className="flex items-center mt-1">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-primary-500 h-2 rounded-full"
+                    style={{ width: `${prediction.parkinson_prediction.confidence * 100}%` }}
+                  ></div>
+                </div>
+                <span className="ml-3 text-sm font-medium">
+                  {(prediction.parkinson_prediction.confidence * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recommendations */}
+        <div className="lg:col-span-2 card">
+          <h2 className="text-xl font-bold mb-4">📋 Clinical Recommendations</h2>
+          <div className="prose prose-sm max-w-none">
+            <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">
+              {prediction.recommendations || 'No recommendations available'}
+            </pre>
+          </div>
+        </div>
+
+        {/* Feature Importance */}
+        <div className="card">
+          <h2 className="text-xl font-bold mb-4">🔍 Top Contributing Factors</h2>
+          {prediction.feature_importance && (
+            <div className="space-y-3">
+              {Object.entries(prediction.feature_importance)
+                .slice(0, 10)
+                .map(([feature, importance]) => (
+                  <div key={feature}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-700 capitalize">
+                        {feature.replace(/_/g, ' ')}
+                      </span>
+                      <span className="font-medium">
+                        {((importance as number) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-primary-500 h-2 rounded-full"
+                        style={{ width: `${(importance as number) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
