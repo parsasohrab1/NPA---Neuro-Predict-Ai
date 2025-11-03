@@ -1,3 +1,37 @@
+# 🧠 NeuroPredict-AI
+
+## AI-Powered Neurodegenerative Disease Prediction System
+
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://reactjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd NPA---Neuro-Predict-Ai
+
+# Run setup script (Linux/Mac)
+chmod +x setup.sh && ./setup.sh
+
+# OR on Windows (PowerShell)
+.\setup.ps1
+
+# Access the application
+# Frontend: http://localhost:3000
+# Username: admin | Password: admin123
+```
+
+📚 **[Complete Getting Started Guide](GETTING_STARTED.md)** | 📖 **[API Documentation](docs/API.md)** | 🏗️ **[Architecture](docs/ARCHITECTURE.md)**
+
+---
+
 # Software Requirements Specification (SRS)
 # NeuroPredict-AI: Alzheimer's and Parkinson's Prediction and Risk Assessment Software
 
