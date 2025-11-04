@@ -1,10 +1,34 @@
 # Dependencies
 node_modules/
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
 
 # Environment variables
 .env
@@ -19,12 +43,11 @@ __pycache__/
 *.swo
 *~
 .DS_Store
+Thumbs.db
 
 # Build outputs
 dist/
 build/
-*.egg-info/
-*.egg
 
 # Logs
 *.log
@@ -33,11 +56,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-debug.log*
 
 # Testing
 .coverage
 .pytest_cache/
 .nyc_output/
+htmlcov/
 
 # Database
 *.db
@@ -53,16 +78,11 @@ Thumbs.db
 *.temp
 .cache/
 
-# Python
-venv/
-env/
-ENV/
-.venv
-
 # Frontend
 frontend/dist/
 frontend/.vite/
 frontend/node_modules/
+admin-dashboard/dist/
 
 # Backend
 backend/__pycache__/
@@ -81,3 +101,21 @@ backend/*.db
 *.pb
 models/*.pth
 models/*.ckpt
+models/*.h5
+
+# Uploads & Models
+uploads/
+synthetic_mri_images/
+synthetic_neuro_dataset.csv
+
+# Ignore large generated data but keep sample data
+!data/csv/*.csv
+!data/images/*.npy
+!data/*.csv
+
+# Docker
+.dockerignore
+
+# Alembic
+alembic/versions/*.py
+!alembic/versions/
