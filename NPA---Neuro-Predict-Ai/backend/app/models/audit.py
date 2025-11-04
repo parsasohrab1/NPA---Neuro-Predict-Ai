@@ -31,7 +31,7 @@ class AuditLog(Base):
     error_message = Column(Text, nullable=True)
     
     # Additional Context
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Timestamp
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)

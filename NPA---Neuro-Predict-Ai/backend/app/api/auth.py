@@ -114,3 +114,45 @@ async def logout(current_user: User = Depends(get_current_user)):
     """Logout current user (client should discard tokens)"""
     return {"message": "Successfully logged out"}
 
+
+@router.post("/create-test-admin", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_test_admin(
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a test admin user (Development only)"""
+    from ..models.user import UserRole
+    from ..core.config import settings
+    
+    if not settings.DEBUG:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint is only available in development mode"
+        )
+    
+    # Check if admin exists
+    result = await db.execute(
+        select(User).where(User.username == 'admin')
+    )
+    existing = result.scalar_one_or_none()
+    
+    if existing:
+        return existing
+    
+    # Create admin
+    admin = User(
+        email="admin@neuropredict.ai",
+        username="admin",
+        full_name="System Administrator",
+        hashed_password=get_password_hash("admin123"),
+        role=UserRole.ADMIN,
+        is_active=True,
+        is_verified=True,
+        institution="NeuroPredict-AI"
+    )
+    
+    db.add(admin)
+    await db.commit()
+    await db.refresh(admin)
+    
+    return admin
+

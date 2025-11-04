@@ -14,16 +14,17 @@ import ModelManagementPage from './pages/ModelManagementPage'
 import SettingsPage from './pages/SettingsPage'
 
 function App() {
-  const { isAuthenticated } = useAuthStore()
+  // Disable authentication for now - allow direct access to dashboard
+  // const { isAuthenticated } = useAuthStore()
 
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       
-      {/* Protected routes */}
+      {/* All routes accessible without authentication */}
       <Route
         path="/"
-        element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
+        element={<Layout />}
       >
         <Route index element={<DashboardPage />} />
         <Route path="patients" element={<PatientsPage />} />

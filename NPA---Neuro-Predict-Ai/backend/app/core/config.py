@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     
     # Server Configuration
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 8001
     
     # Database Configuration
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/neuropredict_db"
@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list = [
         "http://localhost:3000",
         "http://localhost:3001",
-        "http://localhost:8080"
+        "http://localhost:8080",
+        "http://127.0.0.1:3001"
     ]
     
     # File Upload

@@ -1,6 +1,8 @@
 import axios from 'axios'
+import { mockDataService } from './mockData'
 
 const API_URL = '/api/v1'
+const USE_MOCK_DATA = true // Set to false to use real backend
 
 export interface Patient {
   id: number
@@ -37,10 +39,40 @@ export interface Prediction {
 
 export const patientsApi = {
   getAll: async (skip = 0, limit = 100, search?: string) => {
-    const params = new URLSearchParams({ skip: skip.toString(), limit: limit.toString() })
-    if (search) params.append('search', search)
-    const response = await axios.get(`${API_URL}/patients?${params}`)
-    return response.data as Patient[]
+    if (USE_MOCK_DATA) {
+      // Use local mock data
+      const data = await mockDataService.getPatients()
+      let filtered = data
+      if (search) {
+        const searchLower = search.toLowerCase()
+        filtered = data.filter(p => 
+          p.first_name?.toLowerCase().includes(searchLower) ||
+          p.last_name?.toLowerCase().includes(searchLower) ||
+          p.patient_id?.toLowerCase().includes(searchLower)
+        )
+      }
+      return filtered.slice(skip, skip + limit) as Patient[]
+    }
+    
+    // Use backend API
+    try {
+      const response = await axios.get(`${API_URL}/mock/patients`)
+      let data = response.data as Patient[]
+      if (search) {
+        const searchLower = search.toLowerCase()
+        data = data.filter(p => 
+          p.first_name?.toLowerCase().includes(searchLower) ||
+          p.last_name?.toLowerCase().includes(searchLower) ||
+          p.patient_id?.toLowerCase().includes(searchLower)
+        )
+      }
+      return data.slice(skip, skip + limit)
+    } catch (error) {
+      console.error('Error fetching patients:', error)
+      // Fallback to local mock data
+      const data = await mockDataService.getPatients()
+      return data.slice(skip, skip + limit) as Patient[]
+    }
   },
 
   getById: async (id: number) => {
@@ -65,10 +97,23 @@ export const patientsApi = {
 
 export const predictionsApi = {
   getAll: async (patientId?: number, skip = 0, limit = 100) => {
-    const params = new URLSearchParams({ skip: skip.toString(), limit: limit.toString() })
-    if (patientId) params.append('patient_id', patientId.toString())
-    const response = await axios.get(`${API_URL}/predictions?${params}`)
-    return response.data as Prediction[]
+    if (USE_MOCK_DATA) {
+      const data = await mockDataService.getPredictions(patientId)
+      return data.slice(skip, skip + limit) as Prediction[]
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/predictions`)
+      let data = response.data as any[]
+      if (patientId) {
+        data = data.filter((p: any) => p.patient_id === patientId)
+      }
+      return data.slice(skip, skip + limit) as Prediction[]
+    } catch (error) {
+      console.error('Error fetching predictions:', error)
+      const data = await mockDataService.getPredictions(patientId)
+      return data.slice(skip, skip + limit) as Prediction[]
+    }
   },
 
   getById: async (id: number) => {
@@ -92,28 +137,61 @@ export const predictionsApi = {
 
 export const reportsApi = {
   getSummary: async (reportType: string = 'clinical', startDate?: string, endDate?: string) => {
-    const params = new URLSearchParams({ report_type: reportType })
-    if (startDate) params.append('start_date', startDate)
-    if (endDate) params.append('end_date', endDate)
-    const response = await axios.get(`${API_URL}/reports/summary?${params}`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getReportSummary()
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/reports/summary`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching report summary:', error)
+      return await mockDataService.getReportSummary()
+    }
   },
 
   getPredictionsTrend: async (days: number = 7) => {
-    const response = await axios.get(`${API_URL}/reports/predictions-trend?days=${days}`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getPredictionsTrend(days)
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/reports/predictions-trend?days=${days}`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching predictions trend:', error)
+      return await mockDataService.getPredictionsTrend(days)
+    }
   },
 
   getRiskDistribution: async () => {
-    const response = await axios.get(`${API_URL}/reports/risk-distribution`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getRiskDistribution()
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/reports/risk-distribution`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching risk distribution:', error)
+      return await mockDataService.getRiskDistribution()
+    }
   },
 }
 
 export const modelsApi = {
   getAll: async () => {
-    const response = await axios.get(`${API_URL}/models`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getModels()
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/models/`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching models:', error)
+      return await mockDataService.getModels()
+    }
   },
 
   getById: async (modelId: string) => {
@@ -149,30 +227,75 @@ export const modelsApi = {
 
 export const analyticsApi = {
   getAgeDistribution: async () => {
-    const response = await axios.get(`${API_URL}/analytics/population/age-distribution`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getAgeDistribution()
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/analytics/population/age-distribution`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching age distribution:', error)
+      return await mockDataService.getAgeDistribution()
+    }
   },
 
   getGenderDistribution: async () => {
-    const response = await axios.get(`${API_URL}/analytics/population/gender-distribution`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getGenderDistribution()
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/analytics/population/gender-distribution`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching gender distribution:', error)
+      return await mockDataService.getGenderDistribution()
+    }
   },
 
   getPopulationStatistics: async () => {
-    const response = await axios.get(`${API_URL}/analytics/population/statistics`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getPopulationStatistics()
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/analytics/population/statistics`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching population statistics:', error)
+      return await mockDataService.getPopulationStatistics()
+    }
   },
 
   getLongitudinalData: async (patientId: number) => {
-    const response = await axios.get(`${API_URL}/analytics/longitudinal/${patientId}`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getLongitudinalData(patientId)
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/analytics/longitudinal/${patientId}`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching longitudinal data:', error)
+      return await mockDataService.getLongitudinalData(patientId)
+    }
   },
 }
 
 export const usersApi = {
   getAll: async (skip = 0, limit = 100) => {
-    const response = await axios.get(`${API_URL}/users?skip=${skip}&limit=${limit}`)
-    return response.data
+    if (USE_MOCK_DATA) {
+      return await mockDataService.getUsers()
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/mock/users/`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      return await mockDataService.getUsers()
+    }
   },
 
   create: async (data: any) => {
