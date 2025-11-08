@@ -90,3 +90,28 @@ export const predictionsApi = {
   },
 }
 
+export interface DicomUploadResponse {
+  imaging_study_id: number
+  study_id: string
+  medical_record_id: number
+  dicom_path: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export const imagingApi = {
+  uploadDicom: async (payload: { patientId: number; file: File; medicalRecordId?: number }) => {
+    const formData = new FormData()
+    formData.append('patient_id', payload.patientId.toString())
+    if (payload.medicalRecordId) {
+      formData.append('medical_record_id', payload.medicalRecordId.toString())
+    }
+    formData.append('file', payload.file)
+
+    const response = await axios.post(`${API_URL}/imaging/dicom`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data as DicomUploadResponse
+  },
+}
+

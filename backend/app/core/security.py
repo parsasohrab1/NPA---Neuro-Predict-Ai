@@ -112,6 +112,7 @@ def check_permission(user: User, required_role: str) -> bool:
         "admin": 3,
         "doctor": 2,
         "radiologist": 2,
+        "researcher": 2,
         "nurse": 1,
         "viewer": 0
     }

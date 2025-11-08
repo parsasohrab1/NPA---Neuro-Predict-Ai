@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { predictionsApi, patientsApi } from '../services/api'
+import {
+  predictionsApi,
+  patientsApi,
+  imagingApi,
+  type DicomUploadResponse,
+} from '../services/api'
 
 export default function PredictionPage() {
   const [searchParams] = useSearchParams()
@@ -10,6 +15,9 @@ export default function PredictionPage() {
   
   const [patientId, setPatientId] = useState(preselectedPatient || '')
   const [diseaseType, setDiseaseType] = useState('both')
+  const [dicomFile, setDicomFile] = useState<File | null>(null)
+  const [uploadedStudy, setUploadedStudy] = useState<DicomUploadResponse | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const { data: patients = [] } = useQuery({
     queryKey: ['patients'],
@@ -20,6 +28,17 @@ export default function PredictionPage() {
     mutationFn: predictionsApi.create,
     onSuccess: (data) => {
       navigate(`/predictions/${data.id}`)
+    },
+  })
+
+  const uploadDicom = useMutation({
+    mutationFn: (payload: { patientId: number; file: File }) => imagingApi.uploadDicom(payload),
+    onSuccess: (data) => {
+      setUploadedStudy(data)
+      setUploadError(null)
+    },
+    onError: (error: any) => {
+      setUploadError(error?.response?.data?.detail || 'Failed to upload DICOM file')
     },
   })
 
@@ -36,6 +55,18 @@ export default function PredictionPage() {
     })
   }
 
+  const handleDicomUpload = () => {
+    if (!patientId) {
+      alert('Please select a patient before uploading imaging data')
+      return
+    }
+    if (!dicomFile) {
+      alert('Please choose a DICOM (.dcm) file to upload')
+      return
+    }
+    uploadDicom.mutate({ patientId: Number(patientId), file: dicomFile })
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
@@ -49,7 +80,12 @@ export default function PredictionPage() {
             <label className="label">Select Patient *</label>
             <select
               value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
+              onChange={(e) => {
+                setPatientId(e.target.value)
+                setDicomFile(null)
+                setUploadedStudy(null)
+                setUploadError(null)
+              }}
               className="input"
               required
             >
@@ -74,6 +110,60 @@ export default function PredictionPage() {
               <option value="alzheimer">Alzheimer's Disease Only</option>
               <option value="parkinson">Parkinson's Disease Only</option>
             </select>
+          </div>
+
+          <div className="card border border-primary-200 rounded-lg p-4 space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">MRI DICOM Upload</h3>
+              <p className="text-sm text-gray-600">
+                Attach the latest MRI study in DICOM format. The file will be stored securely and linked to the
+                patient&apos;s record.
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Choose DICOM file (.dcm)</label>
+              <input
+                type="file"
+                accept=".dcm,application/dicom"
+                className="input"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  setDicomFile(file ?? null)
+                  setUploadedStudy(null)
+                  setUploadError(null)
+                }}
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleDicomUpload}
+                disabled={uploadDicom.isPending}
+              >
+                {uploadDicom.isPending ? 'Uploading DICOM...' : 'Upload DICOM'}
+              </button>
+              {dicomFile && <span className="text-sm text-gray-600">{dicomFile.name}</span>}
+            </div>
+
+            {uploadError && (
+              <div className="bg-danger-50 border border-danger-200 text-danger-700 rounded-lg p-3 text-sm">
+                {uploadError}
+              </div>
+            )}
+
+            {uploadedStudy && (
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-900">
+                <div className="font-medium">DICOM stored successfully</div>
+                <ul className="mt-2 space-y-1 list-disc list-inside">
+                  <li>Study UID: {uploadedStudy.study_id}</li>
+                  <li>Modality: {String(uploadedStudy.metadata?.modality ?? 'N/A')}</li>
+                  <li>Study date: {String(uploadedStudy.metadata?.study_date ?? 'N/A')}</li>
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">

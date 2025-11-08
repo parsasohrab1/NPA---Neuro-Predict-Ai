@@ -55,4 +55,5 @@ httpx==0.25.2
 # Utilities
 python-dateutil==2.8.2
 pytz==2023.3
+aiofiles==23.2.1
 
