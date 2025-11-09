@@ -71,7 +71,7 @@
 
 ### 4. ساختار داده و جداول
 - `longitudinal_report_schedules`:
-  - `id`, `name`, `report_type`, `schedule_cron`, `cohort_filter`, `patient_id`, `status`, `created_by`.
+  - `id`, `episode_id`, `name`, `report_type`, `schedule_cron`, `cohort_filter`, `comparison_filter`, `status`, `created_by`.
 - `longitudinal_report_runs`:
   - `id`, `schedule_id`, `report_id`, `status`, `error`, `started_at`, `finished_at`.
 - به‌روزرسانی جدول `longitudinal_reports` برای نگهداری متادیتای cohort (`comparison_context`).
@@ -84,17 +84,19 @@
   - `cohort_filters` (شیء شامل age_range, gender, diagnosis, tags).
   - `comparison_cohort_filters`.
 - پاسخ API شامل:
-  - `heatmap_png`, `charts_payload`, `comparison_summary`.
+  - `heatmap_path`, `charts_payload`, `comparison_summary`.
+- Endpoint تکمیلی:
+  - `GET /api/v1/longitudinal/reports/{id}/heatmap` برای دریافت PNG آماده نمایش.
 
 ---
 
 ### 6. UI داشبورد ادمین
-- صفحه Reports → تب جدید “Scheduled Reports”.
-- کامپوننت برای ساخت Schedule (form با cron helper ساده: daily/weekly/monthly).
-- لیست job ها + آخرین اجرا + دکمه Force run.
+- صفحه Reports → تب “Scheduled Reports” با امکان ساخت، فعال/غیرفعال‌سازی، اجرای دستی و مشاهده لاگ اجرا.
+- فرم ساخت Schedule با فیلتر cohort/comparison و ساختار cron آماده.
+- لیست job ها + آخرین اجرا + دکمه Run now + مشاهده Execution log.
 - در Longitudinal Tracking:
-  - نمایش Heatmap به‌صورت Modal / کارت.
-  - دانلودهای جدید (Cohort Excel/PDF).
+  - نمایش Heatmap به‌صورت Modal تعاملی و دکمه دانلود.
+  - دانلودهای جدید (Excel/PDF) و نمایش خلاصه مقایسه.
 
 ---
 

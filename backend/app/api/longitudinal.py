@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.security import require_role
 from ..db.session import get_db
-from ..models.longitudinal import MetricCategory
+from ..models.longitudinal import MetricCategory, LongitudinalReportScheduleStatus
 from ..schemas.longitudinal import (
     LongitudinalEpisodeCreate,
     LongitudinalEpisodeDetail,
@@ -29,6 +29,7 @@ from ..schemas.longitudinal import (
     ReportScheduleCreate,
     ReportScheduleResponse,
     ReportRunResponse,
+    ReportScheduleUpdate,
 )
 from ..services.longitudinal_service import longitudinal_service
 
@@ -348,5 +349,127 @@ async def download_report(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file missing")
 
     return FileResponse(path=file_path, media_type=media_type, filename=file_path.name)
+
+
+@router.get(
+    "/reports/{report_id}/heatmap",
+    response_class=FileResponse,
+)
+async def get_report_heatmap(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+):
+    report = await longitudinal_service.get_report(db, report_id)
+    if report is None or not report.heatmap_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Heatmap not available")
+    heatmap_path = Path(report.heatmap_path)
+    if not heatmap_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Heatmap file missing")
+    return FileResponse(path=heatmap_path, media_type="image/png", filename=heatmap_path.name)
+
+
+@router.post(
+    "/reports/schedules",
+    response_model=ReportScheduleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_report_schedule(
+    payload: ReportScheduleCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> ReportScheduleResponse:
+    schedule = await longitudinal_service.create_schedule(db, payload, getattr(current_user, "id", None))
+    return schedule
+
+
+@router.get(
+    "/reports/schedules",
+    response_model=List[ReportScheduleResponse],
+)
+async def list_report_schedules(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> List[ReportScheduleResponse]:
+    schedules = await longitudinal_service.list_schedules(db)
+    return schedules
+
+
+@router.patch(
+    "/reports/schedules/{schedule_id}",
+    response_model=ReportScheduleResponse,
+)
+async def update_report_schedule(
+    schedule_id: int,
+    payload: ReportScheduleUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> ReportScheduleResponse:
+    schedule = await longitudinal_service.update_schedule_status(
+        db,
+        schedule_id,
+        payload.status,
+    )
+    if schedule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+    return schedule
+
+
+@router.delete(
+    "/reports/schedules/{schedule_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_report_schedule(
+    schedule_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> None:
+    deleted = await longitudinal_service.delete_schedule(db, schedule_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+
+
+@router.post(
+    "/reports/schedules/{schedule_id}/runs",
+    response_model=ReportRunResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def enqueue_schedule_run(
+    schedule_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> ReportRunResponse:
+    run = await longitudinal_service.enqueue_schedule_run(db, schedule_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+    return run
+
+
+@router.get(
+    "/reports/schedules/{schedule_id}/runs",
+    response_model=List[ReportRunResponse],
+)
+async def list_schedule_runs(
+    schedule_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> List[ReportRunResponse]:
+    runs = await longitudinal_service.list_schedule_runs(db, schedule_id)
+    return runs
+
+
+@router.post(
+    "/reports/runs/{run_id}/execute",
+    response_model=ReportRunResponse,
+)
+async def execute_schedule_run(
+    run_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> ReportRunResponse:
+    run = await longitudinal_service.execute_schedule_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    return run
 
 

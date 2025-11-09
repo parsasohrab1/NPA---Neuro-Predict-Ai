@@ -214,6 +214,7 @@ class LongitudinalReportSchedule(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(128), nullable=False)
+    episode_id = Column(Integer, ForeignKey("longitudinal_episodes.id"), nullable=False, index=True)
     report_type = Column(String(64), default="summary")
     cohort_definition = Column(JSON, nullable=True)
     comparison_definition = Column(JSON, nullable=True)
@@ -227,6 +228,7 @@ class LongitudinalReportSchedule(Base):
 
     creator = relationship("User")
     runs = relationship("LongitudinalReportRun", back_populates="schedule", cascade="all, delete-orphan")
+    episode = relationship("LongitudinalEpisode")
 
 
 class LongitudinalReportRunStatus(str, enum.Enum):

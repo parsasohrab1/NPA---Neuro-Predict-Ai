@@ -112,6 +112,40 @@ export type EpisodeCreatePayload = {
 export type LongitudinalReportFormat = 'pdf' | 'xlsx'
 export type LongitudinalReportStatus = 'completed' | 'failed'
 
+export type ReportChartPoint = {
+  series: 'cohort' | 'target'
+  visit_date: string
+  value: number | null
+}
+
+export type ReportMetricStats = {
+  average?: number | null
+  minimum?: number | null
+  maximum?: number | null
+  latest?: number | null
+  slope?: number | null
+}
+
+export type ReportComparisonRow = {
+  metric: string
+  cohort_average?: number | null
+  patient_average?: number | null
+  delta?: number | null
+  cohort_a_average?: number | null
+  cohort_b_average?: number | null
+}
+
+export type LongitudinalReportSummary = {
+  report_type: string
+  episode_id: number
+  range?: { from?: string | null; to?: string | null }
+  generated_at?: string
+  visit_count?: number
+  cohort_size?: number
+  metrics?: Record<string, ReportMetricStats>
+  comparison?: { table: ReportComparisonRow[] }
+}
+
 export type LongitudinalReport = {
   id: number
   episode_id: number
@@ -122,7 +156,11 @@ export type LongitudinalReport = {
   end_date?: string | null
   file_path: string
   pdf_path?: string | null
-  summary?: Record<string, unknown> | null
+  heatmap_path?: string | null
+  charts_payload?: Record<string, ReportChartPoint[]>
+  summary?: LongitudinalReportSummary | null
+  cohort_definition?: Record<string, unknown> | null
+  comparison_definition?: Record<string, unknown> | null
   created_at: string
 }
 
@@ -130,6 +168,36 @@ export type ReportCreatePayload = {
   start_date?: string
   end_date?: string
   format?: LongitudinalReportFormat
+  report_type?: 'summary' | 'cohort_patient_vs_average' | 'cohort_vs_cohort'
+  cohort_filters?: Record<string, unknown>
+  comparison_filters?: Record<string, unknown>
+}
+
+export type ReportScheduleStatus = 'active' | 'paused' | 'archived'
+export type ReportRunStatus = 'queued' | 'running' | 'success' | 'failed'
+
+export type ReportSchedule = {
+  id: number
+  name: string
+  episode_id: number
+  report_type: string
+  schedule_cron: string
+  status: ReportScheduleStatus
+  next_run_at?: string | null
+  last_run_at?: string | null
+  cohort_definition?: Record<string, unknown> | null
+  comparison_definition?: Record<string, unknown> | null
+  created_at: string
+}
+
+export type ReportRun = {
+  id: number
+  schedule_id: number
+  report_id?: number | null
+  status: ReportRunStatus
+  started_at?: string | null
+  finished_at?: string | null
+  error_message?: string | null
 }
 
 export const longitudinalService = {
@@ -207,6 +275,54 @@ export const longitudinalService = {
       responseType: 'blob',
     })
     return response
+  },
+
+  async downloadReportHeatmap(reportId: number) {
+    const response = await axios.get(`${API_BASE}/reports/${reportId}/heatmap`, {
+      responseType: 'blob',
+    })
+    return response
+  },
+
+  async createReportSchedule(payload: {
+    name: string
+    episode_id: number
+    report_type: string
+    schedule_cron: string
+    cohort_filters?: Record<string, unknown>
+    comparison_filters?: Record<string, unknown>
+  }) {
+    const response = await axios.post(`${API_BASE}/reports/schedules`, payload)
+    return response.data as ReportSchedule
+  },
+
+  async fetchReportSchedules() {
+    const response = await axios.get(`${API_BASE}/reports/schedules`)
+    return response.data as ReportSchedule[]
+  },
+
+  async updateReportScheduleStatus(scheduleId: number, status: ReportScheduleStatus) {
+    const response = await axios.patch(`${API_BASE}/reports/schedules/${scheduleId}`, { status })
+    return response.data as ReportSchedule
+  },
+
+  async deleteReportSchedule(scheduleId: number) {
+    await axios.delete(`${API_BASE}/reports/schedules/${scheduleId}`)
+  },
+
+  async enqueueScheduleRun(scheduleId: number) {
+    const response = await axios.post(`${API_BASE}/reports/schedules/${scheduleId}/runs`)
+    return response.data as ReportRun
+  },
+
+  async fetchScheduleRuns(scheduleId: number) {
+    const response = await axios.get(`${API_BASE}/reports/schedules/${scheduleId}/runs`)
+    return response.data as ReportRun[]
+  },
+
+  async executeScheduleRun(runId: number) {
+    const response = await axios.post(`${API_BASE}/reports/runs/${runId}/execute`)
+    return response.data as ReportRun
   },
 }
 

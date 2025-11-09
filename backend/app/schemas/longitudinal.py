@@ -186,6 +186,7 @@ class LongitudinalReportResponse(BaseModel):
 
 class ReportScheduleCreate(BaseModel):
     name: str
+    episode_id: int
     report_type: str = "summary"
     schedule_cron: str
     cohort_filters: Optional[Dict[str, Any]] = None
@@ -195,6 +196,7 @@ class ReportScheduleCreate(BaseModel):
 class ReportScheduleResponse(BaseModel):
     id: int
     name: str
+    episode_id: int
     report_type: str
     schedule_cron: str
     status: LongitudinalReportScheduleStatus
@@ -219,6 +221,10 @@ class ReportRunResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ReportScheduleUpdate(BaseModel):
+    status: LongitudinalReportScheduleStatus
 
 
 class LongitudinalReportCreate(BaseModel):

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import {
@@ -24,11 +24,46 @@ import {
   type LongitudinalAlert,
   type ProgressionSummary,
   type LongitudinalReport,
+  type ReportCreatePayload,
+  type ReportSchedule,
+  type ReportRun,
+  type ReportScheduleStatus,
+  type ReportRunStatus,
 } from '../services/longitudinal'
 
 type MetricOption = {
   key: string
   category: MetricCategory
+}
+
+type ReportFormState = {
+  start: string
+  end: string
+  format: 'xlsx' | 'pdf'
+  reportType: 'summary' | 'cohort_patient_vs_average' | 'cohort_vs_cohort'
+  cohortGender: string
+  cohortAgeMin: string
+  cohortAgeMax: string
+  cohortPatientIds: string
+  comparisonGender: string
+  comparisonPatientIds: string
+}
+
+type ScheduleFormState = {
+  name: string
+  scheduleCron: string
+  reportType: 'summary' | 'cohort_patient_vs_average' | 'cohort_vs_cohort'
+  cohortGender: string
+  cohortAgeMin: string
+  cohortAgeMax: string
+  cohortPatientIds: string
+  comparisonGender: string
+  comparisonPatientIds: string
+}
+
+type HeatmapPreviewState = {
+  url: string
+  name: string
 }
 
 export default function LongitudinalTrackingPage() {
@@ -40,12 +75,41 @@ export default function LongitudinalTrackingPage() {
   const [comparisonSelection, setComparisonSelection] = useState<number[]>([])
   const [comparisonResult, setComparisonResult] = useState<ImagingComparison | null>(null)
   const [comparisonError, setComparisonError] = useState<string | null>(null)
-  const [reportForm, setReportForm] = useState<{ start: string; end: string; format: 'xlsx' | 'pdf' }>({
+  const [reportForm, setReportForm] = useState<ReportFormState>({
     start: '',
     end: '',
     format: 'xlsx',
+    reportType: 'summary',
+    cohortGender: '',
+    cohortAgeMin: '',
+    cohortAgeMax: '',
+    cohortPatientIds: '',
+    comparisonGender: '',
+    comparisonPatientIds: '',
   })
   const [reportError, setReportError] = useState<string | null>(null)
+  const [heatmapPreview, setHeatmapPreview] = useState<HeatmapPreviewState | null>(null)
+  const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>({
+    name: '',
+    scheduleCron: '0 6 * * 1',
+    reportType: 'summary',
+    cohortGender: '',
+    cohortAgeMin: '',
+    cohortAgeMax: '',
+    cohortPatientIds: '',
+    comparisonGender: '',
+    comparisonPatientIds: '',
+  })
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
+  const [expandedScheduleId, setExpandedScheduleId] = useState<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (heatmapPreview) {
+        URL.revokeObjectURL(heatmapPreview.url)
+      }
+    }
+  }, [heatmapPreview])
 
   const loadEpisodes = () => {
     const parsed = parseInt(patientIdInput, 10)
@@ -59,8 +123,32 @@ export default function LongitudinalTrackingPage() {
     setComparisonSelection([])
     setComparisonResult(null)
     setComparisonError(null)
-    setReportForm({ start: '', end: '', format: 'xlsx' })
+    setReportForm({
+      start: '',
+      end: '',
+      format: 'xlsx',
+      reportType: 'summary',
+      cohortGender: '',
+      cohortAgeMin: '',
+      cohortAgeMax: '',
+      cohortPatientIds: '',
+      comparisonGender: '',
+      comparisonPatientIds: '',
+    })
     setReportError(null)
+    setScheduleForm({
+      name: '',
+      scheduleCron: '0 6 * * 1',
+      reportType: 'summary',
+      cohortGender: '',
+      cohortAgeMin: '',
+      cohortAgeMax: '',
+      cohortPatientIds: '',
+      comparisonGender: '',
+      comparisonPatientIds: '',
+    })
+    setScheduleError(null)
+    setExpandedScheduleId(null)
   }
 
   const episodesQuery = useQuery({
@@ -113,6 +201,23 @@ export default function LongitudinalTrackingPage() {
     enabled: selectedEpisodeId !== null,
   })
 
+  const schedulesQuery = useQuery({
+    queryKey: ['longitudinal', 'reportSchedules'],
+    queryFn: () => longitudinalService.fetchReportSchedules(),
+  })
+
+  const applicableSchedules = useMemo<ReportSchedule[]>(() => {
+    if (!selectedEpisodeId) return []
+    return (schedulesQuery.data ?? []).filter((schedule) => schedule.episode_id === selectedEpisodeId)
+  }, [schedulesQuery.data, selectedEpisodeId])
+
+  const scheduleRunsQuery = useQuery({
+    queryKey: ['longitudinal', 'scheduleRuns', expandedScheduleId],
+    queryFn: () => longitudinalService.fetchScheduleRuns(expandedScheduleId!),
+    enabled: expandedScheduleId !== null,
+  })
+  const scheduleRuns = expandedScheduleId ? scheduleRunsQuery.data ?? [] : []
+
   const createEpisode = useMutation({
     mutationFn: (payload: { patientId: number; title?: string }) =>
       longitudinalService.createEpisode(payload.patientId, {
@@ -125,8 +230,33 @@ export default function LongitudinalTrackingPage() {
       setComparisonSelection([])
       setComparisonResult(null)
       setComparisonError(null)
-      setReportForm({ start: '', end: '', format: 'xlsx' })
+      setReportForm({
+        start: '',
+        end: '',
+        format: 'xlsx',
+        reportType: 'summary',
+        cohortGender: '',
+        cohortAgeMin: '',
+        cohortAgeMax: '',
+        cohortPatientIds: '',
+        comparisonGender: '',
+        comparisonPatientIds: '',
+      })
       setReportError(null)
+      setScheduleForm((prev) => ({
+        ...prev,
+        name: '',
+        scheduleCron: '0 6 * * 1',
+        reportType: 'summary',
+        cohortGender: '',
+        cohortAgeMin: '',
+        cohortAgeMax: '',
+        cohortPatientIds: '',
+        comparisonGender: '',
+        comparisonPatientIds: '',
+      }))
+      setScheduleError(null)
+      setExpandedScheduleId(null)
     },
   })
 
@@ -191,19 +321,80 @@ export default function LongitudinalTrackingPage() {
     },
   })
 
+  const buildReportPayload = (): ReportCreatePayload => {
+    const payload: ReportCreatePayload = {
+      format: reportForm.format,
+      report_type: reportForm.reportType,
+    }
+
+    if (reportForm.start) {
+      payload.start_date = new Date(reportForm.start).toISOString()
+    }
+    if (reportForm.end) {
+      payload.end_date = new Date(reportForm.end).toISOString()
+    }
+
+    if (reportForm.reportType !== 'summary') {
+      const cohortFilters: Record<string, unknown> = {}
+      if (reportForm.cohortGender) cohortFilters.gender = reportForm.cohortGender
+      if (reportForm.cohortAgeMin) {
+        const value = Number(reportForm.cohortAgeMin)
+        if (!Number.isNaN(value)) cohortFilters.age_min = value
+      }
+      if (reportForm.cohortAgeMax) {
+        const value = Number(reportForm.cohortAgeMax)
+        if (!Number.isNaN(value)) cohortFilters.age_max = value
+      }
+      if (reportForm.cohortPatientIds.trim()) {
+        cohortFilters.patient_ids = reportForm.cohortPatientIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      }
+      if (Object.keys(cohortFilters).length > 0) {
+        payload.cohort_filters = cohortFilters
+      }
+    }
+
+    if (reportForm.reportType === 'cohort_vs_cohort') {
+      const comparisonFilters: Record<string, unknown> = {}
+      if (reportForm.comparisonGender) comparisonFilters.gender = reportForm.comparisonGender
+      if (reportForm.comparisonPatientIds.trim()) {
+        comparisonFilters.patient_ids = reportForm.comparisonPatientIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      }
+      if (Object.keys(comparisonFilters).length > 0) {
+        payload.comparison_filters = comparisonFilters
+      }
+    }
+
+    return payload
+  }
+
   const generateReportMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedEpisodeId) return null
-      const payload = {
-        start_date: reportForm.start || undefined,
-        end_date: reportForm.end || undefined,
-        format: reportForm.format,
+      if (!selectedEpisodeId) {
+        throw new Error('Episode must be selected before generating a report.')
       }
+      const payload = buildReportPayload()
       return longitudinalService.generateReport(selectedEpisodeId, payload)
     },
     onSuccess: () => {
       reportsQuery.refetch()
-      setReportForm({ start: '', end: '', format: 'xlsx' })
+      setReportForm({
+        start: '',
+        end: '',
+        format: 'xlsx',
+        reportType: 'summary',
+        cohortGender: '',
+        cohortAgeMin: '',
+        cohortAgeMax: '',
+        cohortPatientIds: '',
+        comparisonGender: '',
+        comparisonPatientIds: '',
+      })
       setReportError(null)
     },
     onError: (error: any) => {
@@ -211,8 +402,145 @@ export default function LongitudinalTrackingPage() {
     },
   })
 
+  const buildSchedulePayload = () => {
+    if (!selectedEpisodeId) {
+      throw new Error('Episode must be selected before creating a schedule.')
+    }
+    const payload: {
+      name: string
+      episode_id: number
+      report_type: string
+      schedule_cron: string
+      cohort_filters?: Record<string, unknown>
+      comparison_filters?: Record<string, unknown>
+    } = {
+      name: scheduleForm.name.trim() || `Scheduled ${new Date().toLocaleDateString()}`,
+      episode_id: selectedEpisodeId,
+      report_type: scheduleForm.reportType,
+      schedule_cron: scheduleForm.scheduleCron || '0 6 * * 1',
+    }
+
+    if (scheduleForm.reportType !== 'summary') {
+      const cohortFilters: Record<string, unknown> = {}
+      if (scheduleForm.cohortGender) cohortFilters.gender = scheduleForm.cohortGender
+      if (scheduleForm.cohortAgeMin) {
+        const value = Number(scheduleForm.cohortAgeMin)
+        if (!Number.isNaN(value)) cohortFilters.age_min = value
+      }
+      if (scheduleForm.cohortAgeMax) {
+        const value = Number(scheduleForm.cohortAgeMax)
+        if (!Number.isNaN(value)) cohortFilters.age_max = value
+      }
+      if (scheduleForm.cohortPatientIds.trim()) {
+        cohortFilters.patient_ids = scheduleForm.cohortPatientIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      }
+      if (Object.keys(cohortFilters).length > 0) {
+        payload.cohort_filters = cohortFilters
+      }
+    }
+
+    if (scheduleForm.reportType === 'cohort_vs_cohort') {
+      const comparisonFilters: Record<string, unknown> = {}
+      if (scheduleForm.comparisonGender) comparisonFilters.gender = scheduleForm.comparisonGender
+      if (scheduleForm.comparisonPatientIds.trim()) {
+        comparisonFilters.patient_ids = scheduleForm.comparisonPatientIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      }
+      if (Object.keys(comparisonFilters).length > 0) {
+        payload.comparison_filters = comparisonFilters
+      }
+    }
+
+    return payload
+  }
+
+  const createScheduleMutation = useMutation({
+    mutationFn: async () => {
+      const payload = buildSchedulePayload()
+      return longitudinalService.createReportSchedule(payload)
+    },
+    onSuccess: () => {
+      schedulesQuery.refetch()
+      setScheduleForm({
+        name: '',
+        scheduleCron: '0 6 * * 1',
+        reportType: 'summary',
+        cohortGender: '',
+        cohortAgeMin: '',
+        cohortAgeMax: '',
+        cohortPatientIds: '',
+        comparisonGender: '',
+        comparisonPatientIds: '',
+      })
+      setScheduleError(null)
+    },
+    onError: (error: any) => {
+      setScheduleError(error?.response?.data?.detail || 'Unable to create schedule.')
+    },
+  })
+
+  const updateScheduleStatusMutation = useMutation({
+    mutationFn: ({ scheduleId, status }: { scheduleId: number; status: ReportScheduleStatus }) =>
+      longitudinalService.updateReportScheduleStatus(scheduleId, status),
+    onSuccess: () => {
+      schedulesQuery.refetch()
+      setScheduleError(null)
+    },
+    onError: (error: any) => {
+      setScheduleError(error?.response?.data?.detail || 'Unable to update schedule status.')
+    },
+  })
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: (scheduleId: number) => longitudinalService.deleteReportSchedule(scheduleId),
+    onSuccess: (_, scheduleId) => {
+      schedulesQuery.refetch()
+      if (expandedScheduleId === scheduleId) {
+        setExpandedScheduleId(null)
+      }
+      setScheduleError(null)
+    },
+    onError: (error: any) => {
+      setScheduleError(error?.response?.data?.detail || 'Unable to delete schedule.')
+    },
+  })
+
+  const enqueueRunMutation = useMutation({
+    mutationFn: (scheduleId: number) => longitudinalService.enqueueScheduleRun(scheduleId),
+    onSuccess: (_, scheduleId) => {
+      schedulesQuery.refetch()
+      if (expandedScheduleId === scheduleId) {
+        scheduleRunsQuery.refetch()
+      } else {
+        setExpandedScheduleId(scheduleId)
+      }
+      setScheduleError(null)
+    },
+    onError: (error: any) => {
+      setScheduleError(error?.response?.data?.detail || 'Unable to queue run.')
+    },
+  })
+
+  const executeRunMutation = useMutation({
+    mutationFn: (runId: number) => longitudinalService.executeScheduleRun(runId),
+    onSuccess: () => {
+      schedulesQuery.refetch()
+      scheduleRunsQuery.refetch()
+      setScheduleError(null)
+    },
+    onError: (error: any) => {
+      setScheduleError(error?.response?.data?.detail || 'Unable to execute run.')
+    },
+  })
+
   const handleDownload = async (report: LongitudinalReport, variant: 'excel' | 'pdf') => {
     try {
+      setReportError(null)
       const response = await longitudinalService.downloadReport(report.id, variant)
       const contentType = response.headers['content-type'] ?? 'application/octet-stream'
       const blob = new Blob([response.data], { type: contentType })
@@ -238,6 +566,64 @@ export default function LongitudinalTrackingPage() {
     } catch (error: any) {
       setReportError(error?.response?.data?.detail || 'Download failed.')
     }
+  }
+
+  const handleViewHeatmap = async (report: LongitudinalReport) => {
+    if (!report.heatmap_path) {
+      setReportError('No heatmap available for this report.')
+      return
+    }
+    try {
+      setReportError(null)
+      if (heatmapPreview) {
+        URL.revokeObjectURL(heatmapPreview.url)
+      }
+      const response = await longitudinalService.downloadReportHeatmap(report.id)
+      const blob = new Blob([response.data], { type: 'image/png' })
+      const url = URL.createObjectURL(blob)
+      const disposition = response.headers['content-disposition'] as string | undefined
+      let filename = `heatmap-${report.id}.png`
+      if (disposition) {
+        const match = disposition.match(/filename="?([^";]+)"?/i)
+        if (match && match[1]) {
+          filename = match[1]
+        }
+      }
+      setHeatmapPreview({ url, name: filename })
+    } catch (error: any) {
+      setReportError(error?.response?.data?.detail || 'Failed to load heatmap.')
+    }
+  }
+
+  const handleCreateSchedule = () => {
+    if (createScheduleMutation.isPending) return
+    try {
+      createScheduleMutation.mutate()
+    } catch (error: any) {
+      setScheduleError(error?.message || 'Unable to create schedule.')
+    }
+  }
+
+  const handleToggleScheduleStatus = (schedule: ReportSchedule) => {
+    const nextStatus: ReportScheduleStatus =
+      schedule.status === 'active' ? 'paused' : 'active'
+    updateScheduleStatusMutation.mutate({ scheduleId: schedule.id, status: nextStatus })
+  }
+
+  const handleDeleteSchedule = (schedule: ReportSchedule) => {
+    deleteScheduleMutation.mutate(schedule.id)
+  }
+
+  const handleQueueRun = (schedule: ReportSchedule) => {
+    enqueueRunMutation.mutate(schedule.id)
+  }
+
+  const handleExecuteRun = (run: ReportRun) => {
+    executeRunMutation.mutate(run.id)
+  }
+
+  const handleExpandSchedule = (scheduleId: number) => {
+    setExpandedScheduleId((prev) => (prev === scheduleId ? null : scheduleId))
   }
 
   return (
@@ -306,8 +692,32 @@ export default function LongitudinalTrackingPage() {
                         setSelectedEpisodeId(episode.id)
                         setTrendMetricKey(null)
                         setTrendMetricCategory(undefined)
-                        setReportForm({ start: '', end: '', format: 'xlsx' })
+                        setReportForm({
+                          start: '',
+                          end: '',
+                          format: 'xlsx',
+                          reportType: 'summary',
+                          cohortGender: '',
+                          cohortAgeMin: '',
+                          cohortAgeMax: '',
+                          cohortPatientIds: '',
+                          comparisonGender: '',
+                          comparisonPatientIds: '',
+                        })
                         setReportError(null)
+                        setScheduleForm({
+                          name: '',
+                          scheduleCron: '0 6 * * 1',
+                          reportType: 'summary',
+                          cohortGender: '',
+                          cohortAgeMin: '',
+                          cohortAgeMax: '',
+                          cohortPatientIds: '',
+                          comparisonGender: '',
+                          comparisonPatientIds: '',
+                        })
+                        setScheduleError(null)
+                        setExpandedScheduleId(null)
                       }}
                       className={clsx(
                         'rounded-xl border px-4 py-2 text-sm transition',
@@ -546,10 +956,55 @@ export default function LongitudinalTrackingPage() {
               onChangeForm={(form) => setReportForm(form)}
               onGenerate={() => generateReportMutation.mutate()}
               onDownload={handleDownload}
+              onViewHeatmap={handleViewHeatmap}
               error={reportError}
+            />
+            <SchedulesPanel
+              schedules={applicableSchedules}
+              runs={scheduleRuns}
+              isLoadingSchedules={schedulesQuery.isLoading}
+              isLoadingRuns={scheduleRunsQuery.isLoading}
+              form={scheduleForm}
+              onChangeForm={(form) => setScheduleForm(form)}
+              onCreate={handleCreateSchedule}
+              onToggleStatus={handleToggleScheduleStatus}
+              onDelete={handleDeleteSchedule}
+              onQueueRun={handleQueueRun}
+              onExecuteRun={handleExecuteRun}
+              expandedScheduleId={expandedScheduleId}
+              onExpand={handleExpandSchedule}
+              error={scheduleError}
+              isCreating={createScheduleMutation.isPending}
+              isUpdatingStatus={updateScheduleStatusMutation.isPending}
+              isDeleting={deleteScheduleMutation.isPending}
+              isQueuingRun={enqueueRunMutation.isPending}
+              isExecutingRun={executeRunMutation.isPending}
             />
           </div>
         </section>
+      )}
+      {heatmapPreview && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 px-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-white">{heatmapPreview.name}</div>
+              <button
+                type="button"
+                onClick={() => setHeatmapPreview(null)}
+                className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:border-rose-400 hover:text-rose-200"
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-800 bg-slate-950/70 p-2">
+              <img
+                src={heatmapPreview.url}
+                alt="Report heatmap"
+                className="mx-auto max-h-[65vh] w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -701,20 +1156,39 @@ function formatSlope(slope: number | null | undefined): string {
 type ReportsPanelProps = {
   reports: LongitudinalReport[]
   isLoading: boolean
-  reportForm: { start: string; end: string; format: 'xlsx' | 'pdf' }
-  onChangeForm: (form: { start: string; end: string; format: 'xlsx' | 'pdf' }) => void
+  reportForm: ReportFormState
+  onChangeForm: (form: ReportFormState) => void
   onGenerate: () => void
   onDownload: (report: LongitudinalReport, variant: 'excel' | 'pdf') => void
+  onViewHeatmap: (report: LongitudinalReport) => void
   error?: string | null
 }
 
-function ReportsPanel({ reports, isLoading, reportForm, onChangeForm, onGenerate, onDownload, error }: ReportsPanelProps) {
+function ReportsPanel({
+  reports,
+  isLoading,
+  reportForm,
+  onChangeForm,
+  onGenerate,
+  onDownload,
+  onViewHeatmap,
+  error,
+}: ReportsPanelProps) {
+  const showCohortFields = reportForm.reportType !== 'summary'
+  const showComparisonFields = reportForm.reportType === 'cohort_vs_cohort'
+  const formatNumber = (value?: number | null, fractionDigits = 2) => {
+    if (value === null || value === undefined) return '—'
+    return Number.isInteger(value) ? `${value}` : value.toFixed(fractionDigits)
+  }
+
   return (
     <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-white">Longitudinal reports</h4>
-          <p className="text-xs text-slate-400">Generate periodic summaries of MMSE, biomarkers, and risk trends.</p>
+          <p className="text-xs text-slate-400">
+            Generate periodic summaries, cohort comparisons, and high-fidelity exports.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-slate-400">
@@ -743,6 +1217,20 @@ function ReportsPanel({ reports, isLoading, reportForm, onChangeForm, onGenerate
             <option value="xlsx">Excel</option>
             <option value="pdf">PDF</option>
           </select>
+          <select
+            value={reportForm.reportType}
+            onChange={(event) =>
+              onChangeForm({
+                ...reportForm,
+                reportType: event.target.value as ReportFormState['reportType'],
+              })
+            }
+            className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+          >
+            <option value="summary">Summary</option>
+            <option value="cohort_patient_vs_average">Patient vs Cohort</option>
+            <option value="cohort_vs_cohort">Cohort vs Cohort</option>
+          </select>
           <button
             type="button"
             onClick={onGenerate}
@@ -753,70 +1241,510 @@ function ReportsPanel({ reports, isLoading, reportForm, onChangeForm, onGenerate
           </button>
         </div>
       </div>
+      {showCohortFields && (
+        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+          <label className="text-xs text-slate-400">
+            Cohort gender
+            <select
+              value={reportForm.cohortGender}
+              onChange={(event) => onChangeForm({ ...reportForm, cohortGender: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            >
+              <option value="">Any</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="text-xs text-slate-400">
+            Age min
+            <input
+              type="number"
+              min={0}
+              value={reportForm.cohortAgeMin}
+              onChange={(event) => onChangeForm({ ...reportForm, cohortAgeMin: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            Age max
+            <input
+              type="number"
+              min={0}
+              value={reportForm.cohortAgeMax}
+              onChange={(event) => onChangeForm({ ...reportForm, cohortAgeMax: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <label className="text-xs text-slate-400 md:col-span-1">
+            Cohort patient IDs
+            <input
+              type="text"
+              value={reportForm.cohortPatientIds}
+              onChange={(event) => onChangeForm({ ...reportForm, cohortPatientIds: event.target.value })}
+              placeholder="e.g. PT-101, PT-202"
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+        </div>
+      )}
+      {showComparisonFields && (
+        <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+          <label className="text-xs text-slate-400">
+            Comparison gender
+            <select
+              value={reportForm.comparisonGender}
+              onChange={(event) => onChangeForm({ ...reportForm, comparisonGender: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            >
+              <option value="">Any</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="text-xs text-slate-400 md:col-span-2">
+            Comparison patient IDs
+            <input
+              type="text"
+              value={reportForm.comparisonPatientIds}
+              onChange={(event) => onChangeForm({ ...reportForm, comparisonPatientIds: event.target.value })}
+              placeholder="e.g. PT-301, PT-402"
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+        </div>
+      )}
       {error && (
         <p className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>
       )}
       {isLoading && reports.length === 0 ? (
         <p className="mt-3 text-xs text-slate-400">Processing…</p>
       ) : (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
           {reports.map((report) => {
-            const metrics = (report.summary?.metrics ?? {}) as Record<string, any>
+            const metrics = report.summary?.metrics ?? {}
+            const comparisonRows = report.summary?.comparison?.table ?? []
             return (
               <div
                 key={report.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800/70 bg-slate-950/70 px-3 py-2 text-xs text-slate-200"
+                className="space-y-3 rounded-xl border border-slate-800/70 bg-slate-950/70 p-4 text-xs text-slate-200"
               >
-                <div>
-                  <div className="font-medium text-white">
-                    {report.report_type} • {format(new Date(report.created_at), 'PPpp')}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="font-medium text-white">
+                      {report.report_type} • {format(new Date(report.created_at), 'PPpp')}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Range {report.start_date ? format(new Date(report.start_date), 'PP') : 'start'} →{' '}
+                      {report.end_date ? format(new Date(report.end_date), 'PP') : 'latest'} • Format{' '}
+                      {report.format.toUpperCase()}
+                    </div>
+                    {report.summary?.cohort_size && (
+                      <div className="text-[11px] text-slate-500">
+                        Cohort size {report.summary.cohort_size}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[11px] text-slate-400">
-                    Range {report.start_date ? format(new Date(report.start_date), 'PP') : 'start'} →{' '}
-                    {report.end_date ? format(new Date(report.end_date), 'PP') : 'latest'} • Format {report.format.toUpperCase()}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={clsx(
+                        'rounded-full border px-2 py-0.5 uppercase tracking-wide',
+                        report.status === 'completed'
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                          : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                      )}
+                    >
+                      {report.status}
+                    </span>
+                    {report.format === 'xlsx' && (
+                      <button
+                        type="button"
+                        onClick={() => onDownload(report, 'excel')}
+                        className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200 hover:border-sky-400 hover:text-sky-200"
+                      >
+                        Excel
+                      </button>
+                    )}
+                    {report.pdf_path && (
+                      <button
+                        type="button"
+                        onClick={() => onDownload(report, 'pdf')}
+                        className="rounded border border-slate-700 px-2 py-0.5 text-xs text-amber-200 hover:border-amber-400 hover:text-amber-100"
+                      >
+                        PDF
+                      </button>
+                    )}
+                    {report.heatmap_path && (
+                      <button
+                        type="button"
+                        onClick={() => onViewHeatmap(report)}
+                        className="rounded border border-rose-500/40 px-2 py-0.5 text-xs text-rose-200 hover:border-rose-400 hover:text-rose-100"
+                      >
+                        Heatmap
+                      </button>
+                    )}
                   </div>
-                  {Object.entries(metrics)
-                    .slice(0, 2)
-                    .map(([metricKey, stats]) => (
-                      <div key={metricKey} className="text-[11px] text-slate-500">
-                        {metricKey}: avg {stats?.average ?? '—'} • slope {stats?.slope ?? '—'}
+                </div>
+                {Object.keys(metrics).length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    {Object.entries(metrics).map(([metricKey, stats]) => (
+                      <div key={metricKey} className="rounded-lg border border-slate-800/60 bg-slate-950/60 px-3 py-2">
+                        <div className="text-[11px] uppercase text-slate-500">{metricKey}</div>
+                        <div className="text-xs text-slate-300">
+                          Avg {formatNumber(stats.average)} • Latest {formatNumber(stats.latest)}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Min {formatNumber(stats.minimum)} / Max {formatNumber(stats.maximum)} • Slope{' '}
+                          {formatNumber(stats.slope)}
+                        </div>
                       </div>
                     ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={clsx(
-                      'rounded-full border px-2 py-0.5 uppercase tracking-wide',
-                      report.status === 'completed'
-                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                        : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
-                    )}
-                  >
-                    {report.status}
-                  </span>
-                  {report.format === 'xlsx' && (
-                    <button
-                      type="button"
-                      onClick={() => onDownload(report, 'excel')}
-                      className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200 hover:border-sky-400 hover:text-sky-200"
-                    >
-                      Excel
-                    </button>
-                  )}
-                  {report.pdf_path && (
-                    <button
-                      type="button"
-                      onClick={() => onDownload(report, 'pdf')}
-                      className="rounded border border-slate-700 px-2 py-0.5 text-xs text-amber-200 hover:border-amber-400 hover:text-amber-100"
-                    >
-                      PDF
-                    </button>
-                  )}
-                </div>
+                  </div>
+                )}
+                {comparisonRows.length > 0 && (
+                  <div className="rounded-lg border border-slate-800/60 bg-slate-950/40 p-3 text-[11px] text-slate-400">
+                    <div className="mb-1 font-semibold text-slate-300">Comparison snapshot</div>
+                    <ul className="space-y-1">
+                      {comparisonRows.slice(0, 4).map((row) => (
+                        <li key={row.metric}>
+                          <span className="text-slate-300">{row.metric}</span>: Δ {formatNumber(row.delta, 3)}
+                        </li>
+                      ))}
+                      {comparisonRows.length > 4 && <li>+{comparisonRows.length - 4} more metrics…</li>}
+                    </ul>
+                  </div>
+                )}
               </div>
             )
           })}
           {reports.length === 0 && <p className="text-xs text-slate-500">No reports generated yet.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type SchedulesPanelProps = {
+  schedules: ReportSchedule[]
+  runs: ReportRun[]
+  isLoadingSchedules: boolean
+  isLoadingRuns: boolean
+  form: ScheduleFormState
+  onChangeForm: (form: ScheduleFormState) => void
+  onCreate: () => void
+  onToggleStatus: (schedule: ReportSchedule) => void
+  onDelete: (schedule: ReportSchedule) => void
+  onQueueRun: (schedule: ReportSchedule) => void
+  onExecuteRun: (run: ReportRun) => void
+  expandedScheduleId: number | null
+  onExpand: (scheduleId: number) => void
+  error?: string | null
+  isCreating: boolean
+  isUpdatingStatus: boolean
+  isDeleting: boolean
+  isQueuingRun: boolean
+  isExecutingRun: boolean
+}
+
+function SchedulesPanel({
+  schedules,
+  runs,
+  isLoadingSchedules,
+  isLoadingRuns,
+  form,
+  onChangeForm,
+  onCreate,
+  onToggleStatus,
+  onDelete,
+  onQueueRun,
+  onExecuteRun,
+  expandedScheduleId,
+  onExpand,
+  error,
+  isCreating,
+  isUpdatingStatus,
+  isDeleting,
+  isQueuingRun,
+  isExecutingRun,
+}: SchedulesPanelProps) {
+  const showCohortFields = form.reportType !== 'summary'
+  const showComparisonFields = form.reportType === 'cohort_vs_cohort'
+  const renderScheduleStatus = (status: ReportScheduleStatus) => {
+    const labels: Record<ReportScheduleStatus, string> = {
+      active: 'Active',
+      paused: 'Paused',
+      archived: 'Archived',
+    }
+    const styles: Record<ReportScheduleStatus, string> = {
+      active: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+      paused: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
+      archived: 'border-slate-700 bg-slate-900 text-slate-400',
+    }
+    return (
+      <span className={clsx('rounded-full border px-2 py-0.5 text-xs uppercase tracking-wide', styles[status])}>
+        {labels[status]}
+      </span>
+    )
+  }
+
+  const renderRunStatus = (status: ReportRunStatus) => {
+    const labels: Record<ReportRunStatus, string> = {
+      queued: 'Queued',
+      running: 'Running',
+      success: 'Success',
+      failed: 'Failed',
+    }
+    const styles: Record<ReportRunStatus, string> = {
+      queued: 'border-slate-600 bg-slate-900 text-slate-300',
+      running: 'border-sky-500/40 bg-sky-500/10 text-sky-200',
+      success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+      failed: 'border-rose-500/40 bg-rose-500/10 text-rose-300',
+    }
+    return (
+      <span className={clsx('rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide', styles[status])}>
+        {labels[status]}
+      </span>
+    )
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-white">Scheduled reports</h4>
+          <p className="text-xs text-slate-400">
+            Automate cohort comparisons and exports. Cron syntax uses server timezone.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+        <label className="text-xs text-slate-400">
+          Name
+          <input
+            type="text"
+            value={form.name}
+            onChange={(event) => onChangeForm({ ...form, name: event.target.value })}
+            placeholder="e.g. Weekly summary"
+            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+          />
+        </label>
+        <label className="text-xs text-slate-400">
+          Cron expression
+          <input
+            type="text"
+            value={form.scheduleCron}
+            onChange={(event) => onChangeForm({ ...form, scheduleCron: event.target.value })}
+            placeholder="0 6 * * 1"
+            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+          />
+        </label>
+        <label className="text-xs text-slate-400">
+          Report type
+          <select
+            value={form.reportType}
+            onChange={(event) =>
+              onChangeForm({
+                ...form,
+                reportType: event.target.value as ScheduleFormState['reportType'],
+              })
+            }
+            className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+          >
+            <option value="summary">Summary</option>
+            <option value="cohort_patient_vs_average">Patient vs Cohort</option>
+            <option value="cohort_vs_cohort">Cohort vs Cohort</option>
+          </select>
+        </label>
+      </div>
+      {showCohortFields && (
+        <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-4">
+          <label className="text-xs text-slate-400">
+            Cohort gender
+            <select
+              value={form.cohortGender}
+              onChange={(event) => onChangeForm({ ...form, cohortGender: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            >
+              <option value="">Any</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="text-xs text-slate-400">
+            Age min
+            <input
+              type="number"
+              min={0}
+              value={form.cohortAgeMin}
+              onChange={(event) => onChangeForm({ ...form, cohortAgeMin: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            Age max
+            <input
+              type="number"
+              min={0}
+              value={form.cohortAgeMax}
+              onChange={(event) => onChangeForm({ ...form, cohortAgeMax: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <label className="text-xs text-slate-400 md:col-span-1">
+            Cohort patient IDs
+            <input
+              type="text"
+              value={form.cohortPatientIds}
+              onChange={(event) => onChangeForm({ ...form, cohortPatientIds: event.target.value })}
+              placeholder="PT-101, PT-202"
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+        </div>
+      )}
+      {showComparisonFields && (
+        <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+          <label className="text-xs text-slate-400">
+            Comparison gender
+            <select
+              value={form.comparisonGender}
+              onChange={(event) => onChangeForm({ ...form, comparisonGender: event.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            >
+              <option value="">Any</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="text-xs text-slate-400 md:col-span-2">
+            Comparison patient IDs
+            <input
+              type="text"
+              value={form.comparisonPatientIds}
+              onChange={(event) => onChangeForm({ ...form, comparisonPatientIds: event.target.value })}
+              placeholder="PT-301, PT-402"
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+        </div>
+      )}
+      <div className="mt-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onCreate}
+          disabled={isCreating}
+          className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200 hover:border-emerald-400 hover:text-emerald-100 disabled:opacity-40"
+        >
+          {isCreating ? 'Creating…' : 'Create schedule'}
+        </button>
+        {error && <p className="text-xs text-rose-300">{error}</p>}
+      </div>
+      {isLoadingSchedules ? (
+        <p className="mt-3 text-xs text-slate-400">Loading schedules…</p>
+      ) : schedules.length === 0 ? (
+        <p className="mt-3 text-xs text-slate-500">No schedules yet. Create your first automated report.</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {schedules.map((schedule) => (
+            <div key={schedule.id} className="space-y-2 rounded-xl border border-slate-800/70 bg-slate-950/70 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-white">{schedule.name}</div>
+                  <div className="text-[11px] text-slate-400">
+                    Cron: <code className="font-mono text-slate-300">{schedule.schedule_cron}</code>
+                  </div>
+                  {schedule.last_run_at && (
+                    <div className="text-[11px] text-slate-500">
+                      Last run {format(new Date(schedule.last_run_at), 'PPpp')}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {renderScheduleStatus(schedule.status)}
+                  <button
+                    type="button"
+                    onClick={() => onToggleStatus(schedule)}
+                    disabled={isUpdatingStatus || schedule.status === 'archived'}
+                    className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200 hover:border-sky-400 hover:text-sky-200 disabled:opacity-40"
+                  >
+                    {schedule.status === 'active' ? 'Pause' : 'Resume'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQueueRun(schedule)}
+                    disabled={isQueuingRun || schedule.status === 'archived'}
+                    className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-40"
+                  >
+                    Run now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onExpand(schedule.id)}
+                    className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200 hover:border-sky-400 hover:text-sky-200"
+                  >
+                    {expandedScheduleId === schedule.id ? 'Hide runs' : 'View runs'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(schedule)}
+                    disabled={isDeleting}
+                    className="rounded border border-rose-500/40 px-2 py-0.5 text-xs text-rose-200 hover:border-rose-400 hover:text-rose-100 disabled:opacity-40"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              {expandedScheduleId === schedule.id && (
+                <div className="rounded-lg border border-slate-800/60 bg-slate-950/50 p-3">
+                  {isLoadingRuns ? (
+                    <p className="text-[11px] text-slate-400">Loading runs…</p>
+                  ) : runs.length === 0 ? (
+                    <p className="text-[11px] text-slate-500">No runs yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {runs.map((run) => (
+                        <div
+                          key={run.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800/70 bg-slate-950/70 px-3 py-2"
+                        >
+                          <div className="flex flex-col gap-1 text-[11px] text-slate-400">
+                            <div className="flex items-center gap-2 text-xs text-slate-200">
+                              Run #{run.id} {renderRunStatus(run.status)}
+                            </div>
+                            {run.started_at && <div>Started {format(new Date(run.started_at), 'PPpp')}</div>}
+                            {run.finished_at && <div>Finished {format(new Date(run.finished_at), 'PPpp')}</div>}
+                            {run.error_message && (
+                              <div className="text-rose-300">Error: {run.error_message.slice(0, 120)}</div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {run.status === 'queued' && (
+                              <button
+                                type="button"
+                                onClick={() => onExecuteRun(run)}
+                                disabled={isExecutingRun}
+                                className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-40"
+                              >
+                                Execute
+                              </button>
+                            )}
+                            {run.report_id && (
+                              <span className="text-[11px] text-slate-500">
+                                Report #{run.report_id} available in history
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

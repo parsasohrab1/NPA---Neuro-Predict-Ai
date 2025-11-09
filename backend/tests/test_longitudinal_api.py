@@ -283,6 +283,60 @@ async def test_longitudinal_episode_flow(tmp_path: Path):
             == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
+        # Cohort report
+        response = await client.post(
+            f"/api/v1/longitudinal/episodes/{episode_id}/reports",
+            json={
+                "report_type": "cohort_patient_vs_average",
+                "format": "xlsx",
+                "cohort_filters": {"gender": "male"},
+            },
+        )
+        assert response.status_code == 201, response.text
+        cohort_report_id = response.json()["id"]
+        assert response.json()["summary"]["report_type"] == "cohort_patient_vs_average"
+        assert response.json()["heatmap_path"] is not None
+
+        response = await client.get(f"/api/v1/longitudinal/reports/{cohort_report_id}/heatmap")
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"] == "image/png"
+
+        # Report schedules
+        response = await client.post(
+            "/api/v1/longitudinal/reports/schedules",
+            json={
+                "name": "Weekly summary",
+                "episode_id": episode_id,
+                "report_type": "summary",
+                "schedule_cron": "0 6 * * 1",
+            },
+        )
+        assert response.status_code == 201, response.text
+        schedule_id = response.json()["id"]
+
+        response = await client.get("/api/v1/longitudinal/reports/schedules")
+        assert response.status_code == 200
+        assert any(item["id"] == schedule_id for item in response.json())
+
+        response = await client.patch(
+            f"/api/v1/longitudinal/reports/schedules/{schedule_id}",
+            json={"status": "paused"},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "paused"
+
+        response = await client.post(f"/api/v1/longitudinal/reports/schedules/{schedule_id}/runs")
+        assert response.status_code == 201
+        run_id = response.json()["id"]
+
+        response = await client.get(f"/api/v1/longitudinal/reports/schedules/{schedule_id}/runs")
+        assert response.status_code == 200
+        assert any(run["id"] == run_id for run in response.json())
+
+        response = await client.post(f"/api/v1/longitudinal/reports/runs/{run_id}/execute")
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] in {"success", "failed"}
+
         # Imaging comparison
         response = await client.get(
             f"/api/v1/longitudinal/episodes/{episode_id}/comparison",

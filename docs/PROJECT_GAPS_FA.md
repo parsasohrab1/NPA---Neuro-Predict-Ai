@@ -30,20 +30,21 @@
 - ✅ API endpoints برای گزارش‌های بالینی، پژوهشی و مدیریتی (`/api/v1/reports/*`)
 - ✅ کارت‌های شاخص کلیدی و جداول خلاصه
 - ✅ فیلترهای اصلی و Export API (صف)
+- ✅ خروجی Excel/PDF واقعی برای گزارش‌های طولی
+- ✅ گزارش‌های cohort (Patient vs Cohort) به‌همراه Heatmap و charts payload
+- ✅ زمان‌بندی گزارش‌های طولی + اجرای دستی + ثبت run log در UI
 
 **کمبودها**:
-- ❌ مصورسازی تصاویر MRI و گزارش‌های تصویری
-- ❌ خروجی PDF/Excel واقعی (فعلاً فقط پیام صف)
-- ❌ گزارش‌های مقایسه‌ای بیماران و گروه‌ها
-- ❌ نمودارهای Heatmap و Drill-down پیشرفته
-- ❌ سازوکار ذخیره و زمان‌بندی گزارش‌ها
+- ❌ مصورسازی تصاویر MRI و گزارش‌های تصویری پیشرفته
+- ❌ گزارش‌های مقایسه‌ای سطح سازمان/جمعیت (multi-episode، cross-clinic)
+- ❌ نمودارهای Heatmap تعاملی در UI اصلی و Drill-down عمیق
+- ❌ اتوماسیون توزیع (ایمیل، SFTP) و SLA مانیتورینگ
 
 **اقدامات مورد نیاز**:
-1. ایجاد صفحه `ReportsPage.tsx`
-2. API endpoints برای گزارش‌سازی
-3. یکپارچه‌سازی کتابخانه‌های نمودار (Recharts/Chart.js)
-4. PDF generation (React-PDF یا backend)
-5. Excel export (xlsx library)
+1. توسعه گزارش‌های تصویری/Clinical Imaging Dashboard
+2. گزارش‌های مقایسه‌ای سازمانی و Benchmarks
+3. نمودارهای تعاملی (Drill-down، Heatmap Explorer)
+4. خودکارسازی تحویل (Email, Webhook, SFTP) و alerting
 
 ---
 
