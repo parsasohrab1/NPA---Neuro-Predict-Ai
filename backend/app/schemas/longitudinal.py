@@ -10,6 +10,8 @@ from ..models.longitudinal import (
     LongitudinalEpisodeStatus,
     LongitudinalVisitType,
     MetricCategory,
+    AlertSeverity,
+    AlertType,
 )
 
 
@@ -121,6 +123,31 @@ class ImagingComparisonResponse(BaseModel):
     max_absolute_difference: float
     heatmap: str
     metadata: dict
+
+
+class LongitudinalAlertResponse(BaseModel):
+    id: int
+    episode_id: int
+    visit_id: Optional[int]
+    metric_key: Optional[str]
+    alert_type: AlertType
+    severity: AlertSeverity
+    message: str
+    created_at: datetime
+    acknowledged_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class ProgressionMetricSummary(BaseModel):
+    slope: Optional[float]
+    latest_value: Optional[float]
+    latest_recorded_at: Optional[datetime]
+
+
+class LongitudinalProgressionSummary(BaseModel):
+    metrics: dict[str, ProgressionMetricSummary]
 
 
 

@@ -78,6 +78,31 @@ export type ImagingComparison = {
   metadata: Record<string, unknown>
 }
 
+export type AlertSeverity = 'low' | 'medium' | 'high'
+export type AlertType = 'progression_speed' | 'sudden_change'
+
+export type LongitudinalAlert = {
+  id: number
+  episode_id: number
+  visit_id?: number | null
+  metric_key?: string | null
+  alert_type: AlertType
+  severity: AlertSeverity
+  message: string
+  created_at: string
+  acknowledged_at?: string | null
+}
+
+export type ProgressionMetricSummary = {
+  slope?: number | null
+  latest_value?: number | null
+  latest_recorded_at?: string | null
+}
+
+export type ProgressionSummary = {
+  metrics: Record<string, ProgressionMetricSummary>
+}
+
 export type EpisodeCreatePayload = {
   title?: string
   start_date?: string
@@ -123,6 +148,21 @@ export const longitudinalService = {
     })
     const response = await axios.get(`${API_BASE}/episodes/${episodeId}/comparison?${params}`)
     return response.data as ImagingComparison
+  },
+
+  async fetchAlerts(episodeId: number) {
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/alerts`)
+    return response.data as LongitudinalAlert[]
+  },
+
+  async acknowledgeAlert(alertId: number) {
+    const response = await axios.post(`${API_BASE}/alerts/${alertId}/acknowledge`)
+    return response.data as LongitudinalAlert
+  },
+
+  async fetchProgression(episodeId: number) {
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/progression`)
+    return response.data as ProgressionSummary
   },
 }
 

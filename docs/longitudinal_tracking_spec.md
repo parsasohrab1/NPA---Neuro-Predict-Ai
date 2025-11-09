@@ -84,6 +84,9 @@
 | `GET` | `/api/v1/longitudinal/episodes/{episode_id}/timeline` | داده آماده برای تایم‌لاین |
 | `GET` | `/api/v1/longitudinal/episodes/{episode_id}/trend?metric=mmse` | نمودار روند یک متریک |
 | `GET` | `/api/v1/longitudinal/episodes/{episode_id}/comparison?visit_a=&visit_b=` | مقایسه دو visit (MRI diff) |
+| `GET` | `/api/v1/longitudinal/episodes/{episode_id}/progression` | خلاصه سرعت پیشرفت متریک‌های کلیدی |
+| `GET` | `/api/v1/longitudinal/episodes/{episode_id}/alerts` | هشدارهای فعال اپیزود |
+| `POST` | `/api/v1/longitudinal/alerts/{alert_id}/acknowledge` | تأیید هشدار |
 
 > Endpointها در فازهای بعدی با قابلیت فیلتر تاریخ، نوع متریک و هشدار تکمیل می‌شوند.
 
@@ -107,9 +110,9 @@
 ## 🛣️ گام‌های بعدی
 1. ایجاد migrations و مدل‌های SQLAlchemy مطابق طرح.
 2. پیاده‌سازی `LongitudinalTrackingService`.
-3. ساخت API و تست unit/integration.
-4. آماده‌سازی داده نمونه برای UI.
-5. طراحی UI (تایم‌لاین، نمودار، مقایسه تصویری) → فاز فرانت‌اند.
+3. ساخت API و تست unit/integration (timeline، trend، comparison، progression، alerts).
+4. آماده‌سازی داده نمونه برای UI و اعتبارسنجی heatmap/alerts.
+5. طراحی UI (تایم‌لاین، نمودار، مقایسه تصویری، کارت سرعت، هشدارها) → فاز فرانت‌اند.
 
 ---
 

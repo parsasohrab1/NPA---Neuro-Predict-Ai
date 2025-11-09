@@ -21,6 +21,8 @@ import {
   type MetricCategory,
   type TrendPoint,
   type ImagingComparison,
+  type LongitudinalAlert,
+  type ProgressionSummary,
 } from '../services/longitudinal'
 
 type MetricOption = {
@@ -81,6 +83,19 @@ export default function LongitudinalTrackingPage() {
         trendMetricCategory,
       ),
     enabled: selectedEpisodeId !== null && Boolean(trendMetricKey),
+  })
+
+  const alertsQuery = useQuery({
+    queryKey: ['longitudinal', 'alerts', selectedEpisodeId],
+    queryFn: () => longitudinalService.fetchAlerts(selectedEpisodeId!),
+    enabled: selectedEpisodeId !== null,
+    refetchInterval: 60_000,
+  })
+
+  const progressionQuery = useQuery({
+    queryKey: ['longitudinal', 'progression', selectedEpisodeId],
+    queryFn: () => longitudinalService.fetchProgression(selectedEpisodeId!),
+    enabled: selectedEpisodeId !== null,
   })
 
   const createEpisode = useMutation({
@@ -151,6 +166,13 @@ export default function LongitudinalTrackingPage() {
 
   const comparisonReady = comparisonSelection.length === 2 && selectedEpisodeId !== null
   const comparisonButtonDisabled = compareVisitsMutation.isPending || !comparisonReady
+
+  const acknowledgeAlertMutation = useMutation({
+    mutationFn: (alertId: number) => longitudinalService.acknowledgeAlert(alertId),
+    onSuccess: () => {
+      alertsQuery.refetch()
+    },
+  })
 
   return (
     <div className="space-y-6">
@@ -425,8 +447,14 @@ export default function LongitudinalTrackingPage() {
               <EpisodeSummaryPanel
                 summary={episodeDetailQuery.data}
                 episodes={episodesQuery.data ?? []}
+                progression={progressionQuery.data ?? null}
               />
             )}
+            <AlertsPanel
+              alerts={alertsQuery.data ?? []}
+              isLoading={alertsQuery.isLoading}
+              onAcknowledge={(alertId) => acknowledgeAlertMutation.mutate(alertId)}
+            />
             {comparisonResult && (
               <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
                 <h4 className="text-sm font-semibold text-white">Imaging comparison</h4>
@@ -453,13 +481,18 @@ export default function LongitudinalTrackingPage() {
 type EpisodeSummaryPanelProps = {
   summary: EpisodeDetail
   episodes: EpisodeSummary[]
+  progression: ProgressionSummary | null
 }
 
-function EpisodeSummaryPanel({ summary, episodes }: EpisodeSummaryPanelProps) {
+function EpisodeSummaryPanel({ summary, episodes, progression }: EpisodeSummaryPanelProps) {
   const visitCount = summary.visits.length
   const firstVisit = summary.visits[0]?.visit_date
   const latestVisit = summary.visits[visitCount - 1]?.visit_date
   const totalMetrics = summary.visits.reduce((acc, visit) => acc + visit.metrics.length, 0)
+
+  const mmseSlope = progression?.metrics['mmse']?.slope ?? null
+  const amyloidSlope = progression?.metrics['amyloid_beta']?.slope ?? null
+  const riskSlope = progression?.metrics['parkinson_risk_score']?.slope ?? null
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -471,6 +504,21 @@ function EpisodeSummaryPanel({ summary, episodes }: EpisodeSummaryPanelProps) {
       />
       <SummaryCard label="Total metrics logged" value={`${totalMetrics}`} />
       <SummaryCard label="Patient episodes" value={`${episodes.length}`} helper="Across active projects" />
+      <SummaryCard
+        label="MMSE slope (per day)"
+        value={formatSlope(mmseSlope)}
+        trend={mmseSlope}
+      />
+      <SummaryCard
+        label="Amyloid β slope"
+        value={formatSlope(amyloidSlope)}
+        trend={amyloidSlope}
+      />
+      <SummaryCard
+        label="Risk slope"
+        value={formatSlope(riskSlope)}
+        trend={riskSlope}
+      />
     </div>
   )
 }
@@ -479,16 +527,98 @@ type SummaryCardProps = {
   label: string
   value: string
   helper?: string
+  trend?: number | null
 }
 
-function SummaryCard({ label, value, helper }: SummaryCardProps) {
+function SummaryCard({ label, value, helper, trend }: SummaryCardProps) {
+  const trendColor =
+    trend === undefined || trend === null
+      ? 'text-slate-300'
+      : trend > 0
+      ? 'text-emerald-400'
+      : trend < 0
+      ? 'text-rose-400'
+      : 'text-slate-300'
+
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
       <div className="text-xs uppercase text-slate-400">{label}</div>
-      <div className="mt-2 text-xl font-semibold text-white">{value}</div>
+      <div className={clsx('mt-2 text-xl font-semibold', trendColor)}>{value}</div>
       {helper && <div className="text-xs text-slate-500">{helper}</div>}
     </div>
   )
+}
+
+type AlertsPanelProps = {
+  alerts: LongitudinalAlert[]
+  isLoading: boolean
+  onAcknowledge: (alertId: number) => void
+}
+
+function AlertsPanel({ alerts, isLoading, onAcknowledge }: AlertsPanelProps) {
+  if (isLoading) {
+    return <p className="mt-4 text-sm text-slate-400">Loading alerts…</p>
+  }
+  if (alerts.length === 0) {
+    return <p className="mt-4 text-sm text-slate-500">No active alerts.</p>
+  }
+  return (
+    <div className="mt-4 space-y-3">
+      {alerts.map((alert) => (
+        <div
+          key={alert.id}
+          className="flex flex-col gap-2 rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4 md:flex-row md:items-center md:justify-between"
+        >
+          <div>
+            <div className="flex items-center gap-2 text-sm text-white">
+              <SeverityBadge severity={alert.severity} />
+              <span>{alert.message}</span>
+            </div>
+            <div className="text-xs text-slate-400">
+              {format(new Date(alert.created_at), 'PPpp')}{' '}
+              {alert.metric_key ? `• ${alert.metric_key}` : ''}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {alert.acknowledged_at ? (
+              <span className="text-xs text-slate-500">
+                Acknowledged {format(new Date(alert.acknowledged_at), 'PPpp')}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onAcknowledge(alert.id)}
+                className="rounded-full border border-emerald-500/40 px-3 py-1 text-xs text-emerald-300 hover:border-emerald-400 hover:text-emerald-200"
+              >
+                Acknowledge
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SeverityBadge({ severity }: { severity: LongitudinalAlert['severity'] }) {
+  const styles: Record<LongitudinalAlert['severity'], string> = {
+    low: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+    medium: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+    high: 'bg-rose-500/10 text-rose-300 border-rose-500/30',
+  }
+  return (
+    <span className={clsx('rounded-full border px-2 py-0.5 text-xs uppercase tracking-wide', styles[severity])}>
+      {severity}
+    </span>
+  )
+}
+
+function formatSlope(slope: number | null | undefined): string {
+  if (slope === null || slope === undefined) {
+    return '—'
+  }
+  const formatted = slope.toFixed(3)
+  return `${formatted} /day`
 }
 
 

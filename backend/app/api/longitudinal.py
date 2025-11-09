@@ -19,6 +19,9 @@ from ..schemas.longitudinal import (
     ImagingComparisonResponse,
     TimelineEvent,
     TrendPoint,
+    LongitudinalAlertResponse,
+    LongitudinalProgressionSummary,
+    ProgressionMetricSummary,
 )
 from ..services.longitudinal_service import longitudinal_service
 
@@ -214,5 +217,54 @@ async def compare_imaging(
         message = str(exc)
         detail, code = detail_map.get(message, ("Comparison failed", status.HTTP_500_INTERNAL_SERVER_ERROR))
         raise HTTPException(status_code=code, detail=detail) from exc
+
+
+@router.get(
+    "/episodes/{episode_id}/alerts",
+    response_model=List[LongitudinalAlertResponse],
+)
+async def get_alerts(
+    episode_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> List[LongitudinalAlertResponse]:
+    alerts = await longitudinal_service.get_alerts(db, episode_id)
+    return alerts
+
+
+@router.post(
+    "/alerts/{alert_id}/acknowledge",
+    response_model=LongitudinalAlertResponse,
+)
+async def acknowledge_alert(
+    alert_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> LongitudinalAlertResponse:
+    alert = await longitudinal_service.acknowledge_alert(db, alert_id)
+    if alert is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+    return alert
+
+
+@router.get(
+    "/episodes/{episode_id}/progression",
+    response_model=LongitudinalProgressionSummary,
+)
+async def get_progression(
+    episode_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("researcher")),
+) -> LongitudinalProgressionSummary:
+    summary = await longitudinal_service.get_progression_summary(db, episode_id)
+    metrics_payload = {
+        key: ProgressionMetricSummary(
+            slope=value["slope"],
+            latest_value=value["latest_value"],
+            latest_recorded_at=value["latest_recorded_at"],
+        )
+        for key, value in summary.items()
+    }
+    return LongitudinalProgressionSummary(metrics=metrics_payload)
 
 

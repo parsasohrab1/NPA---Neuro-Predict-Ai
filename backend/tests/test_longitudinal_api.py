@@ -215,6 +215,21 @@ async def test_longitudinal_episode_flow(tmp_path: Path):
         assert timeline[0]["imaging_available"] is True
         assert timeline[1]["imaging_available"] is True
 
+        # Add follow-up metrics with decline
+        response = await client.post(
+            f"/api/v1/longitudinal/visits/{visit_b_id}/metrics",
+            params={"episode_id": episode_id},
+            json=[
+                {
+                    "metric_type": "cognitive",
+                    "metric_key": "mmse",
+                    "metric_value": 22,
+                    "unit": "score",
+                }
+            ],
+        )
+        assert response.status_code == 201, response.text
+
         # Trend
         response = await client.get(
             f"/api/v1/longitudinal/episodes/{episode_id}/trend",
@@ -222,7 +237,26 @@ async def test_longitudinal_episode_flow(tmp_path: Path):
         )
         assert response.status_code == 200, response.text
         trend = response.json()
-        assert trend[0]["metric_value"] == 27
+        assert trend[-1]["metric_value"] == 22
+
+        # Alerts
+        response = await client.get(f"/api/v1/longitudinal/episodes/{episode_id}/alerts")
+        assert response.status_code == 200, response.text
+        alerts = response.json()
+        assert alerts, "Expected at least one alert for MMSE decline"
+        alert_id = alerts[0]["id"]
+
+        # Progression summary
+        response = await client.get(f"/api/v1/longitudinal/episodes/{episode_id}/progression")
+        assert response.status_code == 200, response.text
+        progression = response.json()
+        assert "mmse" in progression["metrics"]
+        assert progression["metrics"]["mmse"]["slope"] is not None
+
+        # Acknowledge alert
+        response = await client.post(f"/api/v1/longitudinal/alerts/{alert_id}/acknowledge")
+        assert response.status_code == 200, response.text
+        assert response.json()["acknowledged_at"] is not None
 
         # Imaging comparison
         response = await client.get(

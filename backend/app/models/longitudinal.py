@@ -42,6 +42,17 @@ class MetricCategory(str, enum.Enum):
     FUNCTIONAL = "functional"
 
 
+class AlertSeverity(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class AlertType(str, enum.Enum):
+    PROGRESSION_SPEED = "progression_speed"
+    SUDDEN_CHANGE = "sudden_change"
+
+
 class LongitudinalEpisode(Base):
     __tablename__ = "longitudinal_episodes"
 
@@ -60,6 +71,12 @@ class LongitudinalEpisode(Base):
         back_populates="episode",
         cascade="all, delete-orphan",
         order_by="LongitudinalVisit.visit_date",
+    )
+    alerts = relationship(
+        "LongitudinalAlert",
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="LongitudinalAlert.created_at.desc()",
     )
 
     def __repr__(self) -> str:
@@ -91,6 +108,12 @@ class LongitudinalVisit(Base):
     medical_record = relationship("MedicalRecord", back_populates="longitudinal_visits")
     imaging_study = relationship("ImagingStudy", back_populates="longitudinal_visits")
     prediction = relationship("Prediction", back_populates="longitudinal_visit")
+    alerts = relationship(
+        "LongitudinalAlert",
+        back_populates="visit",
+        cascade="all, delete-orphan",
+        order_by="LongitudinalAlert.created_at.desc()",
+    )
 
     def __repr__(self) -> str:
         return f"<LongitudinalVisit(id={self.id}, episode_id={self.episode_id}, visit_date={self.visit_date})>"
@@ -113,5 +136,26 @@ class LongitudinalMetric(Base):
 
     def __repr__(self) -> str:
         return f"<LongitudinalMetric(id={self.id}, visit_id={self.visit_id}, key={self.metric_key})>"
+
+
+class LongitudinalAlert(Base):
+    __tablename__ = "longitudinal_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    episode_id = Column(Integer, ForeignKey("longitudinal_episodes.id"), nullable=False, index=True)
+    visit_id = Column(Integer, ForeignKey("longitudinal_visits.id"), nullable=True, index=True)
+    metric_key = Column(String(128), nullable=True)
+    alert_type = Column(Enum(AlertType), nullable=False)
+    severity = Column(Enum(AlertSeverity), nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+
+    episode = relationship("LongitudinalEpisode", back_populates="alerts")
+    visit = relationship("LongitudinalVisit", back_populates="alerts")
+
+    def __repr__(self) -> str:
+        return f"<LongitudinalAlert(id={self.id}, type={self.alert_type}, severity={self.severity})>"
+
 
 

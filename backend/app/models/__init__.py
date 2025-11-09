@@ -13,6 +13,9 @@ from .longitudinal import (
     LongitudinalEpisodeStatus,
     LongitudinalVisitType,
     MetricCategory,
+    LongitudinalAlert,
+    AlertSeverity,
+    AlertType,
 )
 from .audit import AuditLog
 
@@ -34,5 +37,8 @@ __all__ = [
     "LongitudinalEpisodeStatus",
     "LongitudinalVisitType",
     "MetricCategory",
+    "LongitudinalAlert",
+    "AlertSeverity",
+    "AlertType",
 ]
 
