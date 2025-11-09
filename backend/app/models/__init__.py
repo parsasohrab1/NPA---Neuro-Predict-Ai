@@ -6,6 +6,14 @@ from .patient import Patient, Gender
 from .medical_record import MedicalRecord
 from .imaging import ImagingStudy, ImagingModality
 from .prediction import Prediction, DiseaseType, RiskLevel
+from .longitudinal import (
+    LongitudinalEpisode,
+    LongitudinalVisit,
+    LongitudinalMetric,
+    LongitudinalEpisodeStatus,
+    LongitudinalVisitType,
+    MetricCategory,
+)
 from .audit import AuditLog
 
 __all__ = [
@@ -20,5 +28,11 @@ __all__ = [
     "DiseaseType",
     "RiskLevel",
     "AuditLog",
+    "LongitudinalEpisode",
+    "LongitudinalVisit",
+    "LongitudinalMetric",
+    "LongitudinalEpisodeStatus",
+    "LongitudinalVisitType",
+    "MetricCategory",
 ]
 

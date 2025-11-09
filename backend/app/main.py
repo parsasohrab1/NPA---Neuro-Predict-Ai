@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .core.config import settings
 from .db.session import init_db, close_db
-from .api import auth, patients, predictions, imaging, reports
+from .api import auth, patients, predictions, imaging, reports, longitudinal
 
 # Configure logging
 logging.basicConfig(
@@ -108,6 +108,7 @@ app.include_router(patients.router, prefix=settings.API_V1_PREFIX)
 app.include_router(predictions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(imaging.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(longitudinal.router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":

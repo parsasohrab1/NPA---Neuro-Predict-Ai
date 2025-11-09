@@ -2,12 +2,16 @@
 Medical Image Processing Service
 Handles DICOM files, MRI preprocessing, and feature extraction
 """
+import base64
+import io
+import logging
+from pathlib import Path
+from typing import Dict, Optional, Tuple
+
+import cv2
 import numpy as np
 import pydicom
-from pathlib import Path
-import logging
-from typing import Dict, Tuple, Optional
-import cv2
+from PIL import Image
 from scipy import ndimage
 
 logger = logging.getLogger(__name__)
@@ -326,6 +330,65 @@ class ImageProcessingService:
         except Exception as e:
             logger.error(f"Error processing DICOM study: {e}")
             raise
+    
+    def compute_diff_heatmap(self, image_a: np.ndarray, image_b: np.ndarray) -> Dict[str, np.ndarray]:
+        """
+        Compute difference heatmap between two aligned MRI slices
+        """
+        try:
+            normalized_a = self.normalize_image(image_a)
+            normalized_b = self.normalize_image(image_b)
+
+            if normalized_a.shape != normalized_b.shape:
+                normalized_b = self.resize_image(normalized_b, target_size=normalized_a.shape[::-1])
+
+            diff = np.abs(normalized_a - normalized_b)
+            diff_norm = self.normalize_image(diff)
+
+            threshold = np.percentile(diff_norm, 95)
+            mask = (diff_norm >= threshold).astype(np.float32)
+            return {
+                'image_a': normalized_a,
+                'image_b': normalized_b,
+                'diff': diff_norm,
+                'mask': mask,
+            }
+        except Exception as e:
+            logger.error(f"Error computing diff heatmap: {e}")
+            raise
+
+    def _heatmap_to_data_uri(self, heatmap: np.ndarray, colormap: int = cv2.COLORMAP_JET) -> str:
+        heatmap_uint8 = (self.normalize_image(heatmap) * 255).astype(np.uint8)
+        colored = cv2.applyColorMap(heatmap_uint8, colormap)
+        colored_rgb = cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(colored_rgb)
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
+
+    def compare_dicom_files(self, path_a: str, path_b: str) -> Dict[str, object]:
+        """
+        Compare two DICOM files and return diff metrics and heatmap
+        """
+        image_a, metadata_a = self.load_dicom(path_a)
+        image_b, metadata_b = self.load_dicom(path_b)
+
+        diff_data = self.compute_diff_heatmap(image_a, image_b)
+        mean_diff = float(np.mean(np.abs(diff_data['image_a'] - diff_data['image_b'])))
+        max_diff = float(np.max(np.abs(diff_data['image_a'] - diff_data['image_b'])))
+
+        heatmap_uri = self._heatmap_to_data_uri(diff_data['diff'])
+
+        return {
+            "mean_absolute_difference": mean_diff,
+            "max_absolute_difference": max_diff,
+            "heatmap": heatmap_uri,
+            "metadata": {
+                "study_a": metadata_a,
+                "study_b": metadata_b,
+            },
+        }
 
 
 # Singleton instance

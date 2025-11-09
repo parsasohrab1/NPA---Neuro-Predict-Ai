@@ -1,0 +1,129 @@
+import axios from 'axios'
+
+const API_BASE = '/api/v1/longitudinal'
+
+export type EpisodeStatus = 'active' | 'completed' | 'archived'
+export type VisitType = 'baseline' | 'followup' | 'therapy' | 'imaging' | 'lab'
+export type MetricCategory = 'cognitive' | 'biomarker' | 'imaging' | 'functional'
+
+export type EpisodeSummary = {
+  id: number
+  patient_id: number
+  title?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  status: EpisodeStatus
+  visit_count: number
+}
+
+export type Metric = {
+  id: number
+  metric_type: MetricCategory
+  metric_key: string
+  metric_value?: number | null
+  metric_payload?: Record<string, unknown> | null
+  unit?: string | null
+  z_score?: number | null
+  created_at: string
+}
+
+export type Visit = {
+  id: number
+  episode_id: number
+  visit_date: string
+  visit_type: VisitType
+  notes?: string | null
+  progression_score?: number | null
+  medical_record_id?: number | null
+  imaging_study_id?: number | null
+  prediction_id?: number | null
+  metrics: Metric[]
+}
+
+export type EpisodeDetail = {
+  id: number
+  patient_id: number
+  title?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  status: EpisodeStatus
+  visits: Visit[]
+}
+
+export type TimelineEvent = {
+  visit_id: number
+  visit_date: string
+  visit_type: VisitType
+  label: string
+  metrics: Metric[]
+  progression_score?: number | null
+}
+
+export type TrendPoint = {
+  visit_id: number
+  visit_date: string
+  metric_value?: number | null
+  z_score?: number | null
+}
+
+export type ImagingComparison = {
+  episode_id: number
+  visit_a_id: number
+  visit_b_id: number
+  visit_a_date: string
+  visit_b_date: string
+  mean_absolute_difference: number
+  max_absolute_difference: number
+  heatmap: string
+  metadata: Record<string, unknown>
+}
+
+export type EpisodeCreatePayload = {
+  title?: string
+  start_date?: string
+  end_date?: string
+}
+
+export const longitudinalService = {
+  async fetchEpisodes(patientId: number) {
+    const response = await axios.get(`${API_BASE}/${patientId}/episodes`)
+    return response.data as EpisodeSummary[]
+  },
+
+  async createEpisode(patientId: number, payload: EpisodeCreatePayload) {
+    const response = await axios.post(`${API_BASE}/${patientId}/episodes`, payload)
+    return response.data as EpisodeDetail
+  },
+
+  async fetchEpisode(episodeId: number, patientId?: number) {
+    const params = new URLSearchParams()
+    if (patientId) params.append('patient_id', patientId.toString())
+    const query = params.toString()
+    const url = query ? `${API_BASE}/episodes/${episodeId}?${query}` : `${API_BASE}/episodes/${episodeId}`
+    const response = await axios.get(url)
+    return response.data as EpisodeDetail
+  },
+
+  async fetchTimeline(episodeId: number) {
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/timeline`)
+    return response.data as TimelineEvent[]
+  },
+
+  async fetchTrend(episodeId: number, metricKey: string, metricType?: MetricCategory) {
+    const params = new URLSearchParams({ metric_key: metricKey })
+    if (metricType) params.append('metric_type', metricType)
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/trend?${params}`)
+    return response.data as TrendPoint[]
+  },
+
+  async compareVisits(episodeId: number, visitA: number, visitB: number) {
+    const params = new URLSearchParams({
+      visit_a: visitA.toString(),
+      visit_b: visitB.toString(),
+    })
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/comparison?${params}`)
+    return response.data as ImagingComparison
+  },
+}
+
+

@@ -6,12 +6,14 @@ import {
   CpuChipIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
+  ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 
 const navigation = [
   { name: 'System Overview', icon: HomeModernIcon, to: '/' },
   { name: 'Reports', icon: ClipboardDocumentListIcon, to: '/reports' },
+  { name: 'Longitudinal', icon: ArrowTrendingUpIcon, to: '/longitudinal' },
   { name: 'Users', icon: UsersIcon, to: '/users' },
   { name: 'Roles & Permissions', icon: ShieldCheckIcon, to: '/roles' },
   { name: 'Models', icon: CpuChipIcon, to: '/models' },

@@ -8,6 +8,7 @@ import ModelManagement from './pages/ModelManagement'
 import AuditLogs from './pages/AuditLogs'
 import SystemSettings from './pages/SystemSettings'
 import ReportsPage from './pages/ReportsPage'
+import LongitudinalTrackingPage from './pages/LongitudinalTrackingPage'
 
 export const router = createBrowserRouter([
   {
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <SystemOverview /> },
       { path: 'reports', element: <ReportsPage /> },
+      { path: 'longitudinal', element: <LongitudinalTrackingPage /> },
       { path: 'users', element: <UsersManagement /> },
       { path: 'roles', element: <RolesPermissions /> },
       { path: 'models', element: <ModelManagement /> },
