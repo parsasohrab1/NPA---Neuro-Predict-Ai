@@ -16,6 +16,13 @@ from .longitudinal import (
     LongitudinalAlert,
     AlertSeverity,
     AlertType,
+    LongitudinalReport,
+    LongitudinalReportFormat,
+    LongitudinalReportStatus,
+    LongitudinalReportSchedule,
+    LongitudinalReportScheduleStatus,
+    LongitudinalReportRun,
+    LongitudinalReportRunStatus,
 )
 from .audit import AuditLog
 
@@ -40,5 +47,12 @@ __all__ = [
     "LongitudinalAlert",
     "AlertSeverity",
     "AlertType",
+    "LongitudinalReport",
+    "LongitudinalReportFormat",
+    "LongitudinalReportStatus",
+    "LongitudinalReportSchedule",
+    "LongitudinalReportScheduleStatus",
+    "LongitudinalReportRun",
+    "LongitudinalReportRunStatus",
 ]
 

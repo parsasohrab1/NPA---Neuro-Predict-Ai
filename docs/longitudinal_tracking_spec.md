@@ -54,6 +54,16 @@
 - `severity` (low/medium/high)
 - `message`, `created_at`, `acknowledged_at`
 
+### 5. جدول `longitudinal_reports` (فاز گزارش‌های طولی)
+- `id`, `episode_id`
+- `report_type` (summary، cohort و ...)
+- `format` (`xlsx`, `pdf`)
+- `start_date`, `end_date`
+- `file_path`, `pdf_path`
+- `summary` (JSON از آمار متریک‌ها و بازه زمانی)
+- `status` (completed, failed)
+- `created_at`, `created_by`
+
 ---
 
 ## 🧠 سرویس‌ها و Aggregation
@@ -64,6 +74,8 @@
 - `record_metrics(visit_id, metrics[])`
 - `get_episode_summary(patient_id, episode_id)` → شامل روند امتیازها، سرعت پیشرفت، نقاط کلیدی.
 - `compare_imaging(visit_a, visit_b)` → خروجی برای UI (تولید thumbnail، heatmap، diff overlays)
+- `create_report(episode_id, start_date, end_date, format)` → تولید summary JSON + فایل Excel/PDF
+- `list_reports(episode_id)` و `get_report(report_id)` → دانلود فایل و نمایش metadata
 
 ### Metric Aggregation
 - روند زمانی: گروه‌بندی بر اساس `metric_key`.
@@ -87,6 +99,9 @@
 | `GET` | `/api/v1/longitudinal/episodes/{episode_id}/progression` | خلاصه سرعت پیشرفت متریک‌های کلیدی |
 | `GET` | `/api/v1/longitudinal/episodes/{episode_id}/alerts` | هشدارهای فعال اپیزود |
 | `POST` | `/api/v1/longitudinal/alerts/{alert_id}/acknowledge` | تأیید هشدار |
+| `POST` | `/api/v1/longitudinal/episodes/{episode_id}/reports` | تولید گزارش دوره‌ای |
+| `GET` | `/api/v1/longitudinal/episodes/{episode_id}/reports` | لیست گزارش‌های ذخیره‌شده |
+| `GET` | `/api/v1/longitudinal/reports/{report_id}/download?variant=` | دانلود فایل Excel/PDF |
 
 > Endpointها در فازهای بعدی با قابلیت فیلتر تاریخ، نوع متریک و هشدار تکمیل می‌شوند.
 
@@ -110,9 +125,9 @@
 ## 🛣️ گام‌های بعدی
 1. ایجاد migrations و مدل‌های SQLAlchemy مطابق طرح.
 2. پیاده‌سازی `LongitudinalTrackingService`.
-3. ساخت API و تست unit/integration (timeline، trend، comparison، progression، alerts).
-4. آماده‌سازی داده نمونه برای UI و اعتبارسنجی heatmap/alerts.
-5. طراحی UI (تایم‌لاین، نمودار، مقایسه تصویری، کارت سرعت، هشدارها) → فاز فرانت‌اند.
+3. ساخت API و تست unit/integration (timeline، trend، comparison، progression، alerts، reports).
+4. آماده‌سازی داده نمونه برای UI و اعتبارسنجی heatmap/alerts/reports.
+5. طراحی UI (تایم‌لاین، نمودار، مقایسه تصویری، کارت سرعت، هشدارها، مدیریت گزارش‌ها) → فاز فرانت‌اند.
 
 ---
 

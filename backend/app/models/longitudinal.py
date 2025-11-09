@@ -78,6 +78,12 @@ class LongitudinalEpisode(Base):
         cascade="all, delete-orphan",
         order_by="LongitudinalAlert.created_at.desc()",
     )
+    reports = relationship(
+        "LongitudinalReport",
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="LongitudinalReport.created_at.desc()",
+    )
 
     def __repr__(self) -> str:
         return f"<LongitudinalEpisode(id={self.id}, patient_id={self.patient_id}, status={self.status})>"
@@ -156,6 +162,93 @@ class LongitudinalAlert(Base):
 
     def __repr__(self) -> str:
         return f"<LongitudinalAlert(id={self.id}, type={self.alert_type}, severity={self.severity})>"
+
+
+class LongitudinalReportFormat(str, enum.Enum):
+    EXCEL = "xlsx"
+    PDF = "pdf"
+
+
+class LongitudinalReportStatus(str, enum.Enum):
+    COMPLETED = "completed"
+    FAILED = "failed"
+    QUEUED = "queued"
+    RUNNING = "running"
+
+
+class LongitudinalReport(Base):
+    __tablename__ = "longitudinal_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    episode_id = Column(Integer, ForeignKey("longitudinal_episodes.id"), nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
+    report_type = Column(String(64), default="summary")
+    format = Column(Enum(LongitudinalReportFormat), default=LongitudinalReportFormat.EXCEL, nullable=False)
+    status = Column(Enum(LongitudinalReportStatus), default=LongitudinalReportStatus.COMPLETED, nullable=False)
+    file_path = Column(String, nullable=False)
+    pdf_path = Column(String, nullable=True)
+    heatmap_path = Column(String, nullable=True)
+    charts_payload = Column(JSON, nullable=True)
+    summary = Column(JSON, nullable=True)
+    cohort_definition = Column(JSON, nullable=True)
+    comparison_definition = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    episode = relationship("LongitudinalEpisode", back_populates="reports")
+    creator = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<LongitudinalReport(id={self.id}, episode_id={self.episode_id}, report_type={self.report_type})>"
+
+
+class LongitudinalReportScheduleStatus(str, enum.Enum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    ARCHIVED = "archived"
+
+
+class LongitudinalReportSchedule(Base):
+    __tablename__ = "longitudinal_report_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(128), nullable=False)
+    report_type = Column(String(64), default="summary")
+    cohort_definition = Column(JSON, nullable=True)
+    comparison_definition = Column(JSON, nullable=True)
+    schedule_cron = Column(String(64), nullable=False)
+    next_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(Enum(LongitudinalReportScheduleStatus), default=LongitudinalReportScheduleStatus.ACTIVE, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    creator = relationship("User")
+    runs = relationship("LongitudinalReportRun", back_populates="schedule", cascade="all, delete-orphan")
+
+
+class LongitudinalReportRunStatus(str, enum.Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
+class LongitudinalReportRun(Base):
+    __tablename__ = "longitudinal_report_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    schedule_id = Column(Integer, ForeignKey("longitudinal_report_schedules.id"), nullable=False, index=True)
+    report_id = Column(Integer, ForeignKey("longitudinal_reports.id"), nullable=True, index=True)
+    status = Column(Enum(LongitudinalReportRunStatus), default=LongitudinalReportRunStatus.QUEUED, nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    schedule = relationship("LongitudinalReportSchedule", back_populates="runs")
+    report = relationship("LongitudinalReport")
 
 
 

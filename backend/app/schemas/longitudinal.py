@@ -2,7 +2,7 @@
 Longitudinal Tracking Schemas
 """
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,10 @@ from ..models.longitudinal import (
     MetricCategory,
     AlertSeverity,
     AlertType,
+    LongitudinalReportFormat,
+    LongitudinalReportStatus,
+    LongitudinalReportScheduleStatus,
+    LongitudinalReportRunStatus,
 )
 
 
@@ -148,6 +152,98 @@ class ProgressionMetricSummary(BaseModel):
 
 class LongitudinalProgressionSummary(BaseModel):
     metrics: dict[str, ProgressionMetricSummary]
+
+
+class LongitudinalReportCreate(BaseModel):
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    format: LongitudinalReportFormat = LongitudinalReportFormat.EXCEL
+    report_type: str = "summary"
+    cohort_filters: Optional[Dict[str, Any]] = None
+    comparison_filters: Optional[Dict[str, Any]] = None
+
+
+class LongitudinalReportResponse(BaseModel):
+    id: int
+    episode_id: int
+    report_type: str
+    format: LongitudinalReportFormat
+    status: LongitudinalReportStatus
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
+    file_path: str
+    pdf_path: Optional[str]
+    heatmap_path: Optional[str]
+    charts_payload: Optional[Dict[str, Any]]
+    created_at: datetime
+    summary: Optional[Dict[str, Any]]
+    cohort_definition: Optional[Dict[str, Any]]
+    comparison_definition: Optional[Dict[str, Any]]
+
+    class Config:
+        from_attributes = True
+
+
+class ReportScheduleCreate(BaseModel):
+    name: str
+    report_type: str = "summary"
+    schedule_cron: str
+    cohort_filters: Optional[Dict[str, Any]] = None
+    comparison_filters: Optional[Dict[str, Any]] = None
+
+
+class ReportScheduleResponse(BaseModel):
+    id: int
+    name: str
+    report_type: str
+    schedule_cron: str
+    status: LongitudinalReportScheduleStatus
+    next_run_at: Optional[datetime]
+    last_run_at: Optional[datetime]
+    cohort_definition: Optional[Dict[str, Any]]
+    comparison_definition: Optional[Dict[str, Any]]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReportRunResponse(BaseModel):
+    id: int
+    schedule_id: int
+    report_id: Optional[int]
+    status: LongitudinalReportRunStatus
+    started_at: Optional[datetime]
+    finished_at: Optional[datetime]
+    error_message: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class LongitudinalReportCreate(BaseModel):
+    from_date: Optional[datetime] = None
+    to_date: Optional[datetime] = None
+    format: LongitudinalReportFormat = LongitudinalReportFormat.PDF
+
+
+class LongitudinalReportResponse(BaseModel):
+    id: int
+    episode_id: int
+    created_by: Optional[int]
+    from_date: Optional[datetime]
+    to_date: Optional[datetime]
+    format: LongitudinalReportFormat
+    status: LongitudinalReportStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LongitudinalReportDetail(LongitudinalReportResponse):
+    summary: Optional[dict]
+
 
 
 

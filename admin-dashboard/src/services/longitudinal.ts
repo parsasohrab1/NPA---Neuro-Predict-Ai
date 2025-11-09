@@ -109,6 +109,29 @@ export type EpisodeCreatePayload = {
   end_date?: string
 }
 
+export type LongitudinalReportFormat = 'pdf' | 'xlsx'
+export type LongitudinalReportStatus = 'completed' | 'failed'
+
+export type LongitudinalReport = {
+  id: number
+  episode_id: number
+  report_type: string
+  format: LongitudinalReportFormat
+  status: LongitudinalReportStatus
+  start_date?: string | null
+  end_date?: string | null
+  file_path: string
+  pdf_path?: string | null
+  summary?: Record<string, unknown> | null
+  created_at: string
+}
+
+export type ReportCreatePayload = {
+  start_date?: string
+  end_date?: string
+  format?: LongitudinalReportFormat
+}
+
 export const longitudinalService = {
   async fetchEpisodes(patientId: number) {
     const response = await axios.get(`${API_BASE}/${patientId}/episodes`)
@@ -164,6 +187,26 @@ export const longitudinalService = {
     const response = await axios.get(`${API_BASE}/episodes/${episodeId}/progression`)
     return response.data as ProgressionSummary
   },
-}
 
+  async generateReport(episodeId: number, payload: ReportCreatePayload) {
+    const response = await axios.post(`${API_BASE}/episodes/${episodeId}/reports`, payload)
+    return response.data as LongitudinalReport
+  },
+
+  async fetchReports(episodeId: number) {
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/reports`)
+    return response.data as LongitudinalReport[]
+  },
+
+  async downloadReport(reportId: number, variant: 'excel' | 'pdf' = 'excel') {
+    const params = new URLSearchParams()
+    if (variant === 'pdf') {
+      params.append('variant', 'pdf')
+    }
+    const response = await axios.get(`${API_BASE}/reports/${reportId}/download${params.toString() ? `?${params}` : ''}`, {
+      responseType: 'blob',
+    })
+    return response
+  },
+}
 

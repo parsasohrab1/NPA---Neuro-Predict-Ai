@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     DICOM_DIR: str = "uploads/dicom"
     MRI_DIR: str = "uploads/mri"
+    REPORTS_DIR: str = "uploads/reports"
     
     # AI Model Paths
     ALZHEIMER_MODEL_PATH: str = "models/alzheimer_model.pth"

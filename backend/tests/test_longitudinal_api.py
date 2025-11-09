@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Awaitable, Callable, Tuple
 
@@ -19,6 +19,7 @@ from app.models.imaging import ImagingStudy, ImagingModality
 from app.models.medical_record import MedicalRecord
 from app.models.patient import Gender, Patient
 from app.models.user import User, UserRole
+from app.core.config import settings
 
 
 class DummyUser:
@@ -258,6 +259,30 @@ async def test_longitudinal_episode_flow(tmp_path: Path):
         assert response.status_code == 200, response.text
         assert response.json()["acknowledged_at"] is not None
 
+        # Generate longitudinal report (excel)
+        response = await client.post(
+            f"/api/v1/longitudinal/episodes/{episode_id}/reports",
+            json={
+                "start_date": (datetime.utcnow() - timedelta(days=7)).isoformat(),
+                "end_date": datetime.utcnow().isoformat(),
+                "format": "xlsx",
+            },
+        )
+        assert response.status_code == 201, response.text
+        report_id = response.json()["id"]
+
+        response = await client.get(f"/api/v1/longitudinal/episodes/{episode_id}/reports")
+        assert response.status_code == 200, response.text
+        reports = response.json()
+        assert len(reports) == 1
+
+        response = await client.get(f"/api/v1/longitudinal/reports/{report_id}/download")
+        assert response.status_code == 200, response.text
+        assert (
+            response.headers.get("content-type")
+            == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
         # Imaging comparison
         response = await client.get(
             f"/api/v1/longitudinal/episodes/{episode_id}/comparison",
@@ -269,6 +294,7 @@ async def test_longitudinal_episode_flow(tmp_path: Path):
         assert comparison["mean_absolute_difference"] > 0
         assert comparison["heatmap"].startswith("data:image/png;base64,")
     finally:
+        settings.REPORTS_DIR = original_reports_dir
         await cleanup()
 
 

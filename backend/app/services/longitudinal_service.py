@@ -4,13 +4,18 @@ Longitudinal Tracking Service
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
+import pandas as pd
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..core.config import settings
 from ..models.longitudinal import (
     AlertSeverity,
     AlertType,
@@ -21,6 +26,9 @@ from ..models.longitudinal import (
     LongitudinalVisit,
     LongitudinalVisitType,
     MetricCategory,
+    LongitudinalReport,
+    LongitudinalReportFormat,
+    LongitudinalReportStatus,
 )
 from ..schemas.longitudinal import (
     LongitudinalEpisodeCreate,
@@ -253,6 +261,112 @@ class LongitudinalTrackingService:
             }
         return summary
 
+    async def create_report(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        created_by: Optional[int],
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        report_format: LongitudinalReportFormat = LongitudinalReportFormat.EXCEL,
+    ) -> LongitudinalReport:
+        timeline = await self.get_timeline(db, episode_id)
+        if not timeline:
+            raise ValueError("no_data")
+
+        visits_in_range = [
+            visit
+            for visit in timeline
+            if (start_date is None or visit.visit_date >= start_date)
+            and (end_date is None or visit.visit_date <= end_date)
+        ]
+        if not visits_in_range:
+            raise ValueError("no_data_in_range")
+
+        metrics_summary: Dict[str, Dict[str, Optional[float]]] = {}
+        for key in ["mmse", "amyloid_beta", "parkinson_risk_score"]:
+            metrics = await self.get_metric_trend(db, episode_id, key)
+            filtered = [
+                metric
+                for metric in metrics
+                if metric.visit and metric.visit in visits_in_range and metric.metric_value is not None
+            ]
+            if not filtered:
+                metrics_summary[key] = {}
+                continue
+            values = [metric.metric_value for metric in filtered if metric.metric_value is not None]
+            slope = self._compute_slope(filtered)
+            metrics_summary[key] = {
+                "average": float(np.mean(values)) if values else None,
+                "minimum": float(np.min(values)) if values else None,
+                "maximum": float(np.max(values)) if values else None,
+                "slope": slope,
+                "latest": filtered[-1].metric_value,
+            }
+
+        summary_payload = {
+            "episode_id": episode_id,
+            "range": {
+                "from": start_date.isoformat() if start_date else None,
+                "to": end_date.isoformat() if end_date else None,
+            },
+            "metrics": metrics_summary,
+            "visit_count": len(visits_in_range),
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+        reports_dir = Path(settings.REPORTS_DIR)
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        base_name = f"episode_{episode_id}_{timestamp}"
+
+        excel_path = reports_dir / f"{base_name}.xlsx"
+        pdf_path = reports_dir / f"{base_name}.pdf"
+
+        file_path: Path
+        pdf_path_str: Optional[str] = None
+
+        if report_format == LongitudinalReportFormat.PDF:
+            self._write_pdf_report(pdf_path, summary_payload)
+            file_path = pdf_path
+        else:
+            self._write_excel_report(excel_path, summary_payload)
+            file_path = excel_path
+            # Generate companion PDF for quick preview
+            self._write_pdf_report(pdf_path, summary_payload)
+            pdf_path_str = str(pdf_path)
+
+        report = LongitudinalReport(
+            episode_id=episode_id,
+            created_by=created_by,
+            start_date=start_date,
+            end_date=end_date,
+            report_type="summary",
+            format=report_format,
+            status=LongitudinalReportStatus.COMPLETED,
+            file_path=str(file_path),
+            pdf_path=pdf_path_str,
+            summary=summary_payload,
+        )
+        db.add(report)
+        await db.commit()
+        await db.refresh(report)
+        return report
+
+    async def list_reports(self, db: AsyncSession, episode_id: int) -> List[LongitudinalReport]:
+        stmt = (
+            select(LongitudinalReport)
+            .where(LongitudinalReport.episode_id == episode_id)
+            .order_by(LongitudinalReport.created_at.desc())
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_report(self, db: AsyncSession, report_id: int) -> Optional[LongitudinalReport]:
+        stmt = select(LongitudinalReport).where(LongitudinalReport.id == report_id)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def _evaluate_alerts_for_visit(
         self,
         db: AsyncSession,
@@ -367,6 +481,79 @@ class LongitudinalTrackingService:
             return None
         slope, _ = np.polyfit(np.array(x, dtype=float), np.array(y, dtype=float), 1)
         return float(slope)
+
+    def _write_excel_report(self, path: Path, summary: Dict[str, object]) -> None:
+        metrics = summary.get("metrics", {})
+        rows = []
+        for key, stats in metrics.items():
+            rows.append(
+                {
+                    "Metric": key,
+                    "Average": stats.get("average"),
+                    "Minimum": stats.get("minimum"),
+                    "Maximum": stats.get("maximum"),
+                    "Slope": stats.get("slope"),
+                    "Latest": stats.get("latest"),
+                }
+            )
+        df = pd.DataFrame(rows)
+        with pd.ExcelWriter(path, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Metrics Summary")
+            meta = pd.DataFrame(
+                [
+                    {"Field": "Episode ID", "Value": summary.get("episode_id")},
+                    {"Field": "From", "Value": summary.get("range", {}).get("from")},
+                    {"Field": "To", "Value": summary.get("range", {}).get("to")},
+                    {"Field": "Generated At", "Value": summary.get("generated_at")},
+                    {"Field": "Visit Count", "Value": summary.get("visit_count")},
+                ]
+            )
+            meta.to_excel(writer, index=False, sheet_name="Metadata")
+
+    def _write_pdf_report(self, path: Path, summary: Dict[str, object]) -> None:
+        c = canvas.Canvas(str(path), pagesize=letter)
+        c.setTitle("Longitudinal Report")
+        width, height = letter
+        margin = 40
+        y = height - margin
+
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(margin, y, "Longitudinal Episode Report")
+        y -= 30
+
+        c.setFont("Helvetica", 10)
+        range_info = summary.get("range", {})
+        c.drawString(margin, y, f"Generated at: {summary.get('generated_at')}")
+        y -= 14
+        c.drawString(
+            margin,
+            y,
+            f"Range: {range_info.get('from') or 'Start'} → {range_info.get('to') or 'Latest'}",
+        )
+        y -= 24
+
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(margin, y, "Metrics Summary")
+        y -= 20
+
+        c.setFont("Helvetica", 10)
+        metrics = summary.get("metrics", {})
+        for key, stats in metrics.items():
+            if y < margin + 80:
+                c.showPage()
+                y = height - margin
+                c.setFont("Helvetica", 10)
+            c.drawString(margin, y, f"- {key.upper()}")
+            y -= 14
+            c.drawString(margin + 20, y, f"Average: {stats.get('average')}")
+            y -= 12
+            c.drawString(margin + 20, y, f"Min/Max: {stats.get('minimum')} / {stats.get('maximum')}")
+            y -= 12
+            c.drawString(margin + 20, y, f"Slope: {stats.get('slope')}")
+            y -= 18
+
+        c.showPage()
+        c.save()
 
 
 longitudinal_service = LongitudinalTrackingService()

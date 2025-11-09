@@ -1,9 +1,11 @@
 """
 Longitudinal Tracking API Endpoints
 """
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.security import require_role
@@ -22,6 +24,11 @@ from ..schemas.longitudinal import (
     LongitudinalAlertResponse,
     LongitudinalProgressionSummary,
     ProgressionMetricSummary,
+    LongitudinalReportCreate,
+    LongitudinalReportResponse,
+    ReportScheduleCreate,
+    ReportScheduleResponse,
+    ReportRunResponse,
 )
 from ..services.longitudinal_service import longitudinal_service
 
@@ -266,5 +273,80 @@ async def get_progression(
         for key, value in summary.items()
     }
     return LongitudinalProgressionSummary(metrics=metrics_payload)
+
+
+@router.post(
+    "/episodes/{episode_id}/reports",
+    response_model=LongitudinalReportResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_report(
+    episode_id: int,
+    payload: LongitudinalReportCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+) -> LongitudinalReportResponse:
+    try:
+        report = await longitudinal_service.create_report(
+            db=db,
+            episode_id=episode_id,
+            created_by=getattr(current_user, "id", None),
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            report_format=payload.format,
+        )
+        return report
+    except ValueError as exc:
+        message = str(exc)
+        if message == "no_data":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No data available for this episode.") from exc
+        if message == "no_data_in_range":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No visits in selected date range.") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Report generation failed.") from exc
+
+
+@router.get(
+    "/episodes/{episode_id}/reports",
+    response_model=List[LongitudinalReportResponse],
+)
+async def list_reports(
+    episode_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("researcher")),
+) -> List[LongitudinalReportResponse]:
+    reports = await longitudinal_service.list_reports(db, episode_id)
+    return reports
+
+
+@router.get(
+    "/reports/{report_id}/download",
+    response_class=FileResponse,
+)
+async def download_report(
+    report_id: int,
+    variant: Optional[str] = Query(None, regex="^(pdf|excel)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("researcher")),
+):
+    report = await longitudinal_service.get_report(db, report_id)
+    if report is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+
+    if variant == "pdf":
+        if not report.pdf_path:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF variant not available")
+        file_path = Path(report.pdf_path)
+        media_type = "application/pdf"
+    else:
+        file_path = Path(report.file_path)
+        if report.format == report.format.PDF and variant != "pdf":
+            media_type = "application/pdf"
+        else:
+            media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file missing")
+
+    return FileResponse(path=file_path, media_type=media_type, filename=file_path.name)
 
 

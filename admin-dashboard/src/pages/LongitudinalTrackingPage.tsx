@@ -23,6 +23,7 @@ import {
   type ImagingComparison,
   type LongitudinalAlert,
   type ProgressionSummary,
+  type LongitudinalReport,
 } from '../services/longitudinal'
 
 type MetricOption = {
@@ -39,6 +40,12 @@ export default function LongitudinalTrackingPage() {
   const [comparisonSelection, setComparisonSelection] = useState<number[]>([])
   const [comparisonResult, setComparisonResult] = useState<ImagingComparison | null>(null)
   const [comparisonError, setComparisonError] = useState<string | null>(null)
+  const [reportForm, setReportForm] = useState<{ start: string; end: string; format: 'xlsx' | 'pdf' }>({
+    start: '',
+    end: '',
+    format: 'xlsx',
+  })
+  const [reportError, setReportError] = useState<string | null>(null)
 
   const loadEpisodes = () => {
     const parsed = parseInt(patientIdInput, 10)
@@ -52,6 +59,8 @@ export default function LongitudinalTrackingPage() {
     setComparisonSelection([])
     setComparisonResult(null)
     setComparisonError(null)
+    setReportForm({ start: '', end: '', format: 'xlsx' })
+    setReportError(null)
   }
 
   const episodesQuery = useQuery({
@@ -98,6 +107,12 @@ export default function LongitudinalTrackingPage() {
     enabled: selectedEpisodeId !== null,
   })
 
+  const reportsQuery = useQuery({
+    queryKey: ['longitudinal', 'reports', selectedEpisodeId],
+    queryFn: () => longitudinalService.fetchReports(selectedEpisodeId!),
+    enabled: selectedEpisodeId !== null,
+  })
+
   const createEpisode = useMutation({
     mutationFn: (payload: { patientId: number; title?: string }) =>
       longitudinalService.createEpisode(payload.patientId, {
@@ -110,6 +125,8 @@ export default function LongitudinalTrackingPage() {
       setComparisonSelection([])
       setComparisonResult(null)
       setComparisonError(null)
+      setReportForm({ start: '', end: '', format: 'xlsx' })
+      setReportError(null)
     },
   })
 
@@ -173,6 +190,55 @@ export default function LongitudinalTrackingPage() {
       alertsQuery.refetch()
     },
   })
+
+  const generateReportMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedEpisodeId) return null
+      const payload = {
+        start_date: reportForm.start || undefined,
+        end_date: reportForm.end || undefined,
+        format: reportForm.format,
+      }
+      return longitudinalService.generateReport(selectedEpisodeId, payload)
+    },
+    onSuccess: () => {
+      reportsQuery.refetch()
+      setReportForm({ start: '', end: '', format: 'xlsx' })
+      setReportError(null)
+    },
+    onError: (error: any) => {
+      setReportError(error?.response?.data?.detail || 'Unable to generate report.')
+    },
+  })
+
+  const handleDownload = async (report: LongitudinalReport, variant: 'excel' | 'pdf') => {
+    try {
+      const response = await longitudinalService.downloadReport(report.id, variant)
+      const contentType = response.headers['content-type'] ?? 'application/octet-stream'
+      const blob = new Blob([response.data], { type: contentType })
+      const url = window.URL.createObjectURL(blob)
+      const extractName = (path: string | null | undefined) => {
+        if (!path) return null
+        const segments = path.split(/[/\\]/)
+        return segments[segments.length - 1] || null
+      }
+      const baseExcel = extractName(report.file_path) || 'longitudinal-report.xlsx'
+      const pdfName =
+        extractName(report.pdf_path) || (baseExcel.endsWith('.xlsx') ? `${baseExcel.replace(/\.xlsx$/, '')}.pdf` : 'longitudinal-report.pdf')
+      const filename = variant === 'pdf' ? pdfName : baseExcel
+
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      setReportError(null)
+    } catch (error: any) {
+      setReportError(error?.response?.data?.detail || 'Download failed.')
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -240,6 +306,8 @@ export default function LongitudinalTrackingPage() {
                         setSelectedEpisodeId(episode.id)
                         setTrendMetricKey(null)
                         setTrendMetricCategory(undefined)
+                        setReportForm({ start: '', end: '', format: 'xlsx' })
+                        setReportError(null)
                       }}
                       className={clsx(
                         'rounded-xl border px-4 py-2 text-sm transition',
@@ -471,6 +539,15 @@ export default function LongitudinalTrackingPage() {
                 </div>
               </div>
             )}
+            <ReportsPanel
+              reports={reportsQuery.data ?? []}
+              isLoading={reportsQuery.isLoading || generateReportMutation.isPending}
+              reportForm={reportForm}
+              onChangeForm={(form) => setReportForm(form)}
+              onGenerate={() => generateReportMutation.mutate()}
+              onDownload={handleDownload}
+              error={reportError}
+            />
           </div>
         </section>
       )}
@@ -619,6 +696,131 @@ function formatSlope(slope: number | null | undefined): string {
   }
   const formatted = slope.toFixed(3)
   return `${formatted} /day`
+}
+
+type ReportsPanelProps = {
+  reports: LongitudinalReport[]
+  isLoading: boolean
+  reportForm: { start: string; end: string; format: 'xlsx' | 'pdf' }
+  onChangeForm: (form: { start: string; end: string; format: 'xlsx' | 'pdf' }) => void
+  onGenerate: () => void
+  onDownload: (report: LongitudinalReport, variant: 'excel' | 'pdf') => void
+  error?: string | null
+}
+
+function ReportsPanel({ reports, isLoading, reportForm, onChangeForm, onGenerate, onDownload, error }: ReportsPanelProps) {
+  return (
+    <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-white">Longitudinal reports</h4>
+          <p className="text-xs text-slate-400">Generate periodic summaries of MMSE, biomarkers, and risk trends.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-slate-400">
+            From
+            <input
+              type="date"
+              value={reportForm.start}
+              onChange={(event) => onChangeForm({ ...reportForm, start: event.target.value })}
+              className="ml-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            To
+            <input
+              type="date"
+              value={reportForm.end}
+              onChange={(event) => onChangeForm({ ...reportForm, end: event.target.value })}
+              className="ml-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <select
+            value={reportForm.format}
+            onChange={(event) => onChangeForm({ ...reportForm, format: event.target.value as 'xlsx' | 'pdf' })}
+            className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white focus:border-sky-500 focus:outline-none"
+          >
+            <option value="xlsx">Excel</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={isLoading}
+            className="rounded border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs text-sky-200 hover:border-sky-400 hover:text-sky-100 disabled:opacity-40"
+          >
+            {isLoading ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+      </div>
+      {error && (
+        <p className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>
+      )}
+      {isLoading && reports.length === 0 ? (
+        <p className="mt-3 text-xs text-slate-400">Processing…</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {reports.map((report) => {
+            const metrics = (report.summary?.metrics ?? {}) as Record<string, any>
+            return (
+              <div
+                key={report.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800/70 bg-slate-950/70 px-3 py-2 text-xs text-slate-200"
+              >
+                <div>
+                  <div className="font-medium text-white">
+                    {report.report_type} • {format(new Date(report.created_at), 'PPpp')}
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Range {report.start_date ? format(new Date(report.start_date), 'PP') : 'start'} →{' '}
+                    {report.end_date ? format(new Date(report.end_date), 'PP') : 'latest'} • Format {report.format.toUpperCase()}
+                  </div>
+                  {Object.entries(metrics)
+                    .slice(0, 2)
+                    .map(([metricKey, stats]) => (
+                      <div key={metricKey} className="text-[11px] text-slate-500">
+                        {metricKey}: avg {stats?.average ?? '—'} • slope {stats?.slope ?? '—'}
+                      </div>
+                    ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={clsx(
+                      'rounded-full border px-2 py-0.5 uppercase tracking-wide',
+                      report.status === 'completed'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                        : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                    )}
+                  >
+                    {report.status}
+                  </span>
+                  {report.format === 'xlsx' && (
+                    <button
+                      type="button"
+                      onClick={() => onDownload(report, 'excel')}
+                      className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200 hover:border-sky-400 hover:text-sky-200"
+                    >
+                      Excel
+                    </button>
+                  )}
+                  {report.pdf_path && (
+                    <button
+                      type="button"
+                      onClick={() => onDownload(report, 'pdf')}
+                      className="rounded border border-slate-700 px-2 py-0.5 text-xs text-amber-200 hover:border-amber-400 hover:text-amber-100"
+                    >
+                      PDF
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {reports.length === 0 && <p className="text-xs text-slate-500">No reports generated yet.</p>}
+        </div>
+      )}
+    </div>
+  )
 }
 
 

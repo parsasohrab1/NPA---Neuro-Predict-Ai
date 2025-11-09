@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.DICOM_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.MRI_DIR).mkdir(parents=True, exist_ok=True)
+    Path(settings.REPORTS_DIR).mkdir(parents=True, exist_ok=True)
     Path("models").mkdir(parents=True, exist_ok=True)
     Path("logs").mkdir(parents=True, exist_ok=True)
     
