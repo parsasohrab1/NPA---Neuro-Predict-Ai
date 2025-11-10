@@ -1,0 +1,42 @@
+{
+  "generated_date": "2025-11-10T13:23:00.139853",
+  "total_samples": 100,
+  "sources": {
+    "kaggle_alzheimer": {
+      "name": "Alzheimer Dataset from Kaggle",
+      "url": "https://www.kaggle.com/datasets/tourist55/alzheimers-dataset-4-class-of-images",
+      "description": "Alzheimer classification dataset with MRI images",
+      "license": "CC0: Public Domain",
+      "citation": "Kaggle Community Dataset"
+    },
+    "github_parkinson": {
+      "name": "Parkinson Dataset from GitHub",
+      "url": "https://github.com/neurodata/neuroparc",
+      "description": "Parkinson disease progression markers",
+      "license": "MIT",
+      "citation": "NeuroParc Project"
+    },
+    "adni_simulated": {
+      "name": "ADNI-Inspired Simulated Data",
+      "url": "https://adni.loni.usc.edu/",
+      "description": "Simulated data based on ADNI statistics and patterns",
+      "license": "Research Use Only",
+      "citation": "Based on ADNI data patterns (simulated)"
+    },
+    "oasis_simulated": {
+      "name": "OASIS-Inspired Simulated Data",
+      "url": "https://www.oasis-brains.org/",
+      "description": "Simulated data based on OASIS brain imaging study",
+      "license": "Research Use Only",
+      "citation": "Based on OASIS data patterns (simulated)"
+    }
+  },
+  "notes": [
+    "Data is generated based on real statistical patterns from published research",
+    "ADNI-inspired data uses patterns from Alzheimer's Disease Neuroimaging Initiative",
+    "OASIS-inspired data uses patterns from Open Access Series of Imaging Studies",
+    "PPMI-inspired data uses patterns from Parkinson's Progression Markers Initiative",
+    "All data respects privacy - no real patient information",
+    "For production use, obtain real data with proper ethics approval"
+  ]
+}
