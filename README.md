@@ -1,46 +1,6 @@
 # 🧠 NeuroPredict-AI
 
 ## AI-Powered Neurodegenerative Disease Prediction System
-
-[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://reactjs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg)](https://fastapi.tiangolo.com/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
-
----
-
-## 🚀 Quick Start
-
-```bash
-# Clone repository
-git clone <repository-url>
-cd NPA---Neuro-Predict-Ai
-
-# Run setup script (Linux/Mac)
-chmod +x setup.sh && ./setup.sh
-
-# OR on Windows (PowerShell)
-.\setup.ps1
-
-# Access the application
-# Frontend: http://localhost:3000
-# Username: admin | Password: admin123
-```
-
-📚 **[Complete Getting Started Guide](GETTING_STARTED.md)** | 📖 **[API Documentation](docs/API.md)** | 🏗️ **[Architecture](docs/ARCHITECTURE.md)**
-
----
-
-# Phase 2 Longitudinal Update (Nov 2025)
-
-- اجرای `pytest --cov=app --cov-report=term-missing` انجام شد؛ ۴ تست مربوط به گزارش‌های طولی به خاطر عدم پشتیبانی پارامتر `lifespan` در `httpx.ASGITransport` شکست خوردند. نیاز است httpx ارتقا یابد یا مدیریت lifecycle در تست‌ها بازنویسی شود.
-- وابستگی‌های backend با `aiosqlite==0.19.0` و ارتقای `httpx==0.27.2` به‌روزرسانی شدند تا تست‌های async و Heatmap اجرا شوند.
-- Admin Dashboard فاقد اسکریپت‌های `lint` و `test` است و اجرای `npm run build` به دلیل نبود `tsconfig.json` متوقف می‌شود؛ باید اسکریپت‌های QA و تنظیمات TypeScript اضافه شود.
-- چک‌لیست QA و مستندات `docs/` برای Heatmap چندلایه، هشدار ترکیبی و زمان‌بندی گزارش‌ها به‌روزرسانی شدند.
-
----
-
 # Software Requirements Specification (SRS)
 # NeuroPredict-AI: Alzheimer's and Parkinson's Prediction and Risk Assessment Software
 
