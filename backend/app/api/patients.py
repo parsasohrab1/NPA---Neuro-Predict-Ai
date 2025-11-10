@@ -9,6 +9,7 @@ from typing import List, Optional
 from ..db.session import get_db
 from ..models.user import User
 from ..models.patient import Patient
+from ..models.medical_record import MedicalRecord
 from ..schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from ..core.security import get_current_user, require_role
 
@@ -144,4 +145,58 @@ async def delete_patient(
     await db.commit()
     
     return None
+
+
+@router.get("/{patient_id}/medical-records")
+async def get_patient_medical_records(
+    patient_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all medical records for a patient"""
+    # Verify patient exists
+    result = await db.execute(
+        select(Patient).where(Patient.id == patient_id)
+    )
+    patient = result.scalar_one_or_none()
+    
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient with ID {patient_id} not found"
+        )
+    
+    # Get medical records
+    result = await db.execute(
+        select(MedicalRecord)
+        .where(MedicalRecord.patient_id == patient_id)
+        .order_by(MedicalRecord.visit_date.desc())
+    )
+    records = result.scalars().all()
+    
+    return [
+        {
+            "id": record.id,
+            "visit_date": record.visit_date.isoformat() if record.visit_date else None,
+            "visit_type": record.visit_type,
+            "mmse_score": record.mmse_score,
+            "moca_score": record.moca_score,
+            "memory_score": record.memory_score,
+            "attention_score": record.attention_score,
+            "executive_function_score": record.executive_function_score,
+            "amyloid_beta": record.amyloid_beta,
+            "tau_protein": record.tau_protein,
+            "dopamine_level": record.dopamine_level,
+            "apoe_e4_status": record.apoe_e4_status,
+            "hippocampal_volume": record.hippocampal_volume,
+            "cortical_thickness": record.cortical_thickness,
+            "ventricular_volume": record.ventricular_volume,
+            "white_matter_hyperintensities": record.white_matter_hyperintensities,
+            "brain_volume_total": record.brain_volume_total,
+            "symptoms": record.symptoms,
+            "clinical_notes": record.clinical_notes,
+            "created_at": record.created_at.isoformat() if record.created_at else None,
+        }
+        for record in records
+    ]
 

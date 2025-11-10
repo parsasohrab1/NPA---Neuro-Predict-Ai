@@ -9,6 +9,7 @@ import AuditLogs from './pages/AuditLogs'
 import SystemSettings from './pages/SystemSettings'
 import ReportsPage from './pages/ReportsPage'
 import LongitudinalTrackingPage from './pages/LongitudinalTrackingPage'
+import TestPage from './pages/TestPage'
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: 'models', element: <ModelManagement /> },
       { path: 'audit', element: <AuditLogs /> },
       { path: 'settings', element: <SystemSettings /> },
+      { path: 'test', element: <TestPage /> },
     ],
   },
 ])

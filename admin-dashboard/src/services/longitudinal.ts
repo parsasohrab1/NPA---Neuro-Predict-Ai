@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios from '../config/api'
 
 const API_BASE = '/api/v1/longitudinal'
 
@@ -323,6 +323,40 @@ export const longitudinalService = {
   async executeScheduleRun(runId: number) {
     const response = await axios.post(`${API_BASE}/reports/runs/${runId}/execute`)
     return response.data as ReportRun
+  },
+
+  async fetchBaseline(episodeId: number, metricKey: string, baselineWindowDays = 90) {
+    const params = new URLSearchParams({
+      metric_key: metricKey,
+      baseline_window_days: baselineWindowDays.toString(),
+    })
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/baseline?${params}`)
+    return response.data
+  },
+
+  async fetchPrediction(episodeId: number, metricKey: string, daysAhead = 30) {
+    const params = new URLSearchParams({
+      metric_key: metricKey,
+      days_ahead: daysAhead.toString(),
+    })
+    const response = await axios.get(`${API_BASE}/episodes/${episodeId}/prediction?${params}`)
+    return response.data
+  },
+
+  async fetchCombinedAlerts(episodeId: number, metricKeys?: string[]) {
+    const params = new URLSearchParams()
+    if (metricKeys && metricKeys.length > 0) {
+      params.append('metric_keys', metricKeys.join(','))
+    }
+    const query = params.toString()
+    const url = query ? `${API_BASE}/episodes/${episodeId}/combined-alerts?${query}` : `${API_BASE}/episodes/${episodeId}/combined-alerts`
+    const response = await axios.get(url)
+    return response.data as { alerts: Array<Record<string, unknown>> }
+  },
+
+  async fetchScheduleMonitoring(scheduleId: number) {
+    const response = await axios.get(`${API_BASE}/reports/schedules/${scheduleId}/monitoring`)
+    return response.data
   },
 }
 

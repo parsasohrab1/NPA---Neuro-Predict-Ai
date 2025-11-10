@@ -473,3 +473,67 @@ async def execute_schedule_run(
     return run
 
 
+@router.get(
+    "/episodes/{episode_id}/baseline",
+)
+async def get_personal_baseline(
+    episode_id: int,
+    metric_key: str = Query(..., min_length=1),
+    baseline_window_days: int = Query(90, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("researcher")),
+):
+    """Get personal baseline for a metric"""
+    baseline = await longitudinal_service.calculate_personal_baseline(
+        db, episode_id, metric_key, baseline_window_days
+    )
+    return baseline
+
+
+@router.get(
+    "/episodes/{episode_id}/prediction",
+)
+async def get_future_prediction(
+    episode_id: int,
+    metric_key: str = Query(..., min_length=1),
+    days_ahead: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("researcher")),
+):
+    """Predict future metric value"""
+    prediction = await longitudinal_service.predict_future_progression(
+        db, episode_id, metric_key, days_ahead
+    )
+    return prediction
+
+
+@router.get(
+    "/episodes/{episode_id}/combined-alerts",
+)
+async def get_combined_alerts(
+    episode_id: int,
+    metric_keys: Optional[str] = Query(None, description="Comma-separated metric keys"),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+):
+    """Get combined alerts based on multiple metrics"""
+    keys_list = None
+    if metric_keys:
+        keys_list = [k.strip() for k in metric_keys.split(',') if k.strip()]
+    alerts = await longitudinal_service.evaluate_combined_alerts(db, episode_id, keys_list)
+    return {"alerts": alerts}
+
+
+@router.get(
+    "/reports/schedules/{schedule_id}/monitoring",
+)
+async def get_schedule_monitoring(
+    schedule_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+):
+    """Get monitoring statistics for a report schedule"""
+    stats = await longitudinal_service.get_schedule_monitoring_stats(db, schedule_id)
+    return stats
+
+

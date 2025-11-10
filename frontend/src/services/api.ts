@@ -61,6 +61,32 @@ export const patientsApi = {
   delete: async (id: number) => {
     await axios.delete(`${API_URL}/patients/${id}`)
   },
+
+  getMedicalRecords: async (patientId: number) => {
+    const response = await axios.get(`${API_URL}/patients/${patientId}/medical-records`)
+    return response.data as Array<{
+      id: number
+      visit_date: string
+      visit_type: string | null
+      mmse_score: number | null
+      moca_score: number | null
+      memory_score: number | null
+      attention_score: number | null
+      executive_function_score: number | null
+      amyloid_beta: number | null
+      tau_protein: number | null
+      dopamine_level: number | null
+      apoe_e4_status: boolean | null
+      hippocampal_volume: number | null
+      cortical_thickness: number | null
+      ventricular_volume: number | null
+      white_matter_hyperintensities: number | null
+      brain_volume_total: number | null
+      symptoms: string | null
+      clinical_notes: string | null
+      created_at: string
+    }>
+  },
 }
 
 export const predictionsApi = {
@@ -88,6 +114,19 @@ export const predictionsApi = {
     })
     return response.data as Prediction
   },
+
+  getImagingStudies: async (predictionId: number) => {
+    const response = await axios.get(`${API_URL}/predictions/${predictionId}/imaging-studies`)
+    return response.data as Array<{
+      id: number
+      study_id: string
+      modality: string
+      study_date: string | null
+      study_description: string | null
+      image_count: number
+      quality_score: number | null
+    }>
+  },
 }
 
 export interface DicomUploadResponse {
@@ -112,6 +151,24 @@ export const imagingApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return response.data as DicomUploadResponse
+  },
+
+  getStudyPreview: (studyId: number, sliceIndex = 0) => {
+    return `${API_URL}/imaging/studies/${studyId}/preview?slice_index=${sliceIndex}`
+  },
+
+  getStudySlice: (studyId: number, sliceIndex: number) => {
+    return `${API_URL}/imaging/studies/${studyId}/slice/${sliceIndex}`
+  },
+
+  getStudySlices: async (studyId: number) => {
+    const response = await axios.get(`${API_URL}/imaging/studies/${studyId}/slices`)
+    return response.data as {
+      study_id: number
+      total_slices: number
+      modality: string
+      study_date: string | null
+    }
   },
 }
 

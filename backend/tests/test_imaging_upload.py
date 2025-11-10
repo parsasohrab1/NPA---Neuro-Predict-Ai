@@ -3,8 +3,12 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Tuple
 
-import numpy as np
 import pytest
+
+pytest.importorskip("numpy")
+pytest.importorskip("pydicom")
+
+import numpy as np
 import pydicom
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -50,7 +54,7 @@ async def create_test_client(tmp_path: Path) -> Tuple[AsyncClient, async_session
     settings.DICOM_DIR = str(storage_root / "dicom")
     Path(settings.DICOM_DIR).mkdir(parents=True, exist_ok=True)
 
-    transport = ASGITransport(app=app, lifespan="auto")
+    transport = ASGITransport(app=app)
     client = AsyncClient(transport=transport, base_url="http://test")
 
     async def cleanup():

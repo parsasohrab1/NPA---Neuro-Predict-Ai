@@ -11,7 +11,16 @@ from pathlib import Path
 
 from .core.config import settings
 from .db.session import init_db, close_db
-from .api import auth, patients, predictions, imaging, reports, longitudinal
+from .api import (
+    auth, patients, predictions, imaging, reports, longitudinal,
+    security, monitoring, integration, backup
+)
+from .middleware.security_middleware import (
+    SecurityHeadersMiddleware,
+    RateLimitMiddleware,
+    RequestLoggingMiddleware
+)
+import redis.asyncio as redis
 
 # Configure logging
 logging.basicConfig(
@@ -34,6 +43,7 @@ async def lifespan(app: FastAPI):
     Path(settings.REPORTS_DIR).mkdir(parents=True, exist_ok=True)
     Path("models").mkdir(parents=True, exist_ok=True)
     Path("logs").mkdir(parents=True, exist_ok=True)
+    Path("backups").mkdir(parents=True, exist_ok=True)
     
     # Initialize database
     try:
@@ -42,10 +52,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
     
+    # Initialize Redis connection for caching
+    try:
+        redis_client = redis.from_url(
+            f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
+            decode_responses=False
+        )
+        await redis_client.ping()
+        app.state.redis = redis_client
+        logger.info("Redis connection established")
+    except Exception as e:
+        logger.warning(f"Redis connection failed: {e}")
+        app.state.redis = None
+    
     yield
     
     # Shutdown
     logger.info("Shutting down NeuroPredict-AI application...")
+    if hasattr(app.state, 'redis') and app.state.redis:
+        await app.state.redis.close()
     await close_db()
 
 
@@ -68,6 +93,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security Middleware
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+
+# Rate Limiting Middleware (requires Redis)
+try:
+    redis_client = redis.from_url(
+        f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
+        decode_responses=False
+    )
+    app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
+except Exception:
+    logger.warning("Rate limiting disabled - Redis not available")
 
 
 # Exception handlers
@@ -110,6 +149,10 @@ app.include_router(predictions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(imaging.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(longitudinal.router, prefix=settings.API_V1_PREFIX)
+app.include_router(security.router, prefix=settings.API_V1_PREFIX)
+app.include_router(monitoring.router, prefix=settings.API_V1_PREFIX)
+app.include_router(integration.router, prefix=settings.API_V1_PREFIX)
+app.include_router(backup.router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":

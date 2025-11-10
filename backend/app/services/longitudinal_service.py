@@ -1,3 +1,609 @@
+"""
+Longitudinal Tracking Service
+"""
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+except ImportError:  # pragma: no cover - optional dependency guard
+    letter = None
+    canvas = None
+from sqlalchemy import Select, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
+
+from ..core.config import settings
+from ..models.longitudinal import (
+    AlertSeverity,
+    AlertType,
+    LongitudinalAlert,
+    LongitudinalEpisode,
+    LongitudinalEpisodeStatus,
+    LongitudinalMetric,
+    LongitudinalReport,
+    LongitudinalReportFormat,
+    LongitudinalReportStatus,
+    LongitudinalReportRun,
+    LongitudinalReportRunStatus,
+    LongitudinalReportSchedule,
+    LongitudinalReportScheduleStatus,
+    LongitudinalVisit,
+    LongitudinalVisitType,
+    MetricCategory,
+)
+from ..models.patient import Gender, Patient
+from ..schemas.longitudinal import (
+    LongitudinalEpisodeCreate,
+    LongitudinalMetricCreate,
+    LongitudinalVisitCreate,
+    ReportScheduleCreate,
+)
+from ..services.image_processing_service import image_processing_service
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class LongitudinalTrackingService:
+    async def list_episodes(self, db: AsyncSession, patient_id: int) -> List[LongitudinalEpisode]:
+        stmt: Select[LongitudinalEpisode] = (
+            select(LongitudinalEpisode)
+            .where(LongitudinalEpisode.patient_id == patient_id)
+            .order_by(LongitudinalEpisode.start_date.nullslast())
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_episode(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        patient_id: Optional[int] = None,
+    ) -> Optional[LongitudinalEpisode]:
+        stmt = (
+            select(LongitudinalEpisode)
+            .options(
+                selectinload(LongitudinalEpisode.visits).selectinload(LongitudinalVisit.metrics),
+                selectinload(LongitudinalEpisode.alerts),
+            )
+            .where(LongitudinalEpisode.id == episode_id)
+        )
+        if patient_id is not None:
+            stmt = stmt.where(LongitudinalEpisode.patient_id == patient_id)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def create_episode(
+        self,
+        db: AsyncSession,
+        patient_id: int,
+        payload: LongitudinalEpisodeCreate,
+    ) -> LongitudinalEpisode:
+        episode = LongitudinalEpisode(
+            patient_id=patient_id,
+            title=payload.title,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            status=LongitudinalEpisodeStatus.ACTIVE,
+        )
+        db.add(episode)
+        await db.commit()
+        await db.refresh(episode)
+        return episode
+
+    async def add_visit(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        payload: LongitudinalVisitCreate,
+    ) -> LongitudinalVisit:
+        visit = LongitudinalVisit(
+            episode_id=episode_id,
+            medical_record_id=payload.medical_record_id,
+            imaging_study_id=payload.imaging_study_id,
+            prediction_id=payload.prediction_id,
+            visit_date=payload.visit_date or datetime.utcnow(),
+            visit_type=payload.visit_type,
+            notes=payload.notes,
+            progression_score=payload.progression_score,
+        )
+        db.add(visit)
+        await db.commit()
+        await db.refresh(visit)
+        return visit
+
+    async def add_metrics(
+        self,
+        db: AsyncSession,
+        visit_id: int,
+        metrics: Iterable[LongitudinalMetricCreate],
+    ) -> List[LongitudinalMetric]:
+        metric_entities: List[LongitudinalMetric] = []
+        for metric in metrics:
+            metric_entities.append(
+                LongitudinalMetric(
+                    visit_id=visit_id,
+                    metric_type=metric.metric_type,
+                    metric_key=metric.metric_key,
+                    metric_value=metric.metric_value,
+                    metric_payload=metric.metric_payload,
+                    unit=metric.unit,
+                    z_score=metric.z_score,
+                )
+            )
+        db.add_all(metric_entities)
+        await db.commit()
+        for entity in metric_entities:
+            await db.refresh(entity)
+
+        visit_stmt = select(LongitudinalVisit).where(LongitudinalVisit.id == visit_id)
+        visit_result = await db.execute(visit_stmt)
+        visit = visit_result.scalar_one()
+        await self._evaluate_alerts_for_visit(db, visit, metric_entities)
+        return metric_entities
+
+    async def get_timeline(self, db: AsyncSession, episode_id: int) -> List[LongitudinalVisit]:
+        stmt = (
+            select(LongitudinalVisit)
+            .options(selectinload(LongitudinalVisit.metrics))
+            .where(LongitudinalVisit.episode_id == episode_id)
+            .order_by(LongitudinalVisit.visit_date)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_metric_trend(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        metric_key: str,
+        metric_type: Optional[MetricCategory] = None,
+    ) -> List[LongitudinalMetric]:
+        stmt = (
+            select(LongitudinalMetric)
+            .join(LongitudinalVisit)
+            .where(
+                LongitudinalVisit.episode_id == episode_id,
+                LongitudinalMetric.metric_key == metric_key,
+            )
+            .order_by(LongitudinalVisit.visit_date)
+        )
+        if metric_type:
+            stmt = stmt.where(LongitudinalMetric.metric_type == metric_type)
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_episode_visit_count(self, db: AsyncSession, episode_id: int) -> int:
+        stmt = select(func.count(LongitudinalVisit.id)).where(LongitudinalVisit.episode_id == episode_id)
+        result = await db.execute(stmt)
+        return result.scalar_one()
+
+    async def compare_imaging(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        visit_a_id: int,
+        visit_b_id: int,
+    ) -> Dict[str, object]:
+        stmt = (
+            select(LongitudinalVisit)
+            .options(selectinload(LongitudinalVisit.imaging_study))
+            .where(
+                LongitudinalVisit.episode_id == episode_id,
+                LongitudinalVisit.id.in_([visit_a_id, visit_b_id]),
+            )
+        )
+        result = await db.execute(stmt)
+        visits = {visit.id: visit for visit in result.scalars()}
+
+        visit_a = visits.get(visit_a_id)
+        visit_b = visits.get(visit_b_id)
+
+        if not visit_a or not visit_b:
+            raise ValueError("visit_not_found")
+        if visit_a.episode_id != episode_id or visit_b.episode_id != episode_id:
+            raise ValueError("episode_mismatch")
+        if visit_a.imaging_study is None or visit_b.imaging_study is None:
+            raise ValueError("imaging_not_available")
+
+        comparison = image_processing_service.compare_dicom_files(
+            visit_a.imaging_study.dicom_path,
+            visit_b.imaging_study.dicom_path,
+        )
+        comparison.update(
+            {
+                "episode_id": episode_id,
+                "visit_a_id": visit_a_id,
+                "visit_b_id": visit_b_id,
+                "visit_a_date": visit_a.visit_date,
+                "visit_b_date": visit_b.visit_date,
+            }
+        )
+        return comparison
+
+    async def get_alerts(self, db: AsyncSession, episode_id: int) -> List[LongitudinalAlert]:
+        stmt = (
+            select(LongitudinalAlert)
+            .where(LongitudinalAlert.episode_id == episode_id)
+            .order_by(LongitudinalAlert.created_at.desc())
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def acknowledge_alert(self, db: AsyncSession, alert_id: int) -> Optional[LongitudinalAlert]:
+        stmt = select(LongitudinalAlert).where(LongitudinalAlert.id == alert_id)
+        result = await db.execute(stmt)
+        alert = result.scalar_one_or_none()
+        if alert is None:
+            return None
+        alert.acknowledged_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(alert)
+        return alert
+
+    async def get_progression_summary(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        metric_keys: Optional[Sequence[str]] = None,
+    ) -> Dict[str, Dict[str, Optional[float]]]:
+        keys = metric_keys or ["mmse", "amyloid_beta", "parkinson_risk_score"]
+        summary: Dict[str, Dict[str, Optional[float]]] = {}
+        for key in keys:
+            metrics = await self.get_metric_trend(db, episode_id, key)
+            if not metrics:
+                summary[key] = {
+                    "slope": None,
+                    "latest_value": None,
+                    "latest_recorded_at": None,
+                }
+                continue
+            slope = self._compute_slope(metrics)
+            latest = metrics[-1]
+            summary[key] = {
+                "slope": slope,
+                "latest_value": latest.metric_value,
+                "latest_recorded_at": latest.visit.visit_date if latest.visit else None,
+            }
+        return summary
+
+    async def create_report(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        created_by: Optional[int],
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        report_format: LongitudinalReportFormat = LongitudinalReportFormat.EXCEL,
+        report_type: str = "summary",
+        cohort_filters: Optional[Dict[str, Any]] = None,
+        comparison_filters: Optional[Dict[str, Any]] = None,
+    ) -> LongitudinalReport:
+        if report_type == "summary":
+            return await self._create_summary_report(
+                db=db,
+                episode_id=episode_id,
+                created_by=created_by,
+                start_date=start_date,
+                end_date=end_date,
+                report_format=report_format,
+            )
+
+        return await self._create_cohort_report(
+            db=db,
+            episode_id=episode_id,
+            created_by=created_by,
+            start_date=start_date,
+            end_date=end_date,
+            report_format=report_format,
+            report_type=report_type,
+            cohort_filters=cohort_filters or {},
+            comparison_filters=comparison_filters or {},
+        )
+
+    async def list_reports(self, db: AsyncSession, episode_id: int) -> List[LongitudinalReport]:
+        stmt = (
+            select(LongitudinalReport)
+            .where(LongitudinalReport.episode_id == episode_id)
+            .order_by(LongitudinalReport.created_at.desc())
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_report(self, db: AsyncSession, report_id: int) -> Optional[LongitudinalReport]:
+        stmt = select(LongitudinalReport).where(LongitudinalReport.id == report_id)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def create_schedule(
+        self,
+        db: AsyncSession,
+        payload: ReportScheduleCreate,
+        created_by: Optional[int],
+    ) -> LongitudinalReportSchedule:
+        schedule = LongitudinalReportSchedule(
+            name=payload.name,
+            episode_id=payload.episode_id,
+            report_type=payload.report_type,
+            cohort_definition=payload.cohort_filters,
+            comparison_definition=payload.comparison_filters,
+            schedule_cron=payload.schedule_cron,
+            status=LongitudinalReportScheduleStatus.ACTIVE,
+            created_by=created_by,
+        )
+        db.add(schedule)
+        await db.commit()
+        await db.refresh(schedule)
+        return schedule
+
+    async def list_schedules(self, db: AsyncSession) -> List[LongitudinalReportSchedule]:
+        stmt = (
+            select(LongitudinalReportSchedule)
+            .options(joinedload(LongitudinalReportSchedule.runs))
+            .order_by(LongitudinalReportSchedule.created_at.desc())
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def update_schedule_status(
+        self,
+        db: AsyncSession,
+        schedule_id: int,
+        status: LongitudinalReportScheduleStatus,
+    ) -> Optional[LongitudinalReportSchedule]:
+        schedule = await db.get(LongitudinalReportSchedule, schedule_id)
+        if schedule is None:
+            return None
+        schedule.status = status
+        await db.commit()
+        await db.refresh(schedule)
+        return schedule
+
+    async def delete_schedule(self, db: AsyncSession, schedule_id: int) -> bool:
+        schedule = await db.get(LongitudinalReportSchedule, schedule_id)
+        if schedule is None:
+            return False
+        await db.delete(schedule)
+        await db.commit()
+        return True
+
+    async def enqueue_schedule_run(
+        self,
+        db: AsyncSession,
+        schedule_id: int,
+    ) -> Optional[LongitudinalReportRun]:
+        schedule = await db.get(LongitudinalReportSchedule, schedule_id)
+        if schedule is None:
+            return None
+        run = LongitudinalReportRun(
+            schedule_id=schedule.id,
+            status=LongitudinalReportRunStatus.QUEUED,
+        )
+        db.add(run)
+        await db.commit()
+        await db.refresh(run)
+        return run
+
+    async def list_schedule_runs(self, db: AsyncSession, schedule_id: int) -> List[LongitudinalReportRun]:
+        stmt = (
+            select(LongitudinalReportRun)
+            .where(LongitudinalReportRun.schedule_id == schedule_id)
+            .order_by(LongitudinalReportRun.id.desc())
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def execute_schedule_run(
+        self,
+        db: AsyncSession,
+        run_id: int,
+    ) -> Optional[LongitudinalReportRun]:
+        run = await db.get(LongitudinalReportRun, run_id)
+        if run is None:
+            return None
+        schedule = await db.get(LongitudinalReportSchedule, run.schedule_id)
+        if schedule is None:
+            run.status = LongitudinalReportRunStatus.FAILED
+            run.error_message = "schedule_missing"
+            await db.commit()
+            return run
+
+        # Set SLA deadline
+        if schedule.sla_hours:
+            run.sla_deadline = datetime.utcnow() + timedelta(hours=schedule.sla_hours)
+        
+        run.status = LongitudinalReportRunStatus.RUNNING
+        run.started_at = datetime.utcnow()
+        await db.commit()
+
+        try:
+            report = await self.create_report(
+                db=db,
+                episode_id=schedule.episode_id,
+                created_by=schedule.created_by,
+                start_date=None,
+                end_date=None,
+                report_format=LongitudinalReportFormat.EXCEL,
+                report_type=schedule.report_type,
+                cohort_filters=schedule.cohort_definition or {},
+                comparison_filters=schedule.comparison_definition or {},
+            )
+            run.status = LongitudinalReportRunStatus.SUCCESS
+            run.report_id = report.id
+            run.finished_at = datetime.utcnow()
+            
+            # Check SLA
+            if run.sla_deadline:
+                run.sla_met = "yes" if run.finished_at <= run.sla_deadline else "no"
+            else:
+                run.sla_met = "n/a"
+            
+            schedule.last_run_at = run.finished_at
+            
+            # Distribute report if configured
+            if schedule.distribution_method and schedule.distribution_config:
+                await self._distribute_report(db, run, schedule, report)
+            
+            await db.commit()
+            return run
+        except Exception as exc:  # noqa: BLE001
+            run.status = LongitudinalReportRunStatus.FAILED
+            run.error_message = str(exc)
+            run.finished_at = datetime.utcnow()
+            if run.sla_deadline:
+                run.sla_met = "no"
+            await db.commit()
+            return run
+
+    async def _distribute_report(
+        self,
+        db: AsyncSession,
+        run: LongitudinalReportRun,
+        schedule: LongitudinalReportSchedule,
+        report: LongitudinalReport,
+    ) -> None:
+        """
+        Distribute report via configured method (email, SFTP, webhook)
+        """
+        try:
+            config = schedule.distribution_config or {}
+            method = schedule.distribution_method
+            
+            if method == "email":
+                await self._distribute_via_email(run, schedule, report, config)
+            elif method == "sftp":
+                await self._distribute_via_sftp(run, schedule, report, config)
+            elif method == "webhook":
+                await self._distribute_via_webhook(run, schedule, report, config)
+            
+            run.distribution_status = "sent"
+            run.distributed_at = datetime.utcnow()
+        except Exception as exc:  # noqa: BLE001
+            run.distribution_status = "failed"
+            run.distribution_error = str(exc)
+            logger.error(f"Failed to distribute report {report.id}: {exc}")
+
+    async def _distribute_via_email(
+        self,
+        run: LongitudinalReportRun,
+        schedule: LongitudinalReportSchedule,
+        report: LongitudinalReport,
+        config: Dict[str, Any],
+    ) -> None:
+        """Distribute report via email (placeholder - integrate with email service)"""
+        recipients = config.get("recipients", [])
+        if not recipients:
+            raise ValueError("No email recipients configured")
+        
+        # Placeholder: In production, use email service (e.g., SendGrid, SES)
+        logger.info(f"Would send report {report.id} to {recipients} via email")
+        # Example: email_service.send_report(recipients, report.file_path, report.pdf_path)
+
+    async def _distribute_via_sftp(
+        self,
+        run: LongitudinalReportRun,
+        schedule: LongitudinalReportSchedule,
+        report: LongitudinalReport,
+        config: Dict[str, Any],
+    ) -> None:
+        """Distribute report via SFTP (placeholder - integrate with SFTP client)"""
+        host = config.get("host")
+        username = config.get("username")
+        password = config.get("password")
+        remote_path = config.get("remote_path", "/reports")
+        
+        if not all([host, username, password]):
+            raise ValueError("SFTP configuration incomplete")
+        
+        # Placeholder: In production, use paramiko or similar
+        logger.info(f"Would upload report {report.id} to SFTP {host}:{remote_path}")
+        # Example: sftp_client.upload(report.file_path, f"{remote_path}/report_{report.id}.xlsx")
+
+    async def _distribute_via_webhook(
+        self,
+        run: LongitudinalReportRun,
+        schedule: LongitudinalReportSchedule,
+        report: LongitudinalReport,
+        config: Dict[str, Any],
+    ) -> None:
+        """Distribute report via webhook (placeholder - integrate with HTTP client)"""
+        webhook_url = config.get("url")
+        if not webhook_url:
+            raise ValueError("Webhook URL not configured")
+        
+        # Placeholder: In production, use httpx or requests
+        logger.info(f"Would POST report {report.id} metadata to webhook {webhook_url}")
+        # Example: httpx.post(webhook_url, json={"report_id": report.id, "download_url": ...})
+
+    async def get_schedule_monitoring_stats(
+        self,
+        db: AsyncSession,
+        schedule_id: int,
+    ) -> Dict[str, Any]:
+        """
+        Get monitoring statistics for a schedule
+        
+        Returns:
+            Dictionary with success rate, average duration, SLA compliance, etc.
+        """
+        schedule = await db.get(LongitudinalReportSchedule, schedule_id)
+        if schedule is None:
+            return {}
+        
+        runs = await self.list_schedule_runs(db, schedule_id)
+        if not runs:
+            return {
+                "total_runs": 0,
+                "success_rate": 0.0,
+                "average_duration_seconds": None,
+                "sla_compliance_rate": 0.0,
+                "distribution_success_rate": 0.0,
+            }
+        
+        total_runs = len(runs)
+        successful_runs = len([r for r in runs if r.status == LongitudinalReportRunStatus.SUCCESS])
+        success_rate = successful_runs / total_runs if total_runs > 0 else 0.0
+        
+        # Calculate average duration
+        durations = []
+        for run in runs:
+            if run.started_at and run.finished_at:
+                duration = (run.finished_at - run.started_at).total_seconds()
+                durations.append(duration)
+        avg_duration = float(np.mean(durations)) if durations else None
+        
+        # SLA compliance
+        sla_runs = [r for r in runs if r.sla_met is not None and r.sla_met != "n/a"]
+        sla_met_count = len([r for r in sla_runs if r.sla_met == "yes"])
+        sla_compliance = sla_met_count / len(sla_runs) if sla_runs else 0.0
+        
+        # Distribution success
+        distributed_runs = [r for r in runs if r.distribution_status is not None]
+        distribution_success = len([r for r in distributed_runs if r.distribution_status == "sent"])
+        distribution_success_rate = distribution_success / len(distributed_runs) if distributed_runs else 0.0
+        
+        return {
+            "total_runs": total_runs,
+            "success_rate": success_rate,
+            "average_duration_seconds": avg_duration,
+            "sla_compliance_rate": sla_compliance,
+            "distribution_success_rate": distribution_success_rate,
+            "last_run_at": schedule.last_run_at.isoformat() if schedule.last_run_at else None,
+        }
+
     async def _create_summary_report(
         self,
         db: AsyncSession,
@@ -71,13 +677,16 @@
         pdf_path_str: Optional[str] = None
 
         if report_format == LongitudinalReportFormat.PDF:
+            if canvas is None or letter is None:
+                raise RuntimeError("reportlab_not_installed")
             self._write_pdf_report(pdf_path, summary_payload, charts_payload=charts_payload)
             file_path = pdf_path
         else:
             self._write_excel_report(excel_path, summary_payload, charts_payload=charts_payload)
             file_path = excel_path
-            self._write_pdf_report(pdf_path, summary_payload, charts_payload=charts_payload)
-            pdf_path_str = str(pdf_path)
+            if canvas is not None and letter is not None:
+                self._write_pdf_report(pdf_path, summary_payload, charts_payload=charts_payload)
+                pdf_path_str = str(pdf_path)
 
         report = LongitudinalReport(
             episode_id=episode_id,
@@ -469,7 +1078,9 @@
         if date_of_birth is None:
             return None
         today = datetime.utcnow().date()
-        age = today.year - date_of_birth.year - ((today.month, today.day) < (date_of_birth.month, date_of_birth.day))
+        age = today.year - date_of_birth.year - (
+            (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
+        )
         return age
 
     async def _create_cohort_report(
@@ -502,6 +1113,8 @@
         pdf_path_str: Optional[str] = None
 
         if report_format == LongitudinalReportFormat.PDF:
+            if canvas is None or letter is None:
+                raise RuntimeError("reportlab_not_installed")
             self._write_pdf_report(
                 pdf_path,
                 cohort_result["summary"],
@@ -518,13 +1131,14 @@
                 heatmap_path=cohort_result.get("heatmap_path"),
             )
             file_path = excel_path
-            self._write_pdf_report(
-                pdf_path,
-                cohort_result["summary"],
-                charts_payload=cohort_result["charts"],
-                heatmap_path=cohort_result.get("heatmap_path"),
-            )
-            pdf_path_str = str(pdf_path)
+            if canvas is not None and letter is not None:
+                self._write_pdf_report(
+                    pdf_path,
+                    cohort_result["summary"],
+                    charts_payload=cohort_result["charts"],
+                    heatmap_path=cohort_result.get("heatmap_path"),
+                )
+                pdf_path_str = str(pdf_path)
 
         report = LongitudinalReport(
             episode_id=episode_id,
@@ -546,448 +1160,6 @@
         await db.commit()
         await db.refresh(report)
         return report
-"""
-Longitudinal Tracking Service
-"""
-from __future__ import annotations
-
-from datetime import datetime, date
-from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
-
-import numpy as np
-import pandas as pd
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from sqlalchemy import Select, and_, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
-
-from ..core.config import settings
-from ..models.longitudinal import (
-    AlertSeverity,
-    AlertType,
-    LongitudinalAlert,
-    LongitudinalEpisode,
-    LongitudinalEpisodeStatus,
-    LongitudinalMetric,
-    LongitudinalVisit,
-    LongitudinalVisitType,
-    MetricCategory,
-    LongitudinalReport,
-    LongitudinalReportFormat,
-    LongitudinalReportStatus,
-    LongitudinalReportSchedule,
-    LongitudinalReportScheduleStatus,
-    LongitudinalReportRun,
-    LongitudinalReportRunStatus,
-)
-from ..models.patient import Patient, Gender
-from ..schemas.longitudinal import (
-    LongitudinalEpisodeCreate,
-    LongitudinalMetricCreate,
-    LongitudinalVisitCreate,
-    ReportScheduleCreate,
-)
-from ..services.image_processing_service import image_processing_service
-
-
-class LongitudinalTrackingService:
-    async def list_episodes(self, db: AsyncSession, patient_id: int) -> List[LongitudinalEpisode]:
-        stmt: Select[LongitudinalEpisode] = (
-            select(LongitudinalEpisode)
-            .where(LongitudinalEpisode.patient_id == patient_id)
-            .order_by(LongitudinalEpisode.start_date.nullslast())
-        )
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def get_episode(
-        self,
-        db: AsyncSession,
-        episode_id: int,
-        patient_id: Optional[int] = None,
-    ) -> Optional[LongitudinalEpisode]:
-        stmt = (
-            select(LongitudinalEpisode)
-            .options(
-                selectinload(LongitudinalEpisode.visits).selectinload(LongitudinalVisit.metrics),
-                selectinload(LongitudinalEpisode.alerts),
-            )
-            .where(LongitudinalEpisode.id == episode_id)
-        )
-        if patient_id is not None:
-            stmt = stmt.where(LongitudinalEpisode.patient_id == patient_id)
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def create_episode(
-        self,
-        db: AsyncSession,
-        patient_id: int,
-        payload: LongitudinalEpisodeCreate,
-    ) -> LongitudinalEpisode:
-        episode = LongitudinalEpisode(
-            patient_id=patient_id,
-            title=payload.title,
-            start_date=payload.start_date,
-            end_date=payload.end_date,
-            status=LongitudinalEpisodeStatus.ACTIVE,
-        )
-        db.add(episode)
-        await db.commit()
-        await db.refresh(episode)
-        return episode
-
-    async def add_visit(
-        self,
-        db: AsyncSession,
-        episode_id: int,
-        payload: LongitudinalVisitCreate,
-    ) -> LongitudinalVisit:
-        visit = LongitudinalVisit(
-            episode_id=episode_id,
-            medical_record_id=payload.medical_record_id,
-            imaging_study_id=payload.imaging_study_id,
-            prediction_id=payload.prediction_id,
-            visit_date=payload.visit_date or datetime.utcnow(),
-            visit_type=payload.visit_type,
-            notes=payload.notes,
-            progression_score=payload.progression_score,
-        )
-        db.add(visit)
-        await db.commit()
-        await db.refresh(visit)
-        return visit
-
-    async def add_metrics(
-        self,
-        db: AsyncSession,
-        visit_id: int,
-        metrics: Iterable[LongitudinalMetricCreate],
-    ) -> List[LongitudinalMetric]:
-        metric_entities: List[LongitudinalMetric] = []
-        for metric in metrics:
-            metric_entities.append(
-                LongitudinalMetric(
-                    visit_id=visit_id,
-                    metric_type=metric.metric_type,
-                    metric_key=metric.metric_key,
-                    metric_value=metric.metric_value,
-                    metric_payload=metric.metric_payload,
-                    unit=metric.unit,
-                    z_score=metric.z_score,
-                )
-            )
-        db.add_all(metric_entities)
-        await db.commit()
-        for entity in metric_entities:
-            await db.refresh(entity)
-
-        visit_stmt = select(LongitudinalVisit).where(LongitudinalVisit.id == visit_id)
-        visit_result = await db.execute(visit_stmt)
-        visit = visit_result.scalar_one()
-        await self._evaluate_alerts_for_visit(db, visit, metric_entities)
-        return metric_entities
-
-    async def get_timeline(self, db: AsyncSession, episode_id: int) -> List[LongitudinalVisit]:
-        stmt = (
-            select(LongitudinalVisit)
-            .options(selectinload(LongitudinalVisit.metrics))
-            .where(LongitudinalVisit.episode_id == episode_id)
-            .order_by(LongitudinalVisit.visit_date)
-        )
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def get_metric_trend(
-        self,
-        db: AsyncSession,
-        episode_id: int,
-        metric_key: str,
-        metric_type: Optional[MetricCategory] = None,
-    ) -> List[LongitudinalMetric]:
-        stmt = (
-            select(LongitudinalMetric)
-            .join(LongitudinalVisit)
-            .where(
-                LongitudinalVisit.episode_id == episode_id,
-                LongitudinalMetric.metric_key == metric_key,
-            )
-            .order_by(LongitudinalVisit.visit_date)
-        )
-        if metric_type:
-            stmt = stmt.where(LongitudinalMetric.metric_type == metric_type)
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def get_episode_visit_count(self, db: AsyncSession, episode_id: int) -> int:
-        stmt = select(func.count(LongitudinalVisit.id)).where(LongitudinalVisit.episode_id == episode_id)
-        result = await db.execute(stmt)
-        return result.scalar_one()
-
-    async def compare_imaging(
-        self,
-        db: AsyncSession,
-        episode_id: int,
-        visit_a_id: int,
-        visit_b_id: int,
-    ) -> Dict[str, object]:
-        stmt = (
-            select(LongitudinalVisit)
-            .options(selectinload(LongitudinalVisit.imaging_study))
-            .where(
-                LongitudinalVisit.episode_id == episode_id,
-                LongitudinalVisit.id.in_([visit_a_id, visit_b_id]),
-            )
-        )
-        result = await db.execute(stmt)
-        visits = {visit.id: visit for visit in result.scalars()}
-
-        visit_a = visits.get(visit_a_id)
-        visit_b = visits.get(visit_b_id)
-
-        if not visit_a or not visit_b:
-            raise ValueError("visit_not_found")
-        if visit_a.episode_id != episode_id or visit_b.episode_id != episode_id:
-            raise ValueError("episode_mismatch")
-        if visit_a.imaging_study is None or visit_b.imaging_study is None:
-            raise ValueError("imaging_not_available")
-
-        comparison = image_processing_service.compare_dicom_files(
-            visit_a.imaging_study.dicom_path,
-            visit_b.imaging_study.dicom_path,
-        )
-        comparison.update(
-            {
-                "episode_id": episode_id,
-                "visit_a_id": visit_a_id,
-                "visit_b_id": visit_b_id,
-                "visit_a_date": visit_a.visit_date,
-                "visit_b_date": visit_b.visit_date,
-            }
-        )
-        return comparison
-
-    async def get_alerts(self, db: AsyncSession, episode_id: int) -> List[LongitudinalAlert]:
-        stmt = (
-            select(LongitudinalAlert)
-            .where(LongitudinalAlert.episode_id == episode_id)
-            .order_by(LongitudinalAlert.created_at.desc())
-        )
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def acknowledge_alert(self, db: AsyncSession, alert_id: int) -> Optional[LongitudinalAlert]:
-        stmt = select(LongitudinalAlert).where(LongitudinalAlert.id == alert_id)
-        result = await db.execute(stmt)
-        alert = result.scalar_one_or_none()
-        if alert is None:
-            return None
-        alert.acknowledged_at = datetime.utcnow()
-        await db.commit()
-        await db.refresh(alert)
-        return alert
-
-    async def get_progression_summary(
-        self,
-        db: AsyncSession,
-        episode_id: int,
-        metric_keys: Optional[Sequence[str]] = None,
-    ) -> Dict[str, Dict[str, Optional[float]]]:
-        keys = metric_keys or ["mmse", "amyloid_beta", "parkinson_risk_score"]
-        summary: Dict[str, Dict[str, Optional[float]]] = {}
-        for key in keys:
-            metrics = await self.get_metric_trend(db, episode_id, key)
-            if not metrics:
-                summary[key] = {
-                    "slope": None,
-                    "latest_value": None,
-                    "latest_recorded_at": None,
-                }
-                continue
-            slope = self._compute_slope(metrics)
-            latest = metrics[-1]
-            summary[key] = {
-                "slope": slope,
-                "latest_value": latest.metric_value,
-                "latest_recorded_at": latest.visit.visit_date if latest.visit else None,
-            }
-        return summary
-
-    async def create_report(
-        self,
-        db: AsyncSession,
-        episode_id: int,
-        created_by: Optional[int],
-        start_date: Optional[datetime],
-        end_date: Optional[datetime],
-        report_format: LongitudinalReportFormat = LongitudinalReportFormat.EXCEL,
-        report_type: str = "summary",
-        cohort_filters: Optional[Dict[str, Any]] = None,
-        comparison_filters: Optional[Dict[str, Any]] = None,
-    ) -> LongitudinalReport:
-        if report_type == "summary":
-            return await self._create_summary_report(
-                db=db,
-                episode_id=episode_id,
-                created_by=created_by,
-                start_date=start_date,
-                end_date=end_date,
-                report_format=report_format,
-            )
-
-        return await self._create_cohort_report(
-            db=db,
-            episode_id=episode_id,
-            created_by=created_by,
-            start_date=start_date,
-            end_date=end_date,
-            report_format=report_format,
-            report_type=report_type,
-            cohort_filters=cohort_filters or {},
-            comparison_filters=comparison_filters or {},
-        )
-
-    async def list_reports(self, db: AsyncSession, episode_id: int) -> List[LongitudinalReport]:
-        stmt = (
-            select(LongitudinalReport)
-            .where(LongitudinalReport.episode_id == episode_id)
-            .order_by(LongitudinalReport.created_at.desc())
-        )
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def get_report(self, db: AsyncSession, report_id: int) -> Optional[LongitudinalReport]:
-        stmt = select(LongitudinalReport).where(LongitudinalReport.id == report_id)
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def create_schedule(
-        self,
-        db: AsyncSession,
-        payload: "ReportScheduleCreate",
-        created_by: Optional[int],
-    ) -> LongitudinalReportSchedule:
-        schedule = LongitudinalReportSchedule(
-            name=payload.name,
-            episode_id=payload.episode_id,
-            report_type=payload.report_type,
-            cohort_definition=payload.cohort_filters,
-            comparison_definition=payload.comparison_filters,
-            schedule_cron=payload.schedule_cron,
-            status=LongitudinalReportScheduleStatus.ACTIVE,
-            created_by=created_by,
-        )
-        db.add(schedule)
-        await db.commit()
-        await db.refresh(schedule)
-        return schedule
-
-    async def list_schedules(self, db: AsyncSession) -> List[LongitudinalReportSchedule]:
-        stmt = (
-            select(LongitudinalReportSchedule)
-            .options(joinedload(LongitudinalReportSchedule.runs))
-            .order_by(LongitudinalReportSchedule.created_at.desc())
-        )
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def update_schedule_status(
-        self,
-        db: AsyncSession,
-        schedule_id: int,
-        status: LongitudinalReportScheduleStatus,
-    ) -> Optional[LongitudinalReportSchedule]:
-        schedule = await db.get(LongitudinalReportSchedule, schedule_id)
-        if schedule is None:
-            return None
-        schedule.status = status
-        await db.commit()
-        await db.refresh(schedule)
-        return schedule
-
-    async def delete_schedule(self, db: AsyncSession, schedule_id: int) -> bool:
-        schedule = await db.get(LongitudinalReportSchedule, schedule_id)
-        if schedule is None:
-            return False
-        await db.delete(schedule)
-        await db.commit()
-        return True
-
-    async def enqueue_schedule_run(
-        self,
-        db: AsyncSession,
-        schedule_id: int,
-    ) -> Optional[LongitudinalReportRun]:
-        schedule = await db.get(LongitudinalReportSchedule, schedule_id)
-        if schedule is None:
-            return None
-        run = LongitudinalReportRun(
-            schedule_id=schedule.id,
-            status=LongitudinalReportRunStatus.QUEUED,
-        )
-        db.add(run)
-        await db.commit()
-        await db.refresh(run)
-        return run
-
-    async def list_schedule_runs(self, db: AsyncSession, schedule_id: int) -> List[LongitudinalReportRun]:
-        stmt = (
-            select(LongitudinalReportRun)
-            .where(LongitudinalReportRun.schedule_id == schedule_id)
-            .order_by(LongitudinalReportRun.id.desc())
-        )
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def execute_schedule_run(
-        self,
-        db: AsyncSession,
-        run_id: int,
-    ) -> Optional[LongitudinalReportRun]:
-        run = await db.get(LongitudinalReportRun, run_id)
-        if run is None:
-            return None
-        schedule = await db.get(LongitudinalReportSchedule, run.schedule_id)
-        if schedule is None:
-            run.status = LongitudinalReportRunStatus.FAILED
-            run.error_message = "schedule_missing"
-            await db.commit()
-            return run
-
-        run.status = LongitudinalReportRunStatus.RUNNING
-        run.started_at = datetime.utcnow()
-        await db.commit()
-
-        try:
-            report = await self.create_report(
-                db=db,
-                episode_id=schedule.episode_id,
-                created_by=schedule.created_by,
-                start_date=None,
-                end_date=None,
-                report_format=LongitudinalReportFormat.EXCEL,
-                report_type=schedule.report_type,
-                cohort_filters=schedule.cohort_definition or {},
-                comparison_filters=schedule.comparison_definition or {},
-            )
-            run.status = LongitudinalReportRunStatus.SUCCESS
-            run.report_id = report.id
-            run.finished_at = datetime.utcnow()
-            schedule.last_run_at = run.finished_at
-            await db.commit()
-            return run
-        except Exception as exc:
-            run.status = LongitudinalReportRunStatus.FAILED
-            run.error_message = str(exc)
-            run.finished_at = datetime.utcnow()
-            await db.commit()
-            return run
 
     async def _evaluate_alerts_for_visit(
         self,
@@ -1104,6 +1276,231 @@ class LongitudinalTrackingService:
         slope, _ = np.polyfit(np.array(x, dtype=float), np.array(y, dtype=float), 1)
         return float(slope)
 
+    async def calculate_personal_baseline(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        metric_key: str,
+        baseline_window_days: int = 90,
+    ) -> Dict[str, Optional[float]]:
+        """
+        Calculate personal baseline for a metric using initial window
+        
+        Args:
+            db: Database session
+            episode_id: Episode ID
+            metric_key: Metric key to analyze
+            baseline_window_days: Number of days to use for baseline calculation
+        
+        Returns:
+            Dictionary with baseline statistics
+        """
+        metrics = await self.get_metric_trend(db, episode_id, metric_key)
+        if not metrics:
+            return {
+                'baseline_mean': None,
+                'baseline_std': None,
+                'baseline_median': None,
+                'baseline_count': 0,
+            }
+        
+        # Get episode start date
+        episode = await db.get(LongitudinalEpisode, episode_id)
+        if not episode or not episode.start_date:
+            return {
+                'baseline_mean': None,
+                'baseline_std': None,
+                'baseline_median': None,
+                'baseline_count': 0,
+            }
+        
+        baseline_cutoff = episode.start_date + timedelta(days=baseline_window_days)
+        baseline_values = [
+            metric.metric_value
+            for metric in metrics
+            if metric.metric_value is not None
+            and metric.visit
+            and metric.visit.visit_date <= baseline_cutoff
+        ]
+        
+        if not baseline_values:
+            return {
+                'baseline_mean': None,
+                'baseline_std': None,
+                'baseline_median': None,
+                'baseline_count': 0,
+            }
+        
+        return {
+            'baseline_mean': float(np.mean(baseline_values)),
+            'baseline_std': float(np.std(baseline_values)),
+            'baseline_median': float(np.median(baseline_values)),
+            'baseline_count': len(baseline_values),
+        }
+
+    async def predict_future_progression(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        metric_key: str,
+        days_ahead: int = 30,
+    ) -> Dict[str, Optional[float]]:
+        """
+        Predict future metric value using linear regression
+        
+        Args:
+            db: Database session
+            episode_id: Episode ID
+            metric_key: Metric key to predict
+            days_ahead: Number of days to predict ahead
+        
+        Returns:
+            Dictionary with prediction and confidence
+        """
+        metrics = await self.get_metric_trend(db, episode_id, metric_key)
+        if len(metrics) < 2:
+            return {
+                'predicted_value': None,
+                'confidence_interval_lower': None,
+                'confidence_interval_upper': None,
+                'prediction_date': None,
+            }
+        
+        # Prepare data
+        x: List[float] = []
+        y: List[float] = []
+        base_visit = metrics[0].visit
+        base_date = base_visit.visit_date if base_visit else None
+        if base_date is None:
+            return {
+                'predicted_value': None,
+                'confidence_interval_lower': None,
+                'confidence_interval_upper': None,
+                'prediction_date': None,
+            }
+        
+        for metric in metrics:
+            if metric.metric_value is None or metric.visit is None:
+                continue
+            delta_days = (metric.visit.visit_date - base_date).total_seconds() / 86400.0
+            x.append(delta_days)
+            y.append(metric.metric_value)
+        
+        if len(x) < 2:
+            return {
+                'predicted_value': None,
+                'confidence_interval_lower': None,
+                'confidence_interval_upper': None,
+                'prediction_date': None,
+            }
+        
+        # Linear regression
+        x_arr = np.array(x, dtype=float)
+        y_arr = np.array(y, dtype=float)
+        slope, intercept = np.polyfit(x_arr, y_arr, 1)
+        
+        # Calculate prediction
+        latest_date = metrics[-1].visit.visit_date if metrics[-1].visit else base_date
+        if latest_date is None:
+            return {
+                'predicted_value': None,
+                'confidence_interval_lower': None,
+                'confidence_interval_upper': None,
+                'prediction_date': None,
+            }
+        
+        prediction_date = latest_date + timedelta(days=days_ahead)
+        days_from_base = (prediction_date - base_date).total_seconds() / 86400.0
+        predicted_value = slope * days_from_base + intercept
+        
+        # Calculate confidence interval (simplified)
+        residuals = y_arr - (slope * x_arr + intercept)
+        std_error = np.std(residuals)
+        confidence_interval = 1.96 * std_error  # 95% CI
+        
+        return {
+            'predicted_value': float(predicted_value),
+            'confidence_interval_lower': float(predicted_value - confidence_interval),
+            'confidence_interval_upper': float(predicted_value + confidence_interval),
+            'prediction_date': prediction_date.isoformat(),
+        }
+
+    async def evaluate_combined_alerts(
+        self,
+        db: AsyncSession,
+        episode_id: int,
+        metric_keys: Optional[List[str]] = None,
+    ) -> List[Dict[str, object]]:
+        """
+        Evaluate combined alerts based on multiple metrics
+        
+        Args:
+            db: Database session
+            episode_id: Episode ID
+            metric_keys: List of metric keys to evaluate (default: key metrics)
+        
+        Returns:
+            List of combined alert dictionaries
+        """
+        if metric_keys is None:
+            metric_keys = ['mmse', 'amyloid_beta', 'parkinson_risk_score']
+        
+        alerts = []
+        
+        # Get baseline for each metric
+        baselines = {}
+        for key in metric_keys:
+            baseline = await self.calculate_personal_baseline(db, episode_id, key)
+            baselines[key] = baseline
+        
+        # Get latest metrics
+        latest_metrics = {}
+        for key in metric_keys:
+            trend = await self.get_metric_trend(db, episode_id, key)
+            if trend and trend[-1].metric_value is not None:
+                latest_metrics[key] = trend[-1].metric_value
+        
+        # Evaluate combined conditions
+        # Example: Rapid decline in MMSE + increase in amyloid
+        if 'mmse' in latest_metrics and 'amyloid_beta' in latest_metrics:
+            mmse_baseline = baselines.get('mmse', {}).get('baseline_mean')
+            amyloid_baseline = baselines.get('amyloid_beta', {}).get('baseline_mean')
+            
+            if mmse_baseline is not None and amyloid_baseline is not None:
+                mmse_change = latest_metrics['mmse'] - mmse_baseline
+                amyloid_change = latest_metrics['amyloid_beta'] - amyloid_baseline
+                
+                # Combined alert: MMSE decline > 3 points AND amyloid increase > 50
+                if mmse_change < -3 and amyloid_change > 50:
+                    alerts.append({
+                        'type': 'combined',
+                        'severity': AlertSeverity.HIGH,
+                        'message': f'Combined alert: MMSE declined by {abs(mmse_change):.1f} points and amyloid increased by {amyloid_change:.1f}',
+                        'metrics': ['mmse', 'amyloid_beta'],
+                        'metric_values': {
+                            'mmse': latest_metrics['mmse'],
+                            'amyloid_beta': latest_metrics['amyloid_beta'],
+                        },
+                    })
+        
+        # Risk score escalation
+        if 'parkinson_risk_score' in latest_metrics:
+            risk_baseline = baselines.get('parkinson_risk_score', {}).get('baseline_mean')
+            if risk_baseline is not None:
+                risk_change = latest_metrics['parkinson_risk_score'] - risk_baseline
+                if risk_change > 0.15:  # 15% increase
+                    alerts.append({
+                        'type': 'combined',
+                        'severity': AlertSeverity.HIGH,
+                        'message': f'Significant risk escalation: {risk_change * 100:.1f}% increase from baseline',
+                        'metrics': ['parkinson_risk_score'],
+                        'metric_values': {
+                            'parkinson_risk_score': latest_metrics['parkinson_risk_score'],
+                        },
+                    })
+        
+        return alerts
+
     def _write_excel_report(
         self,
         path: Path,
@@ -1160,6 +1557,8 @@ class LongitudinalTrackingService:
         charts_payload: Optional[Dict[str, Any]] = None,
         heatmap_path: Optional[str] = None,
     ) -> None:
+        if canvas is None or letter is None:
+            raise RuntimeError("reportlab_not_installed")
         c = canvas.Canvas(str(path), pagesize=letter)
         c.setTitle("Longitudinal Report")
         width, height = letter
@@ -1225,8 +1624,15 @@ class LongitudinalTrackingService:
             c.setFont("Helvetica-Bold", 12)
             c.drawString(margin, height - margin - 20, "Heatmap")
             try:
-                c.drawImage(str(heatmap_path), margin, margin, width=width - 2 * margin, preserveAspectRatio=True, mask="auto")
-            except Exception:
+                c.drawImage(
+                    str(heatmap_path),
+                    margin,
+                    margin,
+                    width=width - 2 * margin,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:  # noqa: BLE001
                 c.setFont("Helvetica", 10)
                 c.drawString(margin, height / 2, f"Heatmap could not be embedded. Path: {heatmap_path}")
 

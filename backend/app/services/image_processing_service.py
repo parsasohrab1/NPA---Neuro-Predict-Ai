@@ -6,11 +6,16 @@ import base64
 import io
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
-import pydicom
+
+try:
+    import pydicom
+except ImportError:  # pragma: no cover - optional dependency guard
+    pydicom = None
+
 from PIL import Image
 from scipy import ndimage
 
@@ -33,6 +38,8 @@ class ImageProcessingService:
         Returns:
             Tuple of (image_array, metadata_dict)
         """
+        if pydicom is None:
+            raise RuntimeError("pydicom_not_installed")
         try:
             dicom_data = pydicom.dcmread(file_path)
             
@@ -389,6 +396,183 @@ class ImageProcessingService:
                 "study_b": metadata_b,
             },
         }
+
+    def load_dicom_series(self, dicom_dir: str) -> Tuple[List[np.ndarray], Dict]:
+        """
+        Load entire DICOM series (multi-slice 3D volume)
+        
+        Args:
+            dicom_dir: Directory containing DICOM files
+        
+        Returns:
+            Tuple of (list of image arrays, metadata)
+        """
+        if pydicom is None:
+            raise RuntimeError("pydicom_not_installed")
+        
+        dicom_path = Path(dicom_dir)
+        dicom_files = sorted(list(dicom_path.glob('*.dcm')))
+        
+        if not dicom_files:
+            raise ValueError(f"No DICOM files found in {dicom_dir}")
+        
+        slices = []
+        metadata = {}
+        
+        for dicom_file in dicom_files:
+            try:
+                dicom_data = pydicom.dcmread(str(dicom_file))
+                image_array = dicom_data.pixel_array
+                slices.append(image_array)
+                
+                # Collect metadata from first slice
+                if not metadata:
+                    metadata = {
+                        'patient_id': str(dicom_data.get('PatientID', '')),
+                        'study_date': str(dicom_data.get('StudyDate', '')),
+                        'modality': str(dicom_data.get('Modality', '')),
+                        'series_description': str(dicom_data.get('SeriesDescription', '')),
+                        'slice_thickness': float(dicom_data.get('SliceThickness', 0)),
+                        'pixel_spacing': list(dicom_data.get('PixelSpacing', [1.0, 1.0])),
+                        'rows': int(dicom_data.Rows),
+                        'columns': int(dicom_data.Columns),
+                    }
+            except Exception as e:
+                logger.warning(f"Error loading DICOM file {dicom_file}: {e}")
+                continue
+        
+        metadata['num_slices'] = len(slices)
+        return slices, metadata
+
+    def compare_multi_slice(
+        self, 
+        slices_a: List[np.ndarray], 
+        slices_b: List[np.ndarray],
+        slice_indices: Optional[List[int]] = None
+    ) -> Dict[str, object]:
+        """
+        Compare multi-slice MRI volumes
+        
+        Args:
+            slices_a: List of slices from first study
+            slices_b: List of slices from second study
+            slice_indices: Optional list of slice indices to compare (default: all)
+        
+        Returns:
+            Dictionary with comparison results for each slice
+        """
+        if slice_indices is None:
+            min_slices = min(len(slices_a), len(slices_b))
+            slice_indices = list(range(min_slices))
+        
+        comparisons = []
+        for idx in slice_indices:
+            if idx >= len(slices_a) or idx >= len(slices_b):
+                continue
+            
+            diff_data = self.compute_diff_heatmap(slices_a[idx], slices_b[idx])
+            mean_diff = float(np.mean(np.abs(diff_data['image_a'] - diff_data['image_b'])))
+            
+            comparisons.append({
+                'slice_index': idx,
+                'mean_absolute_difference': mean_diff,
+                'heatmap': self._heatmap_to_data_uri(diff_data['diff']),
+            })
+        
+        return {
+            'slice_comparisons': comparisons,
+            'total_slices_compared': len(comparisons),
+        }
+
+    def create_3d_volume_heatmap(
+        self, 
+        volume_a: np.ndarray, 
+        volume_b: np.ndarray,
+        projection: str = 'mip'  # 'mip', 'avg', 'max'
+    ) -> Dict[str, object]:
+        """
+        Create 3D volume comparison heatmap using projections
+        
+        Args:
+            volume_a: 3D numpy array (z, y, x)
+            volume_b: 3D numpy array (z, y, x)
+            projection: Type of projection ('mip', 'avg', 'max')
+        
+        Returns:
+            Dictionary with projected heatmap
+        """
+        if volume_a.shape != volume_b.shape:
+            # Resize volume_b to match volume_a
+            from scipy.ndimage import zoom
+            zoom_factors = [volume_a.shape[i] / volume_b.shape[i] for i in range(3)]
+            volume_b = zoom(volume_b, zoom_factors, order=1)
+        
+        diff_volume = np.abs(volume_a - volume_b)
+        
+        if projection == 'mip':  # Maximum Intensity Projection
+            projected = np.max(diff_volume, axis=0)
+        elif projection == 'avg':
+            projected = np.mean(diff_volume, axis=0)
+        elif projection == 'max':
+            projected = np.max(diff_volume, axis=0)
+        else:
+            projected = np.mean(diff_volume, axis=0)
+        
+        heatmap_uri = self._heatmap_to_data_uri(projected)
+        
+        return {
+            'heatmap': heatmap_uri,
+            'projection_type': projection,
+            'volume_shape': list(volume_a.shape),
+            'mean_volume_difference': float(np.mean(diff_volume)),
+        }
+
+    def create_interactive_overlay(
+        self,
+        base_image: np.ndarray,
+        overlay_image: np.ndarray,
+        opacity: float = 0.5,
+        colormap: int = cv2.COLORMAP_JET
+    ) -> str:
+        """
+        Create interactive overlay visualization
+        
+        Args:
+            base_image: Base image array
+            overlay_image: Overlay image array
+            opacity: Overlay opacity (0-1)
+            colormap: OpenCV colormap
+        
+        Returns:
+            Data URI of blended image
+        """
+        normalized_base = self.normalize_image(base_image)
+        normalized_overlay = self.normalize_image(overlay_image)
+        
+        if normalized_base.shape != normalized_overlay.shape:
+            normalized_overlay = self.resize_image(
+                normalized_overlay, 
+                target_size=normalized_base.shape[::-1]
+            )
+        
+        # Apply colormap to overlay
+        overlay_uint8 = (normalized_overlay * 255).astype(np.uint8)
+        overlay_colored = cv2.applyColorMap(overlay_uint8, colormap)
+        overlay_rgb = cv2.cvtColor(overlay_colored, cv2.COLOR_BGR2RGB)
+        
+        # Convert base to RGB
+        base_uint8 = (normalized_base * 255).astype(np.uint8)
+        base_rgb = np.stack([base_uint8] * 3, axis=-1)
+        
+        # Blend images
+        blended = (base_rgb * (1 - opacity) + overlay_rgb * opacity).astype(np.uint8)
+        
+        # Convert to data URI
+        image = Image.fromarray(blended)
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
 
 
 # Singleton instance

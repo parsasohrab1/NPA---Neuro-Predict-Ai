@@ -26,16 +26,21 @@
    - خروجی: PDF (قالب کلینیکی با لوگو/امضا)
 
 2. **Research Report**  
-   - فیلتر: Date range، Disease type، Risk level، Demographic filters  
-   - محتوا: آمار توصیفی، نمودار توزیع ریسک، جدول aggregate (mean/median)، heatmap  
-   - خروجی: CSV/Excel، تصویر نمودارها
+   - فیلتر: Date range، Disease type، Risk level، Demographic filters، Episode/Study tag  
+   - محتوا: آمار توصیفی، نمودار توزیع ریسک، جدول aggregate (mean/median)، heatmap چندلایه (MRI + Biomarker)  
+   - خروجی: CSV/Excel، تصویر نمودارها، JSON خلاصه heatmap برای اشتراک‌گذاری سریع
 
 3. **Management Dashboard**  
    - فیلتر: Date range، Facility، Model version  
    - محتوا: KPI نهایی (تعداد پیش‌بینی، زمان پاسخ، دقت مدل)، نمودار performance، لیست هشدارها/کارهای باز  
    - خروجی: PDF خلاصه مدیریتی
 
-4. **Custom Builder (نسخه بعدی)**  
+4. **Alert & Schedule Insights (Phase 2)**  
+   - کارت وضعیت هشدارهای ترکیبی (Progression + Biomarker drift)  
+   - لیست زمان‌بندی‌های فعال با وضعیت آخرین اجرا و CTA برای Run Now  
+   - پیوند مستقیم به خروجی Heatmap آخرین ران  
+
+5. **Custom Builder (نسخه بعدی)**  
    - Drag & drop ویجت‌ها، ذخیره قالب، اشتراک‌گذاری → در نسخه اولیه فقط ساختار اولیه و placeholder.
 
 ---
@@ -80,6 +85,10 @@
   - `GET /api/v1/reports/research?from=&to=&risk_level=&age_group=...`
   - `GET /api/v1/reports/management?model_version=&facility=&from=&to=`
   - `POST /api/v1/reports/export` (نوع گزارش + پارامترها + فرمت خروجی)
+- Endpoint های فاز ۲:
+  - `POST /api/v1/longitudinal/reports/schedules` برای ایجاد/ویرایش زمان‌بندی
+  - `POST /api/v1/longitudinal/reports/{schedule_id}/run` برای اجرای دستی
+  - `GET /api/v1/longitudinal/reports/{report_id}/heatmap/summary` جهت داده‌های خلاصه
 - ماژول سرویس: `app/services/reporting_service.py`
   - لایه استخراج داده از جداول موجود (patients, medical_records, predictions, imaging_studies)
   - Aggregation با SQLAlchemy / pandas
@@ -87,6 +96,7 @@
 - Migration احتمالی:
   - جدول `report_exports` برای ذخیره متادیتای دانلودها
   - نمای (view) برای کوئری‌های پیچیده (اختیاری)
+  - جدول `report_schedules` و `report_schedule_runs` برای نگه‌داری وضعیت اجراها
 
 ---
 
@@ -98,6 +108,8 @@
   - `ClinicalReportPanel`, `ResearchReportPanel`, `ManagementReportPanel`
   - `ReportFiltersDrawer`
   - `ReportExportMenu`
+  - `ReportScheduleBoard` (نمایش وضعیت scheduleها و تاریخچه اجرا)
+  - `CombinedAlertBanner` برای هشدارهای cross-module
 - Chart library: `Recharts` (درحال حاضر نصب است)؛ برای heatmap ممکن است `Nivo` اضافه شود.
 - PDF export: بررسی `react-pdf` در frontend یا سرویس backend (برای هماهنگی با branding به احتمال زیاد backend مناسب‌تر است).
 
@@ -107,6 +119,8 @@
 - تولید گزارش در کمتر از 3 ثانیه (با داده‌ی نمونه)
 - امکان اعمال فیلترهای اصلی و مشاهده‌ی بازتاب در محتوا
 - خروجی PDF/Excel بدون خطا برای حداقل گزارش کلینیکی و پژوهشی
+- اجرای موفقیت‌آمیز حداقل یک زمان‌بندی گزارش در 24 ساعت گذشته
+- کمتر از 3 هشدار false-positive در هفته برای هشدار ترکیبی
 - تمام اقدامات (Generate/Export) در audit log ثبت شود
 
 ---
@@ -117,6 +131,7 @@
 3. تعریف API contract (schema request/response) و اضافه‌کردن تست‌های واحد سرویس گزارش.
 4. پیاده‌سازی incremental: ابتدا تب Clinical، سپس Research و Management.
 5. ادغام با Role-based access → Clinical و Management فقط برای Admin/Doctor قابل مشاهده، Research برای Researcher/Admin.
+6. فاز ۲: تکمیل بورد زمان‌بندی و هشدار، افزودن تست‌های end-to-end برای heatmap چندلایه.
 
 ---
 

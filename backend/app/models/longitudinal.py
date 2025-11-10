@@ -225,7 +225,12 @@ class LongitudinalReportSchedule(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
+    
+    # Distribution settings
+    distribution_method = Column(String(32), nullable=True)  # 'email', 'sftp', 'webhook', 'none'
+    distribution_config = Column(JSON, nullable=True)  # Email addresses, SFTP config, webhook URLs
+    sla_hours = Column(Integer, nullable=True, default=24)  # SLA in hours for report delivery
+    
     creator = relationship("User")
     runs = relationship("LongitudinalReportRun", back_populates="schedule", cascade="all, delete-orphan")
     episode = relationship("LongitudinalEpisode")
@@ -248,6 +253,15 @@ class LongitudinalReportRun(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
+    
+    # Distribution tracking
+    distributed_at = Column(DateTime(timezone=True), nullable=True)
+    distribution_status = Column(String(32), nullable=True)  # 'pending', 'sent', 'failed'
+    distribution_error = Column(Text, nullable=True)
+    
+    # SLA tracking
+    sla_met = Column(String(10), nullable=True)  # 'yes', 'no', 'n/a'
+    sla_deadline = Column(DateTime(timezone=True), nullable=True)
 
     schedule = relationship("LongitudinalReportSchedule", back_populates="runs")
     report = relationship("LongitudinalReport")

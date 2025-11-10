@@ -1,12 +1,18 @@
 """
 AI Model Service for Disease Prediction
 """
-import torch
-import torch.nn as nn
-import numpy as np
-from typing import Dict, Tuple, Optional
 import logging
 from pathlib import Path
+from typing import Dict, Optional, Tuple
+
+import numpy as np
+
+try:
+    import torch
+    import torch.nn as nn
+except ImportError:  # pragma: no cover - optional dependency guard
+    torch = None
+    nn = None
 
 from ..core.config import settings
 from ..models.prediction import RiskLevel
@@ -14,56 +20,74 @@ from ..models.prediction import RiskLevel
 logger = logging.getLogger(__name__)
 
 
-class MultiModalNeuralNetwork(nn.Module):
-    """
-    Multi-modal deep learning model for Alzheimer's and Parkinson's prediction
-    Combines imaging features, clinical data, biomarkers, and genetic information
-    """
-    def __init__(self, input_dim: int = 50, hidden_dims: list = [256, 128, 64]):
-        super(MultiModalNeuralNetwork, self).__init__()
-        
-        # Feature extraction layers
-        layers = []
-        prev_dim = input_dim
-        
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(prev_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.Dropout(0.3))
-            prev_dim = hidden_dim
-        
-        self.feature_extractor = nn.Sequential(*layers)
-        
-        # Separate heads for Alzheimer's and Parkinson's
-        self.alzheimer_head = nn.Sequential(
-            nn.Linear(hidden_dims[-1], 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-            nn.Sigmoid()
-        )
-        
-        self.parkinson_head = nn.Sequential(
-            nn.Linear(hidden_dims[-1], 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-            nn.Sigmoid()
-        )
-    
-    def forward(self, x):
-        features = self.feature_extractor(x)
-        alzheimer_prob = self.alzheimer_head(features)
-        parkinson_prob = self.parkinson_head(features)
-        return alzheimer_prob, parkinson_prob
+if nn is not None:
+
+    class MultiModalNeuralNetwork(nn.Module):
+        """
+        Multi-modal deep learning model for Alzheimer's and Parkinson's prediction
+        Combines imaging features, clinical data, biomarkers, and genetic information
+        """
+
+        def __init__(self, input_dim: int = 50, hidden_dims: list = [256, 128, 64]):
+            super().__init__()
+
+            # Feature extraction layers
+            layers = []
+            prev_dim = input_dim
+
+            for hidden_dim in hidden_dims:
+                layers.append(nn.Linear(prev_dim, hidden_dim))
+                layers.append(nn.ReLU())
+                layers.append(nn.BatchNorm1d(hidden_dim))
+                layers.append(nn.Dropout(0.3))
+                prev_dim = hidden_dim
+
+            self.feature_extractor = nn.Sequential(*layers)
+
+            # Separate heads for Alzheimer's and Parkinson's
+            self.alzheimer_head = nn.Sequential(
+                nn.Linear(hidden_dims[-1], 32),
+                nn.ReLU(),
+                nn.Linear(32, 1),
+                nn.Sigmoid(),
+            )
+
+            self.parkinson_head = nn.Sequential(
+                nn.Linear(hidden_dims[-1], 32),
+                nn.ReLU(),
+                nn.Linear(32, 1),
+                nn.Sigmoid(),
+            )
+
+        def forward(self, x):
+            features = self.feature_extractor(x)
+            alzheimer_prob = self.alzheimer_head(features)
+            parkinson_prob = self.parkinson_head(features)
+            return alzheimer_prob, parkinson_prob
+
+else:
+
+    class MultiModalNeuralNetwork:  # type: ignore[override]
+        """Fallback stub when PyTorch is unavailable."""
+
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("pytorch_not_available")
 
 
 class AIModelService:
     """Service for AI-powered disease prediction"""
     
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
-        self.feature_names = []
+        self.feature_names: list[str] = []
+        if torch is None or nn is None:
+            logger.warning("PyTorch is not installed; AIModelService is disabled.")
+            self.device = None
+            self._available = False
+            return
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._available = True
         self._initialize_model()
     
     def _initialize_model(self):
@@ -73,12 +97,40 @@ class AIModelService:
             self.model = MultiModalNeuralNetwork(input_dim=50)
             
             # Try to load pre-trained weights if available
-            model_path = Path(settings.ENSEMBLE_MODEL_PATH)
-            if model_path.exists():
-                self.model.load_state_dict(torch.load(model_path, map_location=self.device))
-                logger.info(f"Loaded pre-trained model from {model_path}")
-            else:
-                logger.warning(f"No pre-trained model found at {model_path}. Using random initialization.")
+            model_loaded = False
+            
+            if settings.USE_TRAINED_MODEL:
+                # Try to load from model registry first
+                try:
+                    from .training.model_registry import ModelRegistry
+                    registry = ModelRegistry(Path(settings.MODEL_REGISTRY_PATH))
+                    active_model = registry.get_active_model()
+                    
+                    if active_model and Path(active_model['model_path']).exists():
+                        model_path = Path(active_model['model_path'])
+                        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+                        logger.info(f"Loaded active model from registry: {model_path} (version: {active_model['version']})")
+                        model_loaded = True
+                    else:
+                        # Try latest model
+                        latest_model = registry.get_latest_model()
+                        if latest_model and Path(latest_model['model_path']).exists():
+                            model_path = Path(latest_model['model_path'])
+                            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+                            logger.info(f"Loaded latest model from registry: {model_path} (version: {latest_model['version']})")
+                            model_loaded = True
+                except Exception as e:
+                    logger.warning(f"Could not load model from registry: {e}")
+            
+            # Fallback to default model path
+            if not model_loaded:
+                model_path = Path(settings.ENSEMBLE_MODEL_PATH)
+                if model_path.exists():
+                    self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+                    logger.info(f"Loaded pre-trained model from {model_path}")
+                    model_loaded = True
+                else:
+                    logger.warning(f"No pre-trained model found at {model_path}. Using random initialization.")
             
             self.model.to(self.device)
             self.model.eval()
@@ -246,6 +298,9 @@ class AIModelService:
         Returns:
             Dictionary with prediction results
         """
+        if not getattr(self, "_available", False) or self.model is None or torch is None:
+            raise RuntimeError("pytorch_not_available")
+
         try:
             # Extract features
             features = self.extract_features(patient_data)

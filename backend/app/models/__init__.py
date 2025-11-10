@@ -25,6 +25,16 @@ from .longitudinal import (
     LongitudinalReportRunStatus,
 )
 from .audit import AuditLog
+from .security import (
+    UserSession,
+    MFASecret,
+    MFAMethod,
+    IPWhitelist,
+    PasswordPolicy,
+    PasswordHistory,
+    SecurityLog,
+    FailedLoginAttempt,
+)
 
 __all__ = [
     "User",
@@ -54,5 +64,13 @@ __all__ = [
     "LongitudinalReportScheduleStatus",
     "LongitudinalReportRun",
     "LongitudinalReportRunStatus",
+    "UserSession",
+    "MFASecret",
+    "MFAMethod",
+    "IPWhitelist",
+    "PasswordPolicy",
+    "PasswordHistory",
+    "SecurityLog",
+    "FailedLoginAttempt",
 ]
 

@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Awaitable, Callable, Tuple
 
 import pytest
+
+pytest.importorskip("aiosqlite")
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -40,7 +42,7 @@ async def create_test_client() -> Tuple[AsyncClient, async_sessionmaker[AsyncSes
   app.dependency_overrides[get_db] = override_get_db
   app.dependency_overrides[get_current_active_user] = override_current_user
 
-  transport = ASGITransport(app=app, lifespan="auto")
+  transport = ASGITransport(app=app)
   client = AsyncClient(transport=transport, base_url="http://test")
 
   async def cleanup():

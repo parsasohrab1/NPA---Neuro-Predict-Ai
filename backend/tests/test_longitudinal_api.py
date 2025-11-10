@@ -46,7 +46,7 @@ async def create_test_client() -> Tuple[AsyncClient, async_sessionmaker[AsyncSes
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_active_user] = override_current_user
 
-    transport = ASGITransport(app=app, lifespan="auto")
+    transport = ASGITransport(app=app)
     client = AsyncClient(transport=transport, base_url="http://test")
 
     async def cleanup():
@@ -348,7 +348,6 @@ async def test_longitudinal_episode_flow(tmp_path: Path):
         assert comparison["mean_absolute_difference"] > 0
         assert comparison["heatmap"].startswith("data:image/png;base64,")
     finally:
-        settings.REPORTS_DIR = original_reports_dir
         await cleanup()
 
 

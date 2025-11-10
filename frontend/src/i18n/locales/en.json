@@ -1,0 +1,93 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "close": "Close"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "patients": "Patients",
+    "predictions": "Predictions",
+    "reports": "Reports",
+    "longitudinal": "Longitudinal Tracking",
+    "settings": "Settings"
+  },
+  "patients": {
+    "title": "Patients",
+    "addPatient": "Add Patient",
+    "searchPlaceholder": "Search patients by name or ID...",
+    "patientId": "Patient ID",
+    "name": "Name",
+    "gender": "Gender",
+    "dateOfBirth": "Date of Birth",
+    "age": "Age",
+    "contact": "Contact",
+    "predictions": "Predictions",
+    "actions": "Actions",
+    "viewDetails": "View Details"
+  },
+  "predictions": {
+    "title": "Predictions",
+    "newPrediction": "New Prediction",
+    "selectPatient": "Select Patient",
+    "diseaseType": "Disease Type",
+    "both": "Both Alzheimer's & Parkinson's",
+    "alzheimer": "Alzheimer's Disease Only",
+    "parkinson": "Parkinson's Disease Only",
+    "runPrediction": "Run Prediction",
+    "results": "Prediction Results",
+    "alzheimerRisk": "Alzheimer's Risk",
+    "parkinsonRisk": "Parkinson's Risk",
+    "riskScore": "Risk Score",
+    "confidence": "Confidence",
+    "recommendations": "Clinical Recommendations",
+    "featureImportance": "Top Contributing Factors"
+  },
+  "mri": {
+    "viewer": "MRI Viewer",
+    "slice": "Slice",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "reset": "Reset",
+    "measurement": "Measurement",
+    "overlay": "Overlay",
+    "window": "Window",
+    "level": "Level"
+  },
+  "reports": {
+    "title": "Reports",
+    "generate": "Generate Report",
+    "type": "Report Type",
+    "summary": "Summary",
+    "cohort": "Cohort Comparison",
+    "clinical": "Clinical",
+    "research": "Research",
+    "administrative": "Administrative"
+  },
+  "longitudinal": {
+    "title": "Longitudinal Tracking",
+    "episodes": "Episodes",
+    "visits": "Visits",
+    "metrics": "Metrics",
+    "trends": "Trends",
+    "alerts": "Alerts",
+    "reports": "Reports"
+  },
+  "accessibility": {
+    "skipToContent": "Skip to main content",
+    "menu": "Menu",
+    "closeMenu": "Close menu",
+    "openMenu": "Open menu"
+  }
+}
+

@@ -48,11 +48,12 @@
 
 > این جدول اجازه می‌دهد داده‌های موجود `medical_records` یا استخراج‌های جدید را نسخه‌برداری کنیم تا نمودار روند سریعاً قابل محاسبه باشد.
 
-### 4. جدول `longitudinal_alerts` (اختیاری فاز ۲)
+### 4. جدول `longitudinal_alerts` (فاز ۲)
 - `id`, `episode_id`, `visit_id`
-- `alert_type` (progression_speed, sudden_change, imaging_drift)
+- `alert_type` (progression_speed, sudden_change, imaging_drift, **combined_heatmap**)
 - `severity` (low/medium/high)
-- `message`, `created_at`, `acknowledged_at`
+- `trigger_payload` (JSON شامل متریک‌های مشارکت‌کننده)
+- `message`, `created_at`, `acknowledged_at`, `resolved_by`
 
 ### 5. جدول `longitudinal_reports` (فاز گزارش‌های طولی)
 - `id`, `episode_id`
@@ -76,6 +77,14 @@
 - `compare_imaging(visit_a, visit_b)` → خروجی برای UI (تولید thumbnail، heatmap، diff overlays)
 - `create_report(episode_id, start_date, end_date, format)` → تولید summary JSON + فایل Excel/PDF
 - `list_reports(episode_id)` و `get_report(report_id)` → دانلود فایل و نمایش metadata
+- `generate_combined_alert(episode_id, visit_id)` → ایجاد هشدار ترکیبی در صورت عبور آستانه‌های چند متریک
+- `get_heatmap_layers(report_id)` → بازگرداندن لایه‌های heatmap برای UI (MRI، Biomarker، AI drift)
+
+### Service: `LongitudinalReportScheduler`
+- `create_schedule(episode_id, payload)` → شامل cron، نوع گزارش، قالب
+- `toggle_schedule(schedule_id, enabled)` → فعال/غیرفعال‌سازی
+- `run_now(schedule_id)` → اجرای دستی و بازگرداندن شناسه run
+- `list_runs(schedule_id, limit)` → تاریخچه اجرا با وضعیت و پیام خطا
 
 ### Metric Aggregation
 - روند زمانی: گروه‌بندی بر اساس `metric_key`.
@@ -102,6 +111,9 @@
 | `POST` | `/api/v1/longitudinal/episodes/{episode_id}/reports` | تولید گزارش دوره‌ای |
 | `GET` | `/api/v1/longitudinal/episodes/{episode_id}/reports` | لیست گزارش‌های ذخیره‌شده |
 | `GET` | `/api/v1/longitudinal/reports/{report_id}/download?variant=` | دانلود فایل Excel/PDF |
+| `GET` | `/api/v1/longitudinal/reports/{report_id}/heatmap/summary` | دریافت متادیتای heatmap چندلایه |
+| `POST` | `/api/v1/longitudinal/reports/schedules` | ایجاد/ویرایش زمان‌بندی گزارش |
+| `GET` | `/api/v1/longitudinal/reports/schedules/{schedule_id}/runs` | تاریخچه اجراهای زمان‌بندی |
 
 > Endpointها در فازهای بعدی با قابلیت فیلتر تاریخ، نوع متریک و هشدار تکمیل می‌شوند.
 
@@ -128,6 +140,7 @@
 3. ساخت API و تست unit/integration (timeline، trend، comparison، progression، alerts، reports).
 4. آماده‌سازی داده نمونه برای UI و اعتبارسنجی heatmap/alerts/reports.
 5. طراحی UI (تایم‌لاین، نمودار، مقایسه تصویری، کارت سرعت، هشدارها، مدیریت گزارش‌ها) → فاز فرانت‌اند.
+6. فاز ۲.۱: پیاده‌سازی Scheduler service، هشدار ترکیبی، و افزودن تست‌های end-to-end برای تولید گزارش‌های زمان‌بندی شده.
 
 ---
 

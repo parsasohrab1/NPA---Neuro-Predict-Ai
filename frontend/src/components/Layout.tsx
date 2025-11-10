@@ -1,7 +1,11 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../services/auth'
+import ThemeSwitcher from './ThemeSwitcher'
+import LanguageSwitcher from './LanguageSwitcher'
 
 export default function Layout() {
+  const { t } = useTranslation()
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
 
@@ -11,48 +15,73 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
       {/* Sidebar */}
-      <aside className="w-64 bg-primary-900 text-white flex flex-col">
+      <aside
+        className="w-64 bg-primary-900 dark:bg-gray-800 text-white flex flex-col"
+        role="navigation"
+        aria-label="Main navigation"
+      >
         <div className="p-6">
           <h1 className="text-2xl font-bold">🧠 NeuroPredict-AI</h1>
-          <p className="text-primary-200 text-sm mt-1">Neurodegenerative Disease Prediction</p>
+          <p className="text-primary-200 dark:text-gray-400 text-sm mt-1">
+            Neurodegenerative Disease Prediction
+          </p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 space-y-2" aria-label="Main menu">
           <Link
             to="/"
-            className="block px-4 py-3 rounded-lg hover:bg-primary-800 transition-colors"
+            className="block px-4 py-3 rounded-lg hover:bg-primary-800 dark:hover:bg-gray-700 transition-colors"
+            aria-current={window.location.pathname === '/' ? 'page' : undefined}
           >
-            📊 Dashboard
+            📊 {t('nav.dashboard')}
           </Link>
           <Link
             to="/patients"
-            className="block px-4 py-3 rounded-lg hover:bg-primary-800 transition-colors"
+            className="block px-4 py-3 rounded-lg hover:bg-primary-800 dark:hover:bg-gray-700 transition-colors"
+            aria-current={window.location.pathname.startsWith('/patients') ? 'page' : undefined}
           >
-            👥 Patients
+            👥 {t('nav.patients')}
           </Link>
           <Link
             to="/predictions/new"
-            className="block px-4 py-3 rounded-lg hover:bg-primary-800 transition-colors"
+            className="block px-4 py-3 rounded-lg hover:bg-primary-800 dark:hover:bg-gray-700 transition-colors"
           >
-            🔬 New Prediction
+            🔬 {t('predictions.newPrediction')}
+          </Link>
+          <Link
+            to="/settings"
+            className="block px-4 py-3 rounded-lg hover:bg-primary-800 dark:hover:bg-gray-700 transition-colors"
+            aria-current={window.location.pathname === '/settings' ? 'page' : undefined}
+          >
+            ⚙️ {t('nav.settings')}
           </Link>
         </nav>
 
-        <div className="p-4 border-t border-primary-800">
+        <div className="p-4 border-t border-primary-800 dark:border-gray-700 space-y-3">
+          <div className="flex items-center justify-between mb-3">
+            <ThemeSwitcher />
+            <LanguageSwitcher />
+          </div>
           <div className="flex items-center space-x-3 mb-3">
-            <div className="w-10 h-10 bg-primary-700 rounded-full flex items-center justify-center">
+            <div
+              className="w-10 h-10 bg-primary-700 dark:bg-gray-700 rounded-full flex items-center justify-center"
+              aria-hidden="true"
+            >
               {user?.full_name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.full_name}</p>
-              <p className="text-xs text-primary-300 truncate">{user?.role}</p>
+              <p className="text-sm font-medium truncate" aria-label={`User: ${user?.full_name}`}>
+                {user?.full_name}
+              </p>
+              <p className="text-xs text-primary-300 dark:text-gray-400 truncate">{user?.role}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full px-4 py-2 bg-primary-800 hover:bg-primary-700 rounded-lg text-sm transition-colors"
+            className="w-full px-4 py-2 bg-primary-800 dark:bg-gray-700 hover:bg-primary-700 dark:hover:bg-gray-600 rounded-lg text-sm transition-colors"
+            aria-label="Logout"
           >
             Logout
           </button>
@@ -60,7 +89,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto" role="main">
         <div className="p-8">
           <Outlet />
         </div>

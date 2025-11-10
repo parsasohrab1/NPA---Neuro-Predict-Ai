@@ -45,10 +45,23 @@ class Settings(BaseSettings):
     ALZHEIMER_MODEL_PATH: str = "models/alzheimer_model.pth"
     PARKINSON_MODEL_PATH: str = "models/parkinson_model.pth"
     ENSEMBLE_MODEL_PATH: str = "models/ensemble_model.pth"
+    MODEL_REGISTRY_PATH: str = "models/registry.json"
     
     # Model Configuration
     MODEL_CONFIDENCE_THRESHOLD: float = 0.75
     BATCH_SIZE: int = 32
+    USE_TRAINED_MODEL: bool = True  # If True, loads trained model from registry
+    
+    # Training Configuration
+    TRAINING_DATA_DIR: Optional[str] = None  # Default: data/data/csv
+    TRAIN_RATIO: float = 0.7
+    VAL_RATIO: float = 0.15
+    TEST_RATIO: float = 0.15
+    TRAINING_EPOCHS: int = 100
+    TRAINING_BATCH_SIZE: int = 32
+    TRAINING_LEARNING_RATE: float = 0.001
+    TRAINING_WEIGHT_DECAY: float = 1e-5
+    TRAINING_PATIENCE: int = 10
     
     # Redis Configuration (for caching and task queue)
     REDIS_HOST: str = "localhost"

@@ -9,9 +9,28 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  BarChart,
+  Bar,
 } from 'recharts'
-import { ArrowPathIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, PlusIcon, LinkIcon, ChartBarIcon } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 import {
   longitudinalService,
@@ -102,6 +121,16 @@ export default function LongitudinalTrackingPage() {
   })
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [expandedScheduleId, setExpandedScheduleId] = useState<number | null>(null)
+  const [sortedTimelineEvents, setSortedTimelineEvents] = useState<TimelineEvent[]>([])
+  const [showCohortAnalysis, setShowCohortAnalysis] = useState(false)
+  const [selectedReportId, setSelectedReportId] = useState<number | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     return () => {
@@ -275,6 +304,24 @@ export default function LongitudinalTrackingPage() {
   }, [episodeDetailQuery.data])
 
   const timelineEvents = timelineQuery.data ?? []
+
+  // Initialize sorted timeline events
+  useEffect(() => {
+    if (timelineQuery.data) {
+      setSortedTimelineEvents([...timelineQuery.data])
+    }
+  }, [timelineQuery.data])
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      setSortedTimelineEvents((items) => {
+        const oldIndex = items.findIndex((item) => item.visit_id === Number(active.id))
+        const newIndex = items.findIndex((item) => item.visit_id === Number(over.id))
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
 
   const trendData: TrendPoint[] = trendQuery.data ?? []
 
@@ -755,60 +802,26 @@ export default function LongitudinalTrackingPage() {
                 </span>
               </div>
 
-              <div className="mt-4 space-y-4">
-                {timelineEvents.map((event) => (
-                  <div
-                    key={event.visit_id}
-                    className="rounded-2xl border border-slate-800/80 bg-slate-900/80 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-sm font-semibold text-white">
-                        {event.label} • {format(new Date(event.visit_date), 'PP')}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={!event.imaging_available}
-                          onClick={() => toggleVisitForComparison(event.visit_id, event.imaging_available)}
-                          className={clsx(
-                            'rounded-full border px-3 py-1 text-xs transition',
-                            event.imaging_available
-                              ? comparisonSelection.includes(event.visit_id)
-                                ? 'border-sky-500 bg-sky-500/20 text-sky-200'
-                                : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-sky-400 hover:text-sky-200'
-                              : 'cursor-not-allowed border-slate-800 bg-slate-900 text-slate-600'
-                          )}
-                        >
-                          {comparisonSelection.includes(event.visit_id) ? 'Selected' : 'Compare'}
-                        </button>
-                        {event.progression_score !== undefined && event.progression_score !== null && (
-                          <span className="text-xs text-sky-300">
-                            Progression score {Math.round(event.progression_score * 100)}%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                      {event.metrics.map((metric: Metric) => (
-                        <div key={metric.id} className="rounded-xl border border-slate-800/70 bg-slate-950/80 p-3">
-                          <div className="text-xs uppercase text-slate-400">{metric.metric_type}</div>
-                          <div className="text-sm font-medium text-white">
-                            {metric.metric_key}: {metric.metric_value ?? '—'} {metric.unit ?? ''}
-                          </div>
-                          {metric.z_score !== null && metric.z_score !== undefined && (
-                            <div className="text-xs text-slate-500">z-score {metric.z_score.toFixed(2)}</div>
-                          )}
-                        </div>
+              <div className="mt-4">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={sortedTimelineEvents.map((e) => e.visit_id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-4">
+                      {sortedTimelineEvents.map((event) => (
+                        <SortableTimelineEvent
+                          key={event.visit_id}
+                          event={event}
+                          reports={reportsQuery.data ?? []}
+                          onCompare={() => toggleVisitForComparison(event.visit_id, event.imaging_available)}
+                          isSelected={comparisonSelection.includes(event.visit_id)}
+                          onViewReport={(reportId) => setSelectedReportId(reportId)}
+                        />
                       ))}
-                      {event.metrics.length === 0 && (
-                        <p className="text-sm text-slate-500">No metrics recorded.</p>
+                      {sortedTimelineEvents.length === 0 && !timelineQuery.isLoading && (
+                        <p className="text-sm text-slate-400">No visits recorded yet.</p>
                       )}
                     </div>
-                  </div>
-                ))}
-                {timelineEvents.length === 0 && !timelineQuery.isLoading && (
-                  <p className="text-sm text-slate-400">No visits recorded yet.</p>
-                )}
+                  </SortableContext>
+                </DndContext>
               </div>
             </div>
 
@@ -949,6 +962,24 @@ export default function LongitudinalTrackingPage() {
                 </div>
               </div>
             )}
+            <div className="mt-6 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCohortAnalysis(!showCohortAnalysis)}
+                className={clsx(
+                  'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition',
+                  showCohortAnalysis
+                    ? 'border-sky-500 bg-sky-500/10 text-sky-200'
+                    : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-sky-400 hover:text-sky-200'
+                )}
+              >
+                <ChartBarIcon className="h-4 w-4" />
+                {showCohortAnalysis ? 'Hide' : 'Show'} Cohort Analysis
+              </button>
+            </div>
+            {showCohortAnalysis && selectedEpisodeId && (
+              <CohortAnalysisPanel episodeId={selectedEpisodeId} reports={reportsQuery.data ?? []} />
+            )}
             <ReportsPanel
               reports={reportsQuery.data ?? []}
               isLoading={reportsQuery.isLoading || generateReportMutation.isPending}
@@ -958,6 +989,8 @@ export default function LongitudinalTrackingPage() {
               onDownload={handleDownload}
               onViewHeatmap={handleViewHeatmap}
               error={reportError}
+              selectedReportId={selectedReportId}
+              onSelectReport={setSelectedReportId}
             />
             <SchedulesPanel
               schedules={applicableSchedules}
@@ -1162,6 +1195,8 @@ type ReportsPanelProps = {
   onDownload: (report: LongitudinalReport, variant: 'excel' | 'pdf') => void
   onViewHeatmap: (report: LongitudinalReport) => void
   error?: string | null
+  selectedReportId?: number | null
+  onSelectReport?: (reportId: number | null) => void
 }
 
 function ReportsPanel({
@@ -1173,6 +1208,8 @@ function ReportsPanel({
   onDownload,
   onViewHeatmap,
   error,
+  selectedReportId,
+  onSelectReport,
 }: ReportsPanelProps) {
   const showCohortFields = reportForm.reportType !== 'summary'
   const showComparisonFields = reportForm.reportType === 'cohort_vs_cohort'
@@ -1328,7 +1365,13 @@ function ReportsPanel({
             return (
               <div
                 key={report.id}
-                className="space-y-3 rounded-xl border border-slate-800/70 bg-slate-950/70 p-4 text-xs text-slate-200"
+                className={clsx(
+                  'space-y-3 rounded-xl border p-4 text-xs text-slate-200 transition',
+                  selectedReportId === report.id
+                    ? 'border-sky-500 bg-sky-500/10'
+                    : 'border-slate-800/70 bg-slate-950/70 hover:border-slate-700'
+                )}
+                onClick={() => onSelectReport?.(report.id)}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1743,6 +1786,210 @@ function SchedulesPanel({
                   )}
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type SortableTimelineEventProps = {
+  event: TimelineEvent
+  reports: LongitudinalReport[]
+  onCompare: () => void
+  isSelected: boolean
+  onViewReport: (reportId: number) => void
+}
+
+function SortableTimelineEvent({ event, reports, onCompare, isSelected, onViewReport }: SortableTimelineEventProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: event.visit_id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  // Find reports that include this visit date
+  const relatedReports = reports.filter((report) => {
+    if (!report.start_date || !report.end_date) return false
+    const visitDate = new Date(event.visit_date)
+    const startDate = new Date(report.start_date)
+    const endDate = new Date(report.end_date)
+    return visitDate >= startDate && visitDate <= endDate
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        'rounded-2xl border border-slate-800/80 bg-slate-900/80 p-4',
+        isDragging && 'shadow-lg ring-2 ring-sky-500/50'
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing rounded border border-slate-700 p-1 text-slate-400 hover:border-sky-400 hover:text-sky-300"
+            title="Drag to reorder"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+            </svg>
+          </button>
+          <div className="text-sm font-semibold text-white">
+            {event.label} • {format(new Date(event.visit_date), 'PP')}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {relatedReports.length > 0 && (
+            <div className="flex items-center gap-1">
+              <LinkIcon className="h-3 w-3 text-sky-400" />
+              <select
+                className="rounded border border-slate-700 bg-slate-950 px-2 py-0.5 text-xs text-sky-300 focus:border-sky-500 focus:outline-none"
+                onChange={(e) => {
+                  const reportId = Number(e.target.value)
+                  if (reportId) onViewReport(reportId)
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <option value="">Reports ({relatedReports.length})</option>
+                {relatedReports.map((report) => (
+                  <option key={report.id} value={report.id}>
+                    {report.report_type} - {format(new Date(report.created_at), 'MM/dd/yyyy')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={!event.imaging_available}
+            onClick={onCompare}
+            className={clsx(
+              'rounded-full border px-3 py-1 text-xs transition',
+              event.imaging_available
+                ? isSelected
+                  ? 'border-sky-500 bg-sky-500/20 text-sky-200'
+                  : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-sky-400 hover:text-sky-200'
+                : 'cursor-not-allowed border-slate-800 bg-slate-900 text-slate-600'
+            )}
+          >
+            {isSelected ? 'Selected' : 'Compare'}
+          </button>
+          {event.progression_score !== undefined && event.progression_score !== null && (
+            <span className="text-xs text-sky-300">
+              Progression score {Math.round(event.progression_score * 100)}%
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+        {event.metrics.map((metric: Metric) => (
+          <div key={metric.id} className="rounded-xl border border-slate-800/70 bg-slate-950/80 p-3">
+            <div className="text-xs uppercase text-slate-400">{metric.metric_type}</div>
+            <div className="text-sm font-medium text-white">
+              {metric.metric_key}: {metric.metric_value ?? '—'} {metric.unit ?? ''}
+            </div>
+            {metric.z_score !== null && metric.z_score !== undefined && (
+              <div className="text-xs text-slate-500">z-score {metric.z_score.toFixed(2)}</div>
+            )}
+          </div>
+        ))}
+        {event.metrics.length === 0 && <p className="text-sm text-slate-500">No metrics recorded.</p>}
+      </div>
+    </div>
+  )
+}
+
+type CohortAnalysisPanelProps = {
+  episodeId: number
+  reports: LongitudinalReport[]
+}
+
+function CohortAnalysisPanel({ episodeId, reports }: CohortAnalysisPanelProps) {
+  const cohortReports = reports.filter((r) => r.report_type !== 'summary')
+  const { data: combinedAlerts } = useQuery({
+    queryKey: ['combined-alerts', episodeId],
+    queryFn: () => longitudinalService.fetchCombinedAlerts(episodeId),
+    enabled: episodeId !== null,
+  })
+
+  if (cohortReports.length === 0) {
+    return (
+      <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+        <h4 className="text-sm font-semibold text-white">Cohort Analysis</h4>
+        <p className="mt-2 text-xs text-slate-400">Generate cohort comparison reports to see analysis here.</p>
+      </div>
+    )
+  }
+
+  const comparisonData = cohortReports
+    .filter((r) => r.summary?.comparison?.table)
+    .flatMap((r) => r.summary?.comparison?.table ?? [])
+    .reduce((acc, row) => {
+      if (!acc[row.metric]) {
+        acc[row.metric] = []
+      }
+      if (row.delta !== null && row.delta !== undefined) {
+        acc[row.metric].push(row.delta)
+      }
+      return acc
+    }, {} as Record<string, number[]>)
+
+  const chartData = Object.entries(comparisonData).map(([metric, deltas]) => ({
+    metric,
+    avgDelta: deltas.length > 0 ? deltas.reduce((a, b) => a + b, 0) / deltas.length : 0,
+    count: deltas.length,
+  }))
+
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <h4 className="text-sm font-semibold text-white">Cohort Analysis</h4>
+      <p className="mt-1 text-xs text-slate-400">
+        Comparison metrics across {cohortReports.length} cohort report{cohortReports.length > 1 ? 's' : ''}
+      </p>
+
+      {chartData.length > 0 && (
+        <div className="mt-4 h-64 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+              <XAxis dataKey="metric" stroke="#94a3b8" angle={-45} textAnchor="end" height={80} />
+              <YAxis stroke="#94a3b8" />
+              <Tooltip
+                contentStyle={{
+                  background: '#0f172a',
+                  borderRadius: '12px',
+                  borderColor: '#1e293b',
+                }}
+              />
+              <Bar dataKey="avgDelta" fill="#38bdf8" name="Average Delta" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {combinedAlerts?.alerts && combinedAlerts.alerts.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <h5 className="text-xs font-semibold text-white">Combined Alerts</h5>
+          {combinedAlerts.alerts.map((alert: any, idx: number) => (
+            <div
+              key={idx}
+              className={clsx(
+                'rounded-lg border p-2 text-xs',
+                alert.severity === 'high'
+                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                  : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+              )}
+            >
+              {alert.message}
             </div>
           ))}
         </div>

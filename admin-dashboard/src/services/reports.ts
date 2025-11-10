@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios from '../config/api'
 
 const API_BASE = '/api/v1/reports'
 

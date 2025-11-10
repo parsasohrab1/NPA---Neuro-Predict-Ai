@@ -8,7 +8,11 @@ from typing import Optional
 from uuid import uuid4
 
 import aiofiles
-import pydicom
+
+try:
+    import pydicom
+except ImportError:  # pragma: no cover - optional dependency guard
+    pydicom = None
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,6 +99,12 @@ async def upload_dicom_study(
     current_user=Depends(require_role("doctor")),
 ):
     """Accept a DICOM file upload, store it on disk, and register an imaging study."""
+
+    if pydicom is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="DICOM processing is unavailable (missing pydicom dependency).",
+        )
 
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file must have a filename")
@@ -200,5 +210,119 @@ async def upload_dicom_study(
         metadata=metadata,
         created_at=imaging_study.created_at or datetime.utcnow(),
     )
+
+
+@router.get(
+    "/studies/{study_id}/preview",
+    summary="Get MRI preview image for a study",
+)
+async def get_study_preview(
+    study_id: int,
+    slice_index: Optional[int] = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+):
+    """Generate and return preview image for an imaging study"""
+    from fastapi.responses import Response
+    from ..services.image_processing_service import image_processing_service
+    import base64
+    import io
+    from PIL import Image
+    
+    result = await db.execute(select(ImagingStudy).where(ImagingStudy.id == study_id))
+    study = result.scalar_one_or_none()
+    
+    if not study or not study.dicom_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study not found or no DICOM path")
+    
+    try:
+        # Load DICOM and generate preview
+        image_array, _ = image_processing_service.load_dicom(study.dicom_path)
+        normalized = image_processing_service.normalize_image(image_array)
+        
+        # Convert to uint8 for PIL
+        preview_uint8 = (normalized * 255).astype('uint8')
+        pil_image = Image.fromarray(preview_uint8)
+        
+        # Convert to PNG bytes
+        buffer = io.BytesIO()
+        pil_image.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        return Response(content=buffer.read(), media_type='image/png')
+    except Exception as exc:
+        logger.error(f"Error generating preview for study {study_id}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate preview: {str(exc)}"
+        ) from exc
+
+
+@router.get(
+    "/studies/{study_id}/slices",
+    summary="Get list of available slices for multi-slice viewing",
+)
+async def get_study_slices(
+    study_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+):
+    """Get metadata about available slices in a DICOM study"""
+    result = await db.execute(select(ImagingStudy).where(ImagingStudy.id == study_id))
+    study = result.scalar_one_or_none()
+    
+    if not study:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study not found")
+    
+    return {
+        "study_id": study.id,
+        "total_slices": study.image_count or 1,
+        "modality": study.modality.value,
+        "study_date": study.study_date.isoformat() if study.study_date else None,
+    }
+
+
+@router.get(
+    "/studies/{study_id}/slice/{slice_index}",
+    summary="Get specific slice image",
+)
+async def get_study_slice(
+    study_id: int,
+    slice_index: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+):
+    """Get a specific slice from a DICOM study"""
+    from fastapi.responses import Response
+    from ..services.image_processing_service import image_processing_service
+    import io
+    from PIL import Image
+    
+    result = await db.execute(select(ImagingStudy).where(ImagingStudy.id == study_id))
+    study = result.scalar_one_or_none()
+    
+    if not study or not study.dicom_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study not found")
+    
+    try:
+        # For now, load single DICOM file
+        # In production, load specific slice from series
+        image_array, metadata = image_processing_service.load_dicom(study.dicom_path)
+        normalized = image_processing_service.normalize_image(image_array)
+        
+        preview_uint8 = (normalized * 255).astype('uint8')
+        pil_image = Image.fromarray(preview_uint8)
+        
+        buffer = io.BytesIO()
+        pil_image.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        return Response(content=buffer.read(), media_type='image/png')
+    except Exception as exc:
+        logger.error(f"Error loading slice {slice_index} for study {study_id}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load slice: {str(exc)}"
+        ) from exc
 
 

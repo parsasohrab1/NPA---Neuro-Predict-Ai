@@ -32,6 +32,15 @@ chmod +x setup.sh && ./setup.sh
 
 ---
 
+# Phase 2 Longitudinal Update (Nov 2025)
+
+- اجرای `pytest --cov=app --cov-report=term-missing` انجام شد؛ ۴ تست مربوط به گزارش‌های طولی به خاطر عدم پشتیبانی پارامتر `lifespan` در `httpx.ASGITransport` شکست خوردند. نیاز است httpx ارتقا یابد یا مدیریت lifecycle در تست‌ها بازنویسی شود.
+- وابستگی‌های backend با `aiosqlite==0.19.0` و ارتقای `httpx==0.27.2` به‌روزرسانی شدند تا تست‌های async و Heatmap اجرا شوند.
+- Admin Dashboard فاقد اسکریپت‌های `lint` و `test` است و اجرای `npm run build` به دلیل نبود `tsconfig.json` متوقف می‌شود؛ باید اسکریپت‌های QA و تنظیمات TypeScript اضافه شود.
+- چک‌لیست QA و مستندات `docs/` برای Heatmap چندلایه، هشدار ترکیبی و زمان‌بندی گزارش‌ها به‌روزرسانی شدند.
+
+---
+
 # Software Requirements Specification (SRS)
 # NeuroPredict-AI: Alzheimer's and Parkinson's Prediction and Risk Assessment Software
 

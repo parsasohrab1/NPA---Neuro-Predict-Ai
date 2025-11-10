@@ -154,6 +154,61 @@ async def get_prediction(
     return prediction
 
 
+@router.get("/{prediction_id}/imaging-studies")
+async def get_prediction_imaging_studies(
+    prediction_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get imaging studies associated with a prediction (via patient's latest medical record)"""
+    from ..models.imaging import ImagingStudy
+    
+    # Get prediction
+    result = await db.execute(
+        select(Prediction).where(Prediction.id == prediction_id)
+    )
+    prediction = result.scalar_one_or_none()
+    
+    if not prediction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prediction with ID {prediction_id} not found"
+        )
+    
+    # Get latest medical record for patient
+    result = await db.execute(
+        select(MedicalRecord)
+        .where(MedicalRecord.patient_id == prediction.patient_id)
+        .order_by(MedicalRecord.visit_date.desc())
+        .limit(1)
+    )
+    medical_record = result.scalar_one_or_none()
+    
+    if not medical_record:
+        return []
+    
+    # Get imaging studies for this medical record
+    result = await db.execute(
+        select(ImagingStudy)
+        .where(ImagingStudy.medical_record_id == medical_record.id)
+        .order_by(ImagingStudy.study_date.desc())
+    )
+    studies = result.scalars().all()
+    
+    return [
+        {
+            "id": study.id,
+            "study_id": study.study_id,
+            "modality": study.modality.value,
+            "study_date": study.study_date.isoformat() if study.study_date else None,
+            "study_description": study.study_description,
+            "image_count": study.image_count,
+            "quality_score": study.quality_score,
+        }
+        for study in studies
+    ]
+
+
 @router.post("/{prediction_id}/review", response_model=PredictionResponse)
 async def review_prediction(
     prediction_id: int,
