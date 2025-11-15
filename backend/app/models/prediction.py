@@ -25,8 +25,8 @@ class Prediction(Base):
     __tablename__ = "predictions"
     
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
     # Prediction Information
     disease_type = Column(Enum(DiseaseType), nullable=False)

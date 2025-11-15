@@ -1,7 +1,7 @@
 """
 Patient Management API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
@@ -12,6 +12,7 @@ from ..models.patient import Patient
 from ..models.medical_record import MedicalRecord
 from ..schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from ..core.security import get_current_user, require_role
+from ..core.cache import generate_cache_key, get_cached_response, set_cached_response, invalidate_patient_cache
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
@@ -41,18 +42,38 @@ async def create_patient(
     await db.commit()
     await db.refresh(new_patient)
     
+    # Invalidate cache
+    await invalidate_patient_cache(new_patient.id)
+    
     return new_patient
 
 
 @router.get("/", response_model=List[PatientResponse])
 async def get_patients(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get list of patients with pagination"""
+    """Get list of patients with pagination (cached for 5 minutes)"""
+    # Generate cache key
+    cache_key = generate_cache_key(
+        "patients",
+        request=request,
+        current_user=current_user,
+        skip=skip,
+        limit=limit,
+        search=search
+    )
+    
+    # Try to get from cache
+    cached_result = await get_cached_response(cache_key, expire_seconds=300)
+    if cached_result is not None:
+        return cached_result
+    
+    # Query database
     query = select(Patient)
     
     # Search filter
@@ -68,6 +89,9 @@ async def get_patients(
     
     result = await db.execute(query)
     patients = result.scalars().all()
+    
+    # Cache result
+    await set_cached_response(cache_key, patients, expire_seconds=300)
     
     return patients
 
