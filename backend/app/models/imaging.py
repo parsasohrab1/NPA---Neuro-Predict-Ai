@@ -21,11 +21,11 @@ class ImagingStudy(Base):
     __tablename__ = "imaging_studies"
     
     id = Column(Integer, primary_key=True, index=True)
-    medical_record_id = Column(Integer, ForeignKey("medical_records.id"), nullable=False)
+    medical_record_id = Column(Integer, ForeignKey("medical_records.id"), nullable=False, index=True)
     
     # Study Information
     study_id = Column(String, unique=True, index=True, nullable=False)  # DICOM Study Instance UID
-    study_date = Column(DateTime(timezone=True), nullable=False)
+    study_date = Column(DateTime(timezone=True), nullable=False, index=True)
     modality = Column(Enum(ImagingModality), nullable=False)
     
     # File Information

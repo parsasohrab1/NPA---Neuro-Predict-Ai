@@ -4,6 +4,7 @@ Patient Management API Endpoints
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 
 from ..db.session import get_db
@@ -73,8 +74,10 @@ async def get_patients(
     if cached_result is not None:
         return cached_result
     
-    # Query database
-    query = select(Patient)
+    # Query database with eager loading to avoid N+1 queries
+    query = select(Patient).options(
+        selectinload(Patient.assigned_doctor)  # Load assigned doctor relationship
+    )
     
     # Search filter
     if search:
@@ -98,13 +101,34 @@ async def get_patients(
 
 @router.get("/{patient_id}", response_model=PatientResponse)
 async def get_patient(
+    request: Request,
     patient_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get patient by ID"""
+    """Get patient by ID (cached for 10 minutes)"""
+    # Generate cache key
+    cache_key = generate_cache_key(
+        "patient",
+        request=request,
+        current_user=current_user,
+        patient_id=patient_id
+    )
+    
+    # Try to get from cache
+    cached_result = await get_cached_response(cache_key, expire_seconds=600)
+    if cached_result is not None:
+        return cached_result
+    
+    # Query database with eager loading to avoid N+1 queries
     result = await db.execute(
-        select(Patient).where(Patient.id == patient_id)
+        select(Patient)
+        .where(Patient.id == patient_id)
+        .options(
+            selectinload(Patient.assigned_doctor),
+            selectinload(Patient.medical_records),
+            selectinload(Patient.predictions)
+        )
     )
     patient = result.scalar_one_or_none()
     
@@ -113,6 +137,9 @@ async def get_patient(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Patient with ID {patient_id} not found"
         )
+    
+    # Cache result
+    await set_cached_response(cache_key, patient, expire_seconds=600)
     
     return patient
 
@@ -144,6 +171,9 @@ async def update_patient(
     await db.commit()
     await db.refresh(patient)
     
+    # Invalidate cache
+    await invalidate_patient_cache(patient_id)
+    
     return patient
 
 
@@ -168,6 +198,9 @@ async def delete_patient(
     await db.delete(patient)
     await db.commit()
     
+    # Invalidate cache
+    await invalidate_patient_cache(patient_id)
+    
     return None
 
 
@@ -178,9 +211,13 @@ async def get_patient_medical_records(
     current_user: User = Depends(get_current_user)
 ):
     """Get all medical records for a patient"""
-    # Verify patient exists
+    # Verify patient exists with eager loading to avoid N+1 queries
     result = await db.execute(
-        select(Patient).where(Patient.id == patient_id)
+        select(Patient)
+        .where(Patient.id == patient_id)
+        .options(
+            selectinload(Patient.medical_records).selectinload(MedicalRecord.imaging_studies)
+        )
     )
     patient = result.scalar_one_or_none()
     
@@ -190,13 +227,13 @@ async def get_patient_medical_records(
             detail=f"Patient with ID {patient_id} not found"
         )
     
-    # Get medical records
-    result = await db.execute(
-        select(MedicalRecord)
-        .where(MedicalRecord.patient_id == patient_id)
-        .order_by(MedicalRecord.visit_date.desc())
+    # Medical records already loaded via relationship, just sort them
+    from datetime import datetime
+    records = sorted(
+        patient.medical_records,
+        key=lambda x: x.visit_date if x.visit_date else datetime.min,
+        reverse=True
     )
-    records = result.scalars().all()
     
     return [
         {

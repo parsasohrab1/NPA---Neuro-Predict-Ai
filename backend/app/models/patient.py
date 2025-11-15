@@ -25,7 +25,7 @@ class Patient(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     date_of_birth = Column(Date, nullable=False)
-    gender = Column(Enum(Gender), nullable=False)
+    gender = Column(Enum(Gender), nullable=False, index=True)
     
     # Contact Information
     email = Column(String, nullable=True)
@@ -39,10 +39,10 @@ class Patient(Base):
     current_medications = Column(Text, nullable=True)
     
     # Assigned Doctor
-    assigned_doctor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assigned_doctor_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships

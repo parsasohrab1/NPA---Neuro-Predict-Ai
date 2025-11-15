@@ -12,10 +12,10 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     
     # Action Information
-    action = Column(String, nullable=False)  # login, view_patient, create_prediction, etc.
+    action = Column(String, nullable=False, index=True)  # login, view_patient, create_prediction, etc.
     resource_type = Column(String, nullable=True)  # patient, prediction, user, etc.
     resource_id = Column(String, nullable=True)
     

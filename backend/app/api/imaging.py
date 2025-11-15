@@ -16,6 +16,7 @@ except ImportError:  # pragma: no cover - optional dependency guard
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..core.config import settings
 from ..core.security import require_role
@@ -117,26 +118,37 @@ async def upload_dicom_study(
     if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
         logger.warning("Unexpected content type for DICOM upload: %s", file.content_type)
 
-    # Ensure patient exists
-    result = await db.execute(select(Patient).where(Patient.id == patient_id))
+    # Ensure patient exists with eager loading to avoid N+1 queries
+    result = await db.execute(
+        select(Patient)
+        .where(Patient.id == patient_id)
+        .options(selectinload(Patient.medical_records))
+    )
     patient = result.scalar_one_or_none()
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Patient {patient_id} not found")
 
-    # Fetch or create medical record
+    # Fetch or create medical record (try from already loaded relationship first)
     medical_record: Optional[MedicalRecord] = None
     if medical_record_id:
-        result = await db.execute(
-            select(MedicalRecord).where(
-                MedicalRecord.id == medical_record_id, MedicalRecord.patient_id == patient_id
-            )
+        # Try to get from already loaded relationship
+        medical_record = next(
+            (mr for mr in patient.medical_records if mr.id == medical_record_id),
+            None
         )
-        medical_record = result.scalar_one_or_none()
+        # If not found, query separately
         if not medical_record:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Medical record {medical_record_id} not found for patient {patient_id}",
+            result = await db.execute(
+                select(MedicalRecord).where(
+                    MedicalRecord.id == medical_record_id, MedicalRecord.patient_id == patient_id
+                )
             )
+            medical_record = result.scalar_one_or_none()
+            if not medical_record:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Medical record {medical_record_id} not found for patient {patient_id}",
+                )
     else:
         medical_record = MedicalRecord(
             patient_id=patient_id,

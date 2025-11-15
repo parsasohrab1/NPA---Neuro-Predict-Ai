@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List, Optional, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from ..models.patient import Patient
 from ..models.medical_record import MedicalRecord
@@ -29,12 +30,20 @@ class ReportingService:
         start: Optional[datetime] = None,
         end: Optional[datetime] = None,
     ) -> ClinicalReport:
-        patient_result = await db.execute(select(Patient).where(Patient.id == patient_id))
+        # Load patient with eager loading to avoid N+1 queries
+        patient_result = await db.execute(
+            select(Patient)
+            .where(Patient.id == patient_id)
+            .options(selectinload(Patient.medical_records))
+        )
         patient = patient_result.scalar_one_or_none()
         if not patient:
             raise ValueError("patient_not_found")
 
-        predictions_query = select(Prediction).where(Prediction.patient_id == patient_id)
+        # Load predictions with eager loading
+        predictions_query = select(Prediction).options(
+            selectinload(Prediction.patient)
+        ).where(Prediction.patient_id == patient_id)
         if start:
             predictions_query = predictions_query.where(Prediction.created_at >= start)
         if end:
@@ -147,7 +156,11 @@ class ReportingService:
         start: Optional[datetime] = None,
         end: Optional[datetime] = None,
     ) -> ManagementReport:
-        base_query = select(Prediction)
+        # Use eager loading to avoid N+1 queries
+        base_query = select(Prediction).options(
+            selectinload(Prediction.patient),
+            selectinload(Prediction.created_by_user)
+        )
         if model_version:
             base_query = base_query.where(Prediction.model_version == model_version)
         if start:

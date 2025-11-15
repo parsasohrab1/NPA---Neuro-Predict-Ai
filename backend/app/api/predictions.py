@@ -1,9 +1,10 @@
 """
 AI Prediction API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload, joinedload
 from typing import List
 from datetime import datetime
 
@@ -14,6 +15,7 @@ from ..models.medical_record import MedicalRecord
 from ..models.prediction import Prediction, DiseaseType
 from ..schemas.prediction import PredictionRequest, PredictionResponse, PredictionReview
 from ..core.security import get_current_user, require_role
+from ..core.cache import generate_cache_key, get_cached_response, set_cached_response, invalidate_prediction_cache
 from ..services.ai_model_service import ai_model_service
 
 router = APIRouter(prefix="/predictions", tags=["Predictions"])
@@ -26,9 +28,11 @@ async def create_prediction(
     current_user: User = Depends(require_role("doctor"))
 ):
     """Create a new disease risk prediction"""
-    # Verify patient exists
+    # Verify patient exists with eager loading
     result = await db.execute(
-        select(Patient).where(Patient.id == request.patient_id)
+        select(Patient)
+        .where(Patient.id == request.patient_id)
+        .options(selectinload(Patient.medical_records))
     )
     patient = result.scalar_one_or_none()
     
@@ -38,14 +42,13 @@ async def create_prediction(
             detail=f"Patient with ID {request.patient_id} not found"
         )
     
-    # Get latest medical record
-    result = await db.execute(
-        select(MedicalRecord)
-        .where(MedicalRecord.patient_id == request.patient_id)
-        .order_by(MedicalRecord.visit_date.desc())
-        .limit(1)
+    # Get latest medical record (already loaded via relationship, but we need to sort)
+    medical_records = sorted(
+        patient.medical_records,
+        key=lambda x: x.visit_date if x.visit_date else datetime.min,
+        reverse=True
     )
-    medical_record = result.scalar_one_or_none()
+    medical_record = medical_records[0] if medical_records else None
     
     if not medical_record:
         raise HTTPException(
@@ -108,19 +111,42 @@ async def create_prediction(
     await db.commit()
     await db.refresh(new_prediction)
     
+    # Invalidate cache
+    await invalidate_prediction_cache(patient_id=request.patient_id)
+    
     return new_prediction
 
 
 @router.get("/", response_model=List[PredictionResponse])
 async def get_predictions(
+    request: Request,
     patient_id: int = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get list of predictions with optional patient filter"""
-    query = select(Prediction)
+    """Get list of predictions with optional patient filter (cached for 5 minutes)"""
+    # Generate cache key
+    cache_key = generate_cache_key(
+        "predictions",
+        request=request,
+        current_user=current_user,
+        patient_id=patient_id,
+        skip=skip,
+        limit=limit
+    )
+    
+    # Try to get from cache
+    cached_result = await get_cached_response(cache_key, expire_seconds=300)
+    if cached_result is not None:
+        return cached_result
+    
+    # Query database with eager loading to avoid N+1 queries
+    query = select(Prediction).options(
+        selectinload(Prediction.patient),  # Load patient relationship
+        selectinload(Prediction.created_by_user)  # Load creator relationship
+    )
     
     if patient_id:
         query = query.where(Prediction.patient_id == patient_id)
@@ -130,18 +156,42 @@ async def get_predictions(
     result = await db.execute(query)
     predictions = result.scalars().all()
     
+    # Cache result
+    await set_cached_response(cache_key, predictions, expire_seconds=300)
+    
     return predictions
 
 
 @router.get("/{prediction_id}", response_model=PredictionResponse)
 async def get_prediction(
+    request: Request,
     prediction_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get prediction by ID"""
+    """Get prediction by ID (cached for 10 minutes)"""
+    # Generate cache key
+    cache_key = generate_cache_key(
+        "prediction",
+        request=request,
+        current_user=current_user,
+        prediction_id=prediction_id
+    )
+    
+    # Try to get from cache
+    cached_result = await get_cached_response(cache_key, expire_seconds=600)
+    if cached_result is not None:
+        return cached_result
+    
+    # Query database with eager loading to avoid N+1 queries
     result = await db.execute(
-        select(Prediction).where(Prediction.id == prediction_id)
+        select(Prediction)
+        .where(Prediction.id == prediction_id)
+        .options(
+            selectinload(Prediction.patient),
+            selectinload(Prediction.created_by_user),
+            selectinload(Prediction.patient).selectinload(Patient.medical_records)
+        )
     )
     prediction = result.scalar_one_or_none()
     
@@ -150,6 +200,9 @@ async def get_prediction(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Prediction with ID {prediction_id} not found"
         )
+    
+    # Cache result
+    await set_cached_response(cache_key, prediction, expire_seconds=600)
     
     return prediction
 
@@ -163,9 +216,13 @@ async def get_prediction_imaging_studies(
     """Get imaging studies associated with a prediction (via patient's latest medical record)"""
     from ..models.imaging import ImagingStudy
     
-    # Get prediction
+    # Get prediction with eager loading to avoid N+1 queries
     result = await db.execute(
-        select(Prediction).where(Prediction.id == prediction_id)
+        select(Prediction)
+        .where(Prediction.id == prediction_id)
+        .options(
+            selectinload(Prediction.patient).selectinload(Patient.medical_records).selectinload(MedicalRecord.imaging_studies)
+        )
     )
     prediction = result.scalar_one_or_none()
     
@@ -175,25 +232,26 @@ async def get_prediction_imaging_studies(
             detail=f"Prediction with ID {prediction_id} not found"
         )
     
-    # Get latest medical record for patient
-    result = await db.execute(
-        select(MedicalRecord)
-        .where(MedicalRecord.patient_id == prediction.patient_id)
-        .order_by(MedicalRecord.visit_date.desc())
-        .limit(1)
-    )
-    medical_record = result.scalar_one_or_none()
-    
-    if not medical_record:
+    # Get latest medical record for patient (already loaded via relationship)
+    if not prediction.patient or not prediction.patient.medical_records:
         return []
     
-    # Get imaging studies for this medical record
-    result = await db.execute(
-        select(ImagingStudy)
-        .where(ImagingStudy.medical_record_id == medical_record.id)
-        .order_by(ImagingStudy.study_date.desc())
+    medical_records = sorted(
+        prediction.patient.medical_records,
+        key=lambda x: x.visit_date if x.visit_date else datetime.min,
+        reverse=True
     )
-    studies = result.scalars().all()
+    medical_record = medical_records[0] if medical_records else None
+    
+    if not medical_record or not medical_record.imaging_studies:
+        return []
+    
+    # Imaging studies already loaded via relationship
+    studies = sorted(
+        medical_record.imaging_studies,
+        key=lambda x: x.study_date if x.study_date else datetime.min,
+        reverse=True
+    )
     
     return [
         {
@@ -236,6 +294,9 @@ async def review_prediction(
     
     await db.commit()
     await db.refresh(prediction)
+    
+    # Invalidate cache
+    await invalidate_prediction_cache(prediction_id=prediction_id, patient_id=prediction.patient_id)
     
     return prediction
 

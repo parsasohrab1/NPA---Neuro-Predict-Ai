@@ -76,8 +76,9 @@ def generate_cache_key(
         cache_key_parts.append(f"k:{hashlib.md5(kwargs_str.encode()).hexdigest()[:8]}")
     
     # Use PerformanceService to generate final cache key
+    # The generate_cache_key method expects prefix and kwargs
     key_string = "|".join(cache_key_parts)
-    return PerformanceService.cache_service.generate_cache_key(key_string)
+    return hashlib.md5(key_string.encode()).hexdigest()
 
 
 async def invalidate_cache_pattern(pattern: str):

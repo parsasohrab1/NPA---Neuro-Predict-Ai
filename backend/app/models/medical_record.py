@@ -12,11 +12,11 @@ class MedicalRecord(Base):
     __tablename__ = "medical_records"
     
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
     
     # Visit Information
-    visit_date = Column(DateTime(timezone=True), nullable=False)
-    visit_type = Column(String, nullable=True)  # Initial, Follow-up, etc.
+    visit_date = Column(DateTime(timezone=True), nullable=False, index=True)
+    visit_type = Column(String, nullable=True, index=True)  # Initial, Follow-up, etc.
     
     # Cognitive Scores
     mmse_score = Column(Float, nullable=True)  # Mini-Mental State Examination (0-30)
