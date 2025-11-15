@@ -204,8 +204,17 @@ Edit `backend/.env`:
 # Database
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/neuropredict_db
 
-# Security
-SECRET_KEY=your-super-secret-key-change-this
+# Security - REQUIRED
+# Generate a secure SECRET_KEY using:
+# python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Must be at least 32 characters long
+SECRET_KEY=your-secure-random-secret-key-minimum-32-characters
+
+# Environment Configuration
+# Options: development, production, staging, test
+# IMPORTANT: DEBUG=True is automatically blocked in production
+ENVIRONMENT=development
+DEBUG=False
 
 # Features
 ENABLE_AUDIT_LOG=true

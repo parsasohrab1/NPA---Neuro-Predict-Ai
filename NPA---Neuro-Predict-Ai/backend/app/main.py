@@ -49,14 +49,19 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI application
+# Disable docs in production for security
+docs_url = "/api/docs" if settings.DEBUG else None
+redoc_url = "/api/redoc" if settings.DEBUG else None
+openapi_url = "/api/openapi.json" if settings.DEBUG else None
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="AI-Powered Clinical Decision Support System for Neurodegenerative Diseases",
     lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    docs_url=docs_url,
+    redoc_url=redoc_url,
+    openapi_url=openapi_url
 )
 
 # CORS Middleware

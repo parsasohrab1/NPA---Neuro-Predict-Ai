@@ -2,8 +2,10 @@
 Application Configuration
 """
 from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator, model_validator
 from typing import Optional
 import os
+import secrets
 
 
 class Settings(BaseSettings):
@@ -11,7 +13,17 @@ class Settings(BaseSettings):
     APP_NAME: str = "NeuroPredict-AI"
     APP_VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
-    DEBUG: bool = True
+    
+    # Environment Configuration
+    ENVIRONMENT: str = Field(
+        default="development",
+        description="Application environment: 'development' or 'production'"
+    )
+    
+    DEBUG: bool = Field(
+        default=False,
+        description="Debug mode. Automatically set to False in production for security."
+    )
     
     # Server Configuration
     HOST: str = "0.0.0.0"
@@ -22,7 +34,50 @@ class Settings(BaseSettings):
     DATABASE_URL_SYNC: str = "postgresql://postgres:postgres@localhost:5432/neuropredict_db"
     
     # Security
-    SECRET_KEY: str = "your-secret-key-change-this-in-production"
+    SECRET_KEY: str = Field(
+        ...,
+        description="Secret key for JWT token signing. Must be set via SECRET_KEY environment variable.",
+        min_length=32
+    )
+    
+    @field_validator('SECRET_KEY')
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Validate that SECRET_KEY is not using the default insecure value"""
+        insecure_defaults = [
+            "your-secret-key-change-this-in-production",
+            "your-super-secret-key-change-this",
+            "secret-key",
+            "change-me",
+            ""
+        ]
+        if v in insecure_defaults:
+            raise ValueError(
+                "SECRET_KEY must be set via environment variable and cannot use default/insecure values. "
+                "Generate a secure key using: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters long for security")
+        return v
+    
+    @field_validator('ENVIRONMENT')
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        """Validate environment value"""
+        valid_environments = ["development", "production", "staging", "test"]
+        if v.lower() not in valid_environments:
+            raise ValueError(f"ENVIRONMENT must be one of: {', '.join(valid_environments)}")
+        return v.lower()
+    
+    @model_validator(mode='after')
+    def validate_debug_in_production(self):
+        """Ensure DEBUG is False in production for security"""
+        if self.ENVIRONMENT.lower() == 'production' and self.DEBUG is True:
+            raise ValueError(
+                "DEBUG=True is not allowed in production environment for security reasons. "
+                "Set ENVIRONMENT=development for development mode or DEBUG=False for production."
+            )
+        return self
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
