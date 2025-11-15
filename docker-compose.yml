@@ -45,6 +45,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/neuropredict_db
       - REDIS_HOST=redis
+      - ENVIRONMENT=development
       - DEBUG=True
     volumes:
       - ./backend:/app

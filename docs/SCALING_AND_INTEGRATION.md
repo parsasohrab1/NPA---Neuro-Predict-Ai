@@ -244,8 +244,11 @@ async def create_default_password_policy():
 
 ### 7.1 Environment Variables
 ```bash
-# Security
-SECRET_KEY=your-secret-key-here
+# Security - REQUIRED
+# Generate a secure SECRET_KEY using:
+# python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Must be at least 32 characters long
+SECRET_KEY=your-secure-random-secret-key-minimum-32-characters
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 

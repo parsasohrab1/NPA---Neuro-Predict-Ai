@@ -402,7 +402,12 @@ docker-compose -f docker-compose.prod.yml up -d
 ```bash
 # Backend
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost/db
-SECRET_KEY=your-secret-key
+# SECRET_KEY is REQUIRED - Generate using: python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Must be at least 32 characters long and set via environment variable
+SECRET_KEY=your-secure-random-secret-key-minimum-32-characters
+# Environment: development, production, staging, test
+ENVIRONMENT=development
+# DEBUG=True is automatically blocked in production for security
 DEBUG=False
 
 # Frontend
