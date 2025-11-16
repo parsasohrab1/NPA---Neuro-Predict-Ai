@@ -16,7 +16,8 @@ from ..core.security import (
     get_password_hash,
     create_access_token,
     create_refresh_token,
-    get_current_user
+    get_current_user,
+    decode_token
 )
 from ..services.security_service import SecurityService
 from ..core.config import settings
@@ -229,8 +230,87 @@ async def get_current_user_info(
     return current_user
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    payload: RefreshRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Issue a new access token using a valid refresh token"""
+    # Check blacklist
+    if await SecurityService.is_token_blacklisted(payload.refresh_token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
+
+    # Validate refresh token
+    try:
+        data = decode_token(payload.refresh_token)
+        if data.get("type") != "refresh":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token type")
+    except HTTPException:
+        raise
+
+    user_id = int(data.get("sub"))
+
+    # Ensure user exists and active
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+
+    # Issue new tokens (MVP: keep refresh, rotate access)
+    access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = payload.refresh_token
+
+    # Record session (optional new session per refresh)
+    expires_at = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    client_ip = SecurityService.get_client_ip(request)
+    user_agent = request.headers.get("User-Agent", "Unknown")
+    await SecurityService.create_session(
+        user_id=user.id,
+        session_token=access_token,
+        refresh_token=refresh_token,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        expires_at=expires_at,
+        db=db
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
-    """Logout current user (client should discard tokens)"""
-    return {"message": "Successfully logged out"}
+async def logout(
+    body: LogoutRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Logout current user:
+    - Blacklist provided refresh token
+    - Revoke all active sessions for the user
+    """
+    # Blacklist the refresh token
+    try:
+        data = decode_token(body.refresh_token)
+        exp = int(data.get("exp"))
+    except Exception:
+        exp = None  # type: ignore
+    await SecurityService.blacklist_token(body.refresh_token, exp)
+
+    # Revoke all sessions
+    await SecurityService.revoke_all_user_sessions(current_user.id, db)
+
+    return {"message": "Logged out"}
 

@@ -9,6 +9,55 @@ import {
   ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
+import { useEffect } from 'react'
+
+function SkipToContent() {
+  return (
+    <a
+      href="#main-content"
+      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-slate-800 focus:text-white focus:rounded-lg focus:shadow-lg"
+      aria-label="Skip to main content"
+    >
+      Skip to main content
+    </a>
+  )
+}
+
+function useKeyboardNavigation() {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        const mainContent = document.getElementById('main-content')
+        if (mainContent) {
+          ;(mainContent as HTMLElement).focus()
+          mainContent.scrollIntoView({ behavior: 'smooth' })
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        const searchInput = document.querySelector<HTMLInputElement>(
+          'input[type="search"], input[placeholder*="Search"], input[aria-label*="Search" i]'
+        )
+        if (searchInput) {
+          searchInput.focus()
+        }
+      }
+      if (e.key === 'Escape') {
+        const modals = document.querySelectorAll('[role="dialog"]')
+        modals.forEach((modal) => {
+          const closeButton = modal.querySelector<HTMLButtonElement>(
+            '[aria-label*="close" i], [data-close], [aria-label="Close"]'
+          )
+          if (closeButton) closeButton.click()
+        })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+}
 
 const navigation = [
   { name: 'System Overview', icon: HomeModernIcon, to: '/' },
@@ -22,15 +71,21 @@ const navigation = [
 ]
 
 export default function AdminLayout() {
+  useKeyboardNavigation()
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      <SkipToContent />
       <div className="flex min-h-screen">
-        <aside className="hidden w-72 flex-col border-r border-slate-800 bg-slate-900 p-6 lg:flex">
+        <aside
+          className="hidden w-72 flex-col border-r border-slate-800 bg-slate-900 p-6 lg:flex"
+          role="navigation"
+          aria-label="Admin navigation"
+        >
           <div className="mb-10 text-sm font-semibold uppercase tracking-widest text-slate-400">
             NeuroPredict-AI
           </div>
 
-          <nav className="space-y-2">
+          <nav className="space-y-2" aria-label="Primary">
             {navigation.map((item) => (
               <NavLink
                 key={item.to}
@@ -38,14 +93,14 @@ export default function AdminLayout() {
                 end={item.to === '/'}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 focus-visible:ring-offset-slate-900',
                     isActive
                       ? 'bg-slate-800 text-slate-50'
                       : 'text-slate-300 hover:bg-slate-800 hover:text-slate-50'
                   )
                 }
               >
-                <item.icon className="h-5 w-5" aria-hidden />
+                <item.icon className="h-5 w-5" aria-hidden="true" />
                 <span>{item.name}</span>
               </NavLink>
             ))}
@@ -53,7 +108,10 @@ export default function AdminLayout() {
         </aside>
 
         <div className="flex w-full flex-col">
-          <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/70 px-6 py-4 backdrop-blur">
+          <header
+            className="flex items-center justify-between border-b border-slate-800 bg-slate-900/70 px-6 py-4 backdrop-blur"
+            role="banner"
+          >
             <div>
               <h1 className="text-lg font-semibold text-slate-100">
                 Admin Control Center
@@ -73,7 +131,12 @@ export default function AdminLayout() {
             </div>
           </header>
 
-          <main className="flex-1 bg-slate-950/70 p-6">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="flex-1 bg-slate-950/70 p-6 focus:outline-none"
+            role="main"
+          >
             <div className="mx-auto max-w-7xl">
               <Outlet />
             </div>

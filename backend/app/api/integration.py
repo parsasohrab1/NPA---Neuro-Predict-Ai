@@ -168,3 +168,36 @@ async def sync_patient_from_ehr(
     result = await IntegrationService.sync_patient_from_ehr(request.patient_id)
     return result
 
+
+# Webhook receiver with HMAC and Idempotency
+@router.post("/webhooks/receive")
+async def receive_webhook(
+    payload: Dict[str, Any],
+    x_signature: str | None = None,
+    idempotency_key: str | None = None,
+    current_user: User = Depends(require_role("admin"))
+) -> Dict[str, Any]:
+    """
+    Receive signed webhook events (e.g., prediction_completed).
+    - HMAC signature in header 'X-Signature'
+    - Idempotency key in header 'Idempotency-Key'
+    """
+    if not x_signature:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing X-Signature")
+    if not IntegrationService.verify_signature(payload, x_signature):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
+
+    # Idempotency
+    if idempotency_key and await IntegrationService.is_idempotent(idempotency_key):
+        return {"status": "duplicate_ignored"}
+
+    # Process event (log-only demo)
+    event_type = payload.get("type")
+    data = payload.get("data", {})
+
+    # TODO: route event types to proper handlers (e.g., update EHR, notify UI)
+
+    if idempotency_key:
+        await IntegrationService.mark_idempotent(idempotency_key)
+
+    return {"status": "ok", "event": event_type}

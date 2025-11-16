@@ -33,7 +33,7 @@ async def create_patient(
     
     if existing_patient:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"Patient with ID {patient_data.patient_id} already exists"
         )
     

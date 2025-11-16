@@ -25,6 +25,24 @@ from app.models.medical_record import MedicalRecord
 from app.models.prediction import Prediction, DiseaseType, RiskLevel
 
 
+# ---------------------
+# Global seeds & faker
+# ---------------------
+@pytest.fixture(autouse=True, scope="session")
+def _global_seed():
+    """Set deterministic seeds for reproducibility across tests."""
+    import random
+    import numpy as np
+    random.seed(42)
+    np.random.seed(42)
+    try:
+        import torch  # type: ignore
+        torch.manual_seed(42)
+    except Exception:
+        pass
+    yield
+
+
 class TestUser:
     """Mock user for testing"""
     def __init__(self, user_id=1, role=UserRole.DOCTOR, is_active=True):
@@ -210,3 +228,136 @@ def override_require_role(required_role):
         return current_user
     return _require_role
 
+
+# ---------------------
+# Factories
+# ---------------------
+@pytest.fixture
+def user_factory():
+    def _make_user(user_id: int = 1, role: UserRole = UserRole.DOCTOR) -> TestUser:
+        return TestUser(user_id=user_id, role=role)
+    return _make_user
+
+
+@pytest.fixture
+def auth_token_factory():
+    from app.core.security import create_access_token
+    def _make_token(user_id: int) -> str:
+        return create_access_token({"sub": str(user_id)})
+    return _make_token
+
+
+@pytest.fixture
+async def make_patient(test_session: AsyncSession):
+    async def _create(
+        pid: str = "PT-FAKE",
+        first_name: str = "Ali",
+        last_name: str = "Rezaei",
+        gender: Gender = Gender.MALE,
+        dob: date = date(1985, 5, 20),
+    ) -> Patient:
+        p = Patient(
+            patient_id=pid,
+            first_name=first_name,
+            last_name=last_name,
+            date_of_birth=dob,
+            gender=gender,
+            email=f"{pid.lower()}@example.com",
+        )
+        test_session.add(p)
+        await test_session.commit()
+        await test_session.refresh(p)
+        return p
+    return _create
+
+
+@pytest.fixture
+async def make_medical_record(test_session: AsyncSession):
+    async def _create(
+        patient: Patient,
+        visit_date: datetime | None = None,
+        mmse: float = 26.0,
+        moca: float = 25.0,
+    ) -> MedicalRecord:
+        rec = MedicalRecord(
+            patient_id=patient.id,
+            visit_date=visit_date or datetime.utcnow(),
+            visit_type="Follow-up",
+            mmse_score=mmse,
+            moca_score=moca,
+            amyloid_beta=600.0,
+            tau_protein=200.0,
+        )
+        test_session.add(rec)
+        await test_session.commit()
+        await test_session.refresh(rec)
+        return rec
+    return _create
+
+
+# ---------------------
+# Mocks
+# ---------------------
+@pytest.fixture
+def mock_ai_model_service(monkeypatch):
+    """Mock AI model outputs with deterministic numbers."""
+    try:
+        from app.services import ai_model_service as _maybe  # type: ignore
+    except Exception:
+        _maybe = None
+
+    async def _predict_stub(patient_data):
+        return {
+            "alzheimer": {"risk_score": 0.42, "risk_level": RiskLevel.MEDIUM, "confidence": 0.9},
+            "parkinson": {"risk_score": 0.13, "risk_level": RiskLevel.LOW, "confidence": 0.88},
+            "attention_scores": {"MRI": 0.5, "Biomarker": 0.3, "Cognitive": 0.2},
+            "feature_importance": {"mmse_score": 0.4},
+            "recommendations": "mock",
+            "model_version": "test-1.0",
+            "model_name": "mock",
+        }
+    try:
+        from app.services.ai_model_service import ai_model_service
+        monkeypatch.setattr(ai_model_service, "predict", _predict_stub, raising=True)
+    except Exception:
+        pass
+    return True
+
+
+@pytest.fixture
+def mock_integration_service(monkeypatch):
+    """Mock integration service external calls."""
+    try:
+        from app.services import integration_service  # type: ignore
+    except Exception:
+        integration_service = None  # type: ignore
+
+    try:
+        from app.services.integration_service import IntegrationService
+        async def _ok(*args, **kwargs):
+            return {"ok": True}
+        monkeypatch.setattr(IntegrationService, "send_hl7_message", _ok, raising=False)
+        monkeypatch.setattr(IntegrationService, "send_fhir_resource", _ok, raising=False)
+        monkeypatch.setattr(IntegrationService, "get_fhir_resource", _ok, raising=False)
+        monkeypatch.setattr(IntegrationService, "query_fhir_resources", _ok, raising=False)
+        monkeypatch.setattr(IntegrationService, "fetch_pacs_study", _ok, raising=False)
+        monkeypatch.setattr(IntegrationService, "sync_imaging_from_pacs", _ok, raising=False)
+    except Exception:
+        pass
+    return True
+
+
+@pytest.fixture
+def redis_client_fake(monkeypatch):
+    """In-memory fake for cache layer style get/set during tests."""
+    store: dict[str, str] = {}
+
+    class FakeRedis:
+        async def get(self, k): return store.get(k)
+        async def set(self, k, v): store[k] = v; return True
+        async def setex(self, k, ttl, v): store[k] = v; return True
+        async def incr(self, k): store[k] = str(int(store.get(k, "0")) + 1); return int(store[k])
+        async def ping(self): return True
+        async def close(self): return True
+
+    return FakeRedis()

@@ -8,6 +8,7 @@ import { NotificationProvider } from './contexts/NotificationContext'
 import './i18n/config'
 import App from './App'
 import './index.css'
+import { initRUM } from './rum/rum'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,4 +35,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 )
+
+// Initialize lightweight RUM collection with 10% sampling
+try {
+  initRUM({ sampleRate: 0.1, sendIntervalMs: 15000 })
+} catch (e) {
+  // ignore RUM init errors
+}
 

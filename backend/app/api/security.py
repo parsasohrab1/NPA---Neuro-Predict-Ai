@@ -384,6 +384,36 @@ async def revoke_all_sessions(
     return {"message": "All sessions revoked successfully"}
 
 
+class CSPReport(BaseModel):
+    """Minimal CSP report body as per browser report format"""
+    csp_report: dict
+
+
+@router.post("/csp/report")
+async def csp_report(
+    report: CSPReport,
+    request: Request,
+):
+    """
+    Receive CSP violation reports (Report-Only). Store/log for observability.
+    For MVP, log to security log; can be extended to persist in DB.
+    """
+    try:
+        details = report.csp_report
+    except Exception:
+        details = {}
+    await SecurityService.log_security_event(
+        db=None,
+        user_id=None,
+        event_type="csp_violation",
+        severity="warning",
+        description=str(details)[:1000],
+        ip_address=SecurityService.get_client_ip(request),
+        request_path=request.url.path,
+    )
+    return {"received": True}
+
+
 # Security Logs
 @router.get("/logs", response_model=List[SecurityLogResponse])
 async def get_security_logs(

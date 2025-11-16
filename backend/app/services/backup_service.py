@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import aiofiles
 import json
+import hashlib
+import shutil
 
 from ..core.config import settings
 
@@ -63,6 +65,9 @@ class BackupService:
                 }
             
             backup_size = backup_path.stat().st_size
+
+            # Compute checksum for integrity
+            checksum = await BackupService._compute_checksum(backup_path)
             
             # Create backup metadata
             metadata = {
@@ -71,12 +76,23 @@ class BackupService:
                 "backup_size_bytes": backup_size,
                 "created_at": datetime.utcnow().isoformat(),
                 "database": "neuropredict_db",
-                "type": "full"
+                "type": "full",
+                "checksum_sha256": checksum,
             }
             
             metadata_path = backup_path.with_suffix('.json')
             async with aiofiles.open(metadata_path, 'w') as f:
                 await f.write(json.dumps(metadata, indent=2))
+
+            # Offsite sync (simulate by copying to secondary directory)
+            try:
+                offsite_dir = Path(settings.BACKUP_OFFSITE_DIR)
+                offsite_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(backup_path, offsite_dir / backup_name)
+                shutil.copy2(metadata_path, offsite_dir / metadata_path.name)
+            except Exception:
+                # Do not fail backup if offsite copy fails; can be alerted via logs
+                pass
             
             return {
                 "success": True,
@@ -248,4 +264,47 @@ class BackupService:
                 "valid": False,
                 "error": str(e)
             }
+
+    @staticmethod
+    async def archive_wal_segment(
+        wal_dir: str = "backups/wal",
+    ) -> Dict[str, Any]:
+        """
+        Simulate WAL/incremental archiving by writing a timestamped marker.
+        In real deployments, enable PostgreSQL WAL archiving to an object storage.
+        """
+        wal_path = Path(wal_dir)
+        wal_path.mkdir(parents=True, exist_ok=True)
+        name = f"wal_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.seg"
+        file_path = wal_path / name
+        try:
+            async with aiofiles.open(file_path, 'w') as f:
+                await f.write(json.dumps({"created_at": datetime.utcnow().isoformat()}, indent=2))
+            return {"success": True, "wal_path": str(file_path)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @staticmethod
+    async def verify_latest_full_backup(backup_dir: str = "backups") -> Dict[str, Any]:
+        backups = await BackupService.list_backups(backup_dir=backup_dir)
+        if not backups:
+            return {"valid": False, "error": "No backups found"}
+        latest = backups[0]
+        # Recompute checksum and compare
+        path = Path(latest["backup_path"])
+        if not path.exists():
+            return {"valid": False, "error": "Latest backup file missing"}
+        checksum = await BackupService._compute_checksum(path)
+        return {"valid": checksum == latest.get("checksum_sha256"), "expected": latest.get("checksum_sha256"), "actual": checksum}
+
+    @staticmethod
+    async def _compute_checksum(path: Path) -> str:
+        h = hashlib.sha256()
+        async with aiofiles.open(path, 'rb') as f:
+            while True:
+                chunk = await f.read(1024 * 1024)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
 

@@ -369,6 +369,40 @@ async def get_report_heatmap(
     return FileResponse(path=heatmap_path, media_type="image/png", filename=heatmap_path.name)
 
 
+@router.get(
+    "/reports/{report_id}/heatmap/summary",
+)
+async def get_report_heatmap_summary(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("doctor")),
+):
+    """
+    Return metadata for the report heatmap (metrics, time buckets, file path).
+    Useful for UI overlays and legends without downloading the PNG.
+    """
+    report = await longitudinal_service.get_report(db, report_id)
+    if report is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    if not report.charts_payload:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Heatmap summary unavailable")
+    metrics = [k for k in report.charts_payload.keys()]
+    time_set = set()
+    for rows in report.charts_payload.values():
+        for row in rows or []:
+            ts = row.get("visit_date")
+            if ts:
+                time_set.add(ts)
+    time_buckets = sorted(time_set)
+    return {
+        "report_id": report.id,
+        "episode_id": report.episode_id,
+        "report_type": report.report_type,
+        "metrics": metrics,
+        "time_buckets": time_buckets,
+        "heatmap_path": report.heatmap_path,
+    }
+
 @router.post(
     "/reports/schedules",
     response_model=ReportScheduleResponse,

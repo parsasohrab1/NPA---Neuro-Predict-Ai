@@ -104,6 +104,7 @@ async def create_prediction(
         model_name=prediction_result['model_name'],
         input_features=patient_data,
         feature_importance=prediction_result['feature_importance'],
+        attention_scores=prediction_result.get('attention_scores'),
         recommendations=prediction_result['recommendations']
     )
     

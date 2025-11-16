@@ -134,3 +134,15 @@ def require_role(required_role: str):
         return current_user
     return role_checker
 
+
+def require_any(*roles: str):
+    """Allow any of the provided roles (OR semantics)."""
+    async def checker(current_user: User = Depends(get_current_active_user)):
+        for r in roles:
+            if check_permission(current_user, r):
+                return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User lacks required roles: {', '.join(roles)}"
+        )
+    return checker

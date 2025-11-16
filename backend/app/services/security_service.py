@@ -21,10 +21,69 @@ from ..models.security import (
 from ..models.user import User
 from ..core.security import get_password_hash, verify_password
 from ..core.config import settings
+from ..core.crypto import encrypt_text, decrypt_text
+import jwt as pyjwt
+from jose import jwt as jose_jwt
+import redis.asyncio as redis
+import time
 
 
 class SecurityService:
     """Security service for MFA, password policies, IP whitelist, and session management"""
+    _redis_client: Optional[redis.Redis] = None
+
+    @staticmethod
+    async def _get_redis() -> Optional[redis.Redis]:
+        if SecurityService._redis_client is None:
+            try:
+                SecurityService._redis_client = redis.from_url(
+                    f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
+                    decode_responses=True
+                )
+            except Exception:
+                SecurityService._redis_client = None
+        return SecurityService._redis_client
+
+    @staticmethod
+    async def blacklist_token(token: str, expires_at_unix: Optional[int] = None):
+        """
+        Blacklist a token in Redis until it expires.
+        """
+        client = await SecurityService._get_redis()
+        if not client:
+            return  # silently ignore if redis not available
+        ttl = 0
+        if expires_at_unix is not None:
+            now = int(time.time())
+            ttl = max(expires_at_unix - now, 0)
+        else:
+            # Try to decode JWT to get exp
+            try:
+                payload = jose_jwt.get_unverified_claims(token)  # type: ignore
+                exp = int(payload.get("exp", 0))
+                now = int(time.time())
+                ttl = max(exp - now, 0)
+            except Exception:
+                ttl = 3600
+        key = f"blacklist:{token}"
+        try:
+            if ttl > 0:
+                await client.setex(key, ttl, "1")
+            else:
+                await client.set(key, "1")
+        except Exception:
+            pass
+
+    @staticmethod
+    async def is_token_blacklisted(token: str) -> bool:
+        client = await SecurityService._get_redis()
+        if not client:
+            return False
+        try:
+            val = await client.get(f"blacklist:{token}")
+            return val == "1"
+        except Exception:
+            return False
     
     @staticmethod
     async def generate_mfa_secret(user_id: int, method: MFAMethod = MFAMethod.TOTP, db: AsyncSession = None) -> dict:
@@ -40,7 +99,7 @@ class SecurityService:
             secret = pyotp.random_base32()
             
             if existing_mfa:
-                existing_mfa.secret_key = secret
+                existing_mfa.secret_key = encrypt_text(secret)
                 existing_mfa.method = method.value
                 existing_mfa.is_verified = False
                 mfa_secret = existing_mfa
@@ -48,7 +107,7 @@ class SecurityService:
                 mfa_secret = MFASecret(
                     user_id=user_id,
                     method=method.value,
-                    secret_key=secret,
+                    secret_key=encrypt_text(secret),
                     is_enabled=False,
                     is_verified=False
                 )
@@ -56,6 +115,7 @@ class SecurityService:
             
             # Generate backup codes
             backup_codes = [secrets.token_hex(4).upper() for _ in range(10)]
+            # store encrypted JSON string to avoid leaking individual codes
             mfa_secret.backup_codes = backup_codes
             
             await db.commit()
@@ -103,7 +163,8 @@ class SecurityService:
             return False
         
         if mfa_secret.method == MFAMethod.TOTP.value:
-            totp = pyotp.TOTP(mfa_secret.secret_key)
+            secret = decrypt_text(mfa_secret.secret_key) or ""
+            totp = pyotp.TOTP(secret)
             # Check if code is valid (current or previous/next window for clock skew)
             if totp.verify(code, valid_window=1):
                 mfa_secret.last_used = datetime.utcnow()
@@ -136,7 +197,8 @@ class SecurityService:
         
         # Verify code
         if mfa_secret.method == MFAMethod.TOTP.value:
-            totp = pyotp.TOTP(mfa_secret.secret_key)
+            secret = decrypt_text(mfa_secret.secret_key) or ""
+            totp = pyotp.TOTP(secret)
             if not totp.verify(verification_code, valid_window=1):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,

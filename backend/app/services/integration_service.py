@@ -6,8 +6,11 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel
 import json
+import hmac
+import hashlib
 
 from ..core.config import settings
+import redis.asyncio as redis
 
 
 class HL7Message(BaseModel):
@@ -32,6 +35,58 @@ class FHIRResource(BaseModel):
 class IntegrationService:
     """Service for integrating with external medical systems"""
     
+    _redis: Optional[redis.Redis] = None
+
+    @staticmethod
+    async def _get_redis() -> Optional[redis.Redis]:
+        if IntegrationService._redis is None:
+            try:
+                IntegrationService._redis = redis.from_url(
+                    f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
+                    decode_responses=True
+                )
+            except Exception:
+                IntegrationService._redis = None
+        return IntegrationService._redis
+
+    # --- Security: HMAC signing/verification for outbound/inbound webhooks
+    @staticmethod
+    def sign_payload(payload: Dict[str, Any]) -> Optional[str]:
+        if not settings.INTEGRATION_HMAC_SECRET:
+            return None
+        body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        signature = hmac.new(settings.INTEGRATION_HMAC_SECRET.encode("utf-8"), body, hashlib.sha256).hexdigest()
+        return signature
+
+    @staticmethod
+    def verify_signature(payload: Dict[str, Any], signature: str) -> bool:
+        if not settings.INTEGRATION_HMAC_SECRET:
+            return False
+        expected = IntegrationService.sign_payload(payload) or ""
+        # constant time compare
+        return hmac.compare_digest(expected, signature)
+
+    # --- Idempotency
+    @staticmethod
+    async def is_idempotent(idempotency_key: str) -> bool:
+        r = await IntegrationService._get_redis()
+        if not r:
+            return False
+        try:
+            return await r.exists(f"idemp:{idempotency_key}") == 1
+        except Exception:
+            return False
+
+    @staticmethod
+    async def mark_idempotent(idempotency_key: str, ttl_seconds: int = 24 * 3600) -> None:
+        r = await IntegrationService._get_redis()
+        if not r:
+            return
+        try:
+            await r.setex(f"idemp:{idempotency_key}", ttl_seconds, "1")
+        except Exception:
+            pass
+
     @staticmethod
     async def send_hl7_message(message: HL7Message) -> Dict[str, Any]:
         """Send HL7 message to external system"""
@@ -200,6 +255,31 @@ class IntegrationService:
             "patient_id": patient_id,
             "data": ehr_data
         }
+
+    @staticmethod
+    async def pull_patients_batch(updated_after: Optional[str] = None, cursor: Optional[str] = None, limit: int = 100) -> Dict[str, Any]:
+        """Pull-batch strategy to fetch patients incrementally."""
+        if not settings.EHR_API_URL:
+            raise ValueError("EHR API not configured")
+        params: Dict[str, Any] = {"limit": limit}
+        if updated_after:
+            params["updated_after"] = updated_after
+        if cursor:
+            params["cursor"] = cursor
+        url = f"{settings.EHR_API_URL}/patients"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                return {
+                    "success": True,
+                    "items": data.get("items", []),
+                    "next_cursor": data.get("next_cursor"),
+                    "total": data.get("total")
+                }
+            except httpx.HTTPError as e:
+                return {"success": False, "error": str(e)}
     
     @staticmethod
     async def sync_imaging_from_pacs(study_instance_uid: str) -> Dict[str, Any]:

@@ -4,12 +4,15 @@ Security Middleware - IP Whitelist, Rate Limiting, Security Headers
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from starlette.types import ASGIApp
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from datetime import datetime, timedelta
 import time
 import redis.asyncio as redis
 from typing import Optional
+import uuid
+import logging
 
 from ..core.config import settings
 from ..db.session import get_db
@@ -28,7 +31,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        # CSP (Report-Only for MVP) - relaxed, to be tightened later
+        csp_report_only = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "font-src 'self' data:",
+            "connect-src 'self'",
+            "frame-ancestors 'none'",
+            "object-src 'none'",
+            "base-uri 'self'",
+        ]
+        response.headers["Content-Security-Policy-Report-Only"] = "; ".join(csp_report_only)
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         
@@ -60,8 +75,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, redis_client: Optional[redis.Redis] = None):
         super().__init__(app)
         self.redis_client = redis_client
-        self.rate_limit_requests = 100  # requests per window
-        self.rate_limit_window = 60  # seconds
+        # Defaults (overridden by per-route policies)
+        self.default_ip_limit = settings.RATE_LIMIT_DEFAULT_PER_MINUTE
+        self.default_ip_window = 60  # seconds
+        # User-based window is hourly
+        self.user_limit = settings.RATE_LIMIT_USER_PER_HOUR
+        self.user_window = 3600  # seconds
+        # Per-route policies
+        self.login_ip_limit = settings.RATE_LIMIT_LOGIN_PER_MINUTE
+        self.upload_ip_limit = settings.RATE_LIMIT_UPLOAD_PER_MINUTE
     
     async def dispatch(self, request: Request, call_next):
         # Skip rate limiting for health checks
@@ -70,41 +92,105 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         if self.redis_client:
             client_ip = SecurityService.get_client_ip(request)
-            key = f"rate_limit:{client_ip}"
+            path = request.url.path
+            # Determine policy by path
+            if path.startswith(f"{settings.API_V1_PREFIX}/auth/login"):
+                ip_limit = self.login_ip_limit
+                ip_window = 60
+                scope = "login"
+            elif path.startswith(f"{settings.API_V1_PREFIX}/imaging/dicom"):
+                ip_limit = self.upload_ip_limit
+                ip_window = 60
+                scope = "upload"
+            else:
+                ip_limit = self.default_ip_limit
+                ip_window = self.default_ip_window
+                scope = "default"
+
+            ip_key = f"rate_limit:{scope}:ip:{client_ip}"
+
+            # Use Authorization token (opaque) as user key if present
+            auth_header = request.headers.get("Authorization")
+            user_token = None
+            if auth_header and auth_header.startswith("Bearer "):
+                user_token = auth_header.split(" ", 1)[1]
+            user_key = f"rate_limit:{scope}:user:{user_token}" if user_token else None
             
             try:
-                # Get current count
-                count = await self.redis_client.get(key)
-                
-                if count is None:
-                    # First request in window
-                    await self.redis_client.setex(key, self.rate_limit_window, 1)
+                # IP bucket
+                ip_count = await self.redis_client.get(ip_key)
+                if ip_count is None:
+                    await self.redis_client.setex(ip_key, ip_window, 1)
+                    ip_remaining = ip_limit - 1
                 else:
-                    count = int(count)
-                    if count >= self.rate_limit_requests:
-                        # Rate limit exceeded
+                    ip_count = int(ip_count)
+                    if ip_count >= ip_limit:
                         await SecurityService.log_security_event(
-                            db=None,  # Will need to handle this differently
+                            db=None,
                             user_id=None,
-                            event_type="rate_limit_exceeded",
+                            event_type="rate_limit_exceeded_ip",
                             severity="warning",
-                            description=f"Rate limit exceeded for IP: {client_ip}",
+                            description=f"IP rate limit exceeded for IP: {client_ip}",
                             ip_address=client_ip,
                             request_path=request.url.path
                         )
                         return Response(
                             content="Rate limit exceeded",
                             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                            headers={"Retry-After": str(self.rate_limit_window)}
+                            headers={
+                                "Retry-After": str(ip_window),
+                                "X-RateLimit-Limit": str(ip_limit),
+                                "X-RateLimit-Remaining": "0",
+                            }
                         )
+                    ip_remaining = max(0, ip_limit - (ip_count + 1))
+                    await self.redis_client.incr(ip_key)
+
+                # User bucket (if authenticated)
+                user_remaining = None
+                if user_key:
+                    user_count = await self.redis_client.get(user_key)
+                    if user_count is None:
+                        await self.redis_client.setex(user_key, self.user_window, 1)
+                        user_remaining = self.user_limit - 1
                     else:
-                        # Increment count
-                        await self.redis_client.incr(key)
+                        user_count = int(user_count)
+                        if user_count >= self.user_limit:
+                            await SecurityService.log_security_event(
+                                db=None,
+                                user_id=None,
+                                event_type="rate_limit_exceeded_user",
+                                severity="warning",
+                                description=f"User rate limit exceeded",
+                                ip_address=client_ip,
+                                request_path=request.url.path
+                            )
+                            return Response(
+                                content="Rate limit exceeded",
+                                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                                headers={
+                                    "Retry-After": str(self.user_window),
+                                    "X-RateLimit-Limit": str(ip_limit),
+                                    "X-RateLimit-Remaining": str(ip_remaining),
+                                    "X-RateLimit-User-Limit": str(self.user_limit),
+                                    "X-RateLimit-User-Remaining": "0",
+                                }
+                            )
+                        user_remaining = max(0, self.user_limit - (user_count + 1))
+                        await self.redis_client.incr(user_key)
             except Exception as e:
                 # If Redis fails, allow request (fail open)
                 pass
         
-        return await call_next(request)
+        response = await call_next(request)
+        # Attach rate limit headers when possible
+        if self.redis_client:
+            # Mirror the default policy numbers for visibility
+            response.headers.setdefault("X-RateLimit-Limit", str(self.default_ip_limit))
+            # We can't always know remaining here; keep headers if a 429 set them
+            if "X-RateLimit-Remaining" not in response.headers:
+                response.headers["X-RateLimit-Remaining"] = response.headers.get("X-RateLimit-Remaining", "")
+        return response
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -114,17 +200,61 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         client_ip = SecurityService.get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "Unknown")
+        logger = logging.getLogger("app.request")
         
         # Process request
         response = await call_next(request)
         
         # Calculate processing time
         process_time = time.time() - start_time
-        
-        # Log security event (async, don't block response)
-        # This would typically be done in a background task
-        # For now, we'll add it to response headers
+        latency_ms = int(process_time * 1000)
+
+        # Attach process time header
         response.headers["X-Process-Time"] = str(process_time)
-        
+
+        # Structured JSON log
+        try:
+            request_id = getattr(request.state, "request_id", None)
+            user_id = None  # populate from auth if available in future
+            error_code = None
+            if 400 <= response.status_code < 600:
+                # If handlers set a code, propagate; else None
+                error_code = response.headers.get("X-Error-Code", None)
+
+            logger.info(
+                "request_completed",
+                extra={
+                    "request_id": request_id,
+                    "user_id": user_id,
+                    "path": request.url.path,
+                    "method": request.method,
+                    "status_code": response.status_code,
+                    "latency_ms": latency_ms,
+                    "error_code": error_code,
+                    # limited, non-PII attributes
+                    "user_agent": user_agent,
+                    "client_ip": client_ip,
+                },
+            )
+        except Exception:
+            # Never break request on logging issues
+            pass
+
+        return response
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Attach a unique request id to each request/response for traceability"""
+
+    def __init__(self, app: ASGIApp, header_name: str = "X-Request-Id") -> None:
+        super().__init__(app)
+        self.header_name = header_name
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get(self.header_name) or str(uuid.uuid4())
+        # expose on request state for handlers
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers[self.header_name] = request_id
         return response
 

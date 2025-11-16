@@ -54,3 +54,20 @@ async def get_prometheus_metrics(
     metrics = await MonitoringService.get_metrics(db)
     return MonitoringService.format_prometheus_metrics(metrics)
 
+
+@router.get("/kpis")
+async def get_business_kpis(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = require_role("admin")
+) -> Dict[str, Any]:
+    """Business-level KPIs for dashboards"""
+    return await MonitoringService.get_business_kpis(db)
+
+
+@router.get("/slo")
+async def get_slo_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = require_role("admin")
+) -> Dict[str, Any]:
+    """SLO compliance summary against phase success criteria (p95, p99, error rate, uptime)."""
+    return await MonitoringService.get_slo_status(db)

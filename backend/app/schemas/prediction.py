@@ -39,6 +39,10 @@ class PredictionResponse(BaseModel):
     model_name: Optional[str] = None
     
     feature_importance: Optional[Dict[str, float]] = None
+    attention_scores: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Attention weights for each data modality (MRI, Biomarker, Cognitive)"
+    )
     recommendations: Optional[str] = None
     follow_up_date: Optional[datetime] = None
     

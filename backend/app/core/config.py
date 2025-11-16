@@ -127,6 +127,7 @@ class Settings(BaseSettings):
     PACS_SERVER_URL: Optional[str] = None
     EHR_API_URL: Optional[str] = None
     HL7_FHIR_ENDPOINT: Optional[str] = None
+    INTEGRATION_HMAC_SECRET: Optional[str] = None
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -139,6 +140,21 @@ class Settings(BaseSettings):
     # Performance
     MAX_CONCURRENT_PREDICTIONS: int = 10
     PREDICTION_TIMEOUT: int = 300  # seconds
+
+    # Rate Limiting (per-minute defaults; tunable per-route)
+    RATE_LIMIT_DEFAULT_PER_MINUTE: int = 120
+    RATE_LIMIT_USER_PER_HOUR: int = 1000
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 10
+    RATE_LIMIT_UPLOAD_PER_MINUTE: int = 10
+
+    # Backup & DR
+    BACKUP_DIR: str = "backups"
+    BACKUP_OFFSITE_DIR: str = "backups_offsite"  # simulate offsite/secondary storage
+    BACKUP_FULL_INTERVAL_HOURS: int = 24  # daily full backup
+    BACKUP_WAL_INTERVAL_MINUTES: int = 15  # incremental/WAL archiving
+    BACKUP_RETENTION_DAYS: int = 14  # keep 7–14 daily copies
+    BACKUP_VERIFY_WEEKLY: bool = True
+    BACKUP_VERIFY_INTERVAL_DAYS: int = 7
     
     class Config:
         env_file = ".env"

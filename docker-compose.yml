@@ -1,3 +1,59 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: npa
+      POSTGRES_PASSWORD: npa
+      POSTGRES_DB: npa
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://npa:npa@db:5432/npa
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DEBUG: "true"
+      HOST: 0.0.0.0
+      PORT: 8000
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+  admin:
+    build:
+      context: ./frontend/admin
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    volumes:
+      - ./frontend/admin:/usr/src/app
+      - /usr/src/app/node_modules
+
+volumes:
+  pgdata:
+
 version: '3.8'
 
 services:
@@ -57,6 +113,11 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Frontend Web Application
   frontend:
@@ -74,6 +135,11 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Admin Dashboard
   admin-dashboard:

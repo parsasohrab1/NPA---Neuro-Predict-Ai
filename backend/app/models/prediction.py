@@ -50,6 +50,8 @@ class Prediction(Base):
     
     # Feature Importance (for explainability)
     feature_importance = Column(JSON, nullable=True)
+    # Attention/explainability scores per modality
+    attention_scores = Column(JSON, nullable=True)
     
     # Clinical Recommendations
     recommendations = Column(Text, nullable=True)

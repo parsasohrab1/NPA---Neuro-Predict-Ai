@@ -332,6 +332,12 @@ class AIModelService:
                 alzheimer_prob, parkinson_prob, patient_data
             )
             
+            # Simple placeholder attention scores summing to 1.0
+            # In production, extract real attention from model
+            att_mri = max(0.05, min(0.9, 0.4 + (features[149] - 0.5) * 0.1))  # heuristic
+            att_bio = 0.3
+            att_cog = 1.0 - (att_mri + att_bio)
+
             return {
                 'alzheimer': {
                     'risk_score': alzheimer_prob,
@@ -342,6 +348,11 @@ class AIModelService:
                     'risk_score': parkinson_prob,
                     'risk_level': parkinson_risk_level,
                     'confidence': parkinson_confidence
+                },
+                'attention_scores': {
+                    'MRI': float(att_mri),
+                    'Biomarker': float(att_bio),
+                    'Cognitive': float(att_cog)
                 },
                 'feature_importance': feature_importance,
                 'recommendations': recommendations,

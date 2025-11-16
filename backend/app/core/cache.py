@@ -114,3 +114,11 @@ async def invalidate_prediction_cache(prediction_id: Optional[int] = None, patie
     for pattern in patterns:
         await invalidate_cache_pattern(pattern)
 
+
+async def invalidate_product_cache(product_id: Optional[int] = None):
+    """Invalidate cache entries related to products"""
+    patterns = ["*products*", "*product*"]
+    if product_id is not None:
+        patterns.append(f"*product:{product_id}*")
+    for pattern in patterns:
+        await invalidate_cache_pattern(pattern)
