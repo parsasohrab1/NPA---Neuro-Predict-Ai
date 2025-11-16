@@ -43,6 +43,8 @@ async def add_indexes():
         "CREATE INDEX IF NOT EXISTS idx_patients_assigned_doctor ON patients(assigned_doctor_id);",
         "CREATE INDEX IF NOT EXISTS idx_patients_created_at ON patients(created_at DESC);",
         "CREATE INDEX IF NOT EXISTS idx_patients_gender ON patients(gender);",
+        # Composite search-friendly index suggested by docs
+        "CREATE INDEX IF NOT EXISTS idx_patients_pid_name ON patients(patient_id, last_name, first_name);",
         
         # Audit logs table indexes
         "CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);",
@@ -52,6 +54,11 @@ async def add_indexes():
         # Composite indexes for common query patterns
         "CREATE INDEX IF NOT EXISTS idx_predictions_patient_risk ON predictions(patient_id, alzheimer_risk_level, parkinson_risk_level);",
         "CREATE INDEX IF NOT EXISTS idx_medical_records_patient_visit_type ON medical_records(patient_id, visit_type, visit_date DESC);",
+
+        # Products table indexes (filtering/sorting)
+        "CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);",
+        "CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);",
+        "CREATE INDEX IF NOT EXISTS idx_products_active_name ON products(is_active, name);",
     ]
     
     async with engine.begin() as conn:

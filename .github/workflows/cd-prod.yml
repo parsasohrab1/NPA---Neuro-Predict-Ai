@@ -1,0 +1,31 @@
+name: CD - Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_tag:
+        description: "Backend image tag (ghcr.io/<repo>-backend:<tag>)"
+        required: true
+      frontend_tag:
+        description: "Frontend image tag (ghcr.io/<repo>-frontend:<tag>)"
+        required: true
+      admin_tag:
+        description: "Admin image tag (ghcr.io/<repo>-admin:<tag>)"
+        required: false
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://example.com
+    steps:
+      - name: Prepare deployment plan
+        run: |
+          echo "Backend: ${{ inputs.backend_tag }}"
+          echo "Frontend: ${{ inputs.frontend_tag }}"
+          echo "Admin   : ${{ inputs.admin_tag }}"
+          echo "This job is a placeholder to integrate with your deployment platform (Kubernetes/VM/PaaS)."
+          echo "Implement Blue-Green/Canary rollout via your chosen tooling (Helm/ArgoCD/GitOps)."
+
+

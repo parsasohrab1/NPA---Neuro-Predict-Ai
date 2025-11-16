@@ -1,0 +1,63 @@
+name: CD - Stage
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy-stage:
+    runs-on: ubuntu-latest
+    environment: stage
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: neuropredict_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Start backend (dev server)
+        working-directory: backend
+        env:
+          SECRET_KEY: test-secret-key-12345678901234567890abcd
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/neuropredict_db
+          DATABASE_URL_SYNC: postgresql://postgres:postgres@localhost:5432/neuropredict_db
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_DB: 0
+          ENVIRONMENT: staging
+          DEBUG: "false"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 10
+
+      - name: Smoke test - health endpoint
+        run: |
+          curl -sf http://localhost:8000/health | jq .
+
+      - name: ZAP Baseline Scan (light)
+        uses: zaproxy/action-baseline@v0.11.0
+        with:
+          target: "http://localhost:8000"
+        continue-on-error: true
+
+
