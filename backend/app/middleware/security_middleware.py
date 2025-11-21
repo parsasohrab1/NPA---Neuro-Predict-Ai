@@ -30,22 +30,38 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        # CSP (Report-Only for MVP) - relaxed, to be tightened later
-        csp_report_only = [
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        
+        # CSP Configuration - improved for production
+        # In production, switch from Report-Only to enforced CSP after testing
+        csp_policy = [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # TODO: Remove unsafe-* in production after code refactoring
+            "style-src 'self' 'unsafe-inline'",  # TODO: Remove unsafe-inline after moving to CSS modules
+            "img-src 'self' data: blob: https:",
             "font-src 'self' data:",
-            "connect-src 'self'",
+            "connect-src 'self' " + " ".join(settings.CORS_ORIGINS),  # Allow API calls to same origin and CORS origins
             "frame-ancestors 'none'",
             "object-src 'none'",
             "base-uri 'self'",
+            "form-action 'self'",
+            "frame-src 'none'",
+            "media-src 'self'",
+            "worker-src 'self' blob:",
+            "manifest-src 'self'",
+            "report-uri /api/v1/security/csp/report",  # CSP violation reporting endpoint
         ]
-        response.headers["Content-Security-Policy-Report-Only"] = "; ".join(csp_report_only)
+        
+        # Use Report-Only in development, enforce in production (when ready)
+        if settings.ENVIRONMENT == "production" and settings.DEBUG is False:
+            response.headers["Content-Security-Policy"] = "; ".join(csp_policy)
+        else:
+            response.headers["Content-Security-Policy-Report-Only"] = "; ".join(csp_policy)
+        
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+        response.headers["X-Download-Options"] = "noopen"  # Prevent IE from executing downloads
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"  # Prevent Flash/PDF cross-domain access
         
         return response
 
@@ -62,9 +78,51 @@ class IPWhitelistMiddleware(BaseHTTPMiddleware):
         # Get user from token if present
         authorization = request.headers.get("Authorization")
         if authorization and authorization.startswith("Bearer "):
-            # Extract user from token (simplified - should use proper JWT decode)
-            # For now, we'll check IP whitelist in the auth dependency
-            pass
+            token = authorization.split(" ", 1)[1]
+            try:
+                from ..core.security import decode_token
+                from ..db.session import get_db
+                from ..models.user import User
+                from sqlalchemy import select
+                
+                # Decode token to get user_id
+                payload = decode_token(token)
+                user_id = int(payload.get("sub"))
+                
+                # Get user from database to check IP whitelist
+                # Note: This creates a new DB session - for production, consider caching user IP whitelist in Redis
+                async for db in get_db():
+                    try:
+                        result = await db.execute(select(User).where(User.id == user_id))
+                        user = result.scalar_one_or_none()
+                        
+                        if user:
+                            client_ip = SecurityService.get_client_ip(request)
+                            ip_allowed = await SecurityService.check_ip_whitelist(user.id, client_ip, db)
+                            
+                            if not ip_allowed:
+                                await SecurityService.log_security_event(
+                                    db=db,
+                                    user_id=user.id,
+                                    event_type="access_blocked_ip",
+                                    severity="warning",
+                                    description=f"Access attempt from non-whitelisted IP: {client_ip}",
+                                    ip_address=client_ip,
+                                    request_path=request.url.path,
+                                    success=False
+                                )
+                                return Response(
+                                    content='{"detail": "Access denied from this IP address"}',
+                                    status_code=status.HTTP_403_FORBIDDEN,
+                                    headers={"Content-Type": "application/json"}
+                                )
+                    finally:
+                        # Ensure session is closed
+                        await db.close()
+                    break
+            except Exception:
+                # If token decode fails or DB error, let auth dependency handle it
+                pass
         
         return await call_next(request)
 
@@ -86,6 +144,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.upload_ip_limit = settings.RATE_LIMIT_UPLOAD_PER_MINUTE
     
     async def dispatch(self, request: Request, call_next):
+        # Skip rate limiting if disabled
+        if not settings.RATE_LIMIT_ENABLED:
+            return await call_next(request)
+        
         # Skip rate limiting for health checks
         if request.url.path in ["/health", "/api/docs", "/api/redoc"]:
             return await call_next(request)
@@ -102,6 +164,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 ip_limit = self.upload_ip_limit
                 ip_window = 60
                 scope = "upload"
+            elif path.startswith(f"{settings.API_V1_PREFIX}/predictions"):
+                # Use prediction-specific limit if configured
+                ip_limit = getattr(settings, "RATE_LIMIT_PREDICTION_PER_MINUTE", self.default_ip_limit)
+                ip_window = 60
+                scope = "prediction"
             else:
                 ip_limit = self.default_ip_limit
                 ip_window = self.default_ip_window
@@ -179,8 +246,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         user_remaining = max(0, self.user_limit - (user_count + 1))
                         await self.redis_client.incr(user_key)
             except Exception as e:
-                # If Redis fails, allow request (fail open)
-                pass
+                # If Redis fails, check fail-open setting
+                if not settings.RATE_LIMIT_FAIL_OPEN:
+                    logger.error(f"Rate limiting Redis error and fail-open disabled: {e}")
+                    return Response(
+                        content='{"detail": "Rate limiting service unavailable"}',
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        headers={"Content-Type": "application/json"}
+                    )
+                # Fail open - allow request if Redis unavailable
+                logger.warning(f"Rate limiting Redis error, failing open: {e}")
         
         response = await call_next(request)
         # Attach rate limit headers when possible

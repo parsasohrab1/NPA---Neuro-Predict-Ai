@@ -4,8 +4,8 @@
   "description": "NeuroPredict-AI Web Application",
   "private": true,
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-router-dom": "^6.20.0",
     "axios": "^1.6.2",
     "@tanstack/react-query": "^5.12.2",
@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.4.11",
+    "vite": "^7.2.4",
     "typescript": "^5.7.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -41,7 +41,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "test:e2e": "cd ../tests/e2e && npx playwright test",
+    "test:e2e:ui": "cd ../tests/e2e && npx playwright test --ui",
+    "test:e2e:headed": "cd ../tests/e2e && npx playwright test --headed"
   },
   "browserslist": {
     "production": [

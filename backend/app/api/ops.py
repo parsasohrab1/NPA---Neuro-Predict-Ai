@@ -84,3 +84,18 @@ async def ops_summary(
     }
 
 
+@router.get("/metrics/prometheus")
+async def prometheus_metrics(
+    current_user=Depends(require_role("admin"))
+):
+    """
+    Prometheus metrics endpoint for scraping
+    Returns metrics in Prometheus text format
+    """
+    from fastapi.responses import Response
+    from ..middleware.prometheus_middleware import get_prometheus_metrics
+    
+    metrics_text = get_prometheus_metrics()
+    return Response(content=metrics_text, media_type="text/plain; version=0.0.4")
+
+

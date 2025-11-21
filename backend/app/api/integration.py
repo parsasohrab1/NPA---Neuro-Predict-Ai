@@ -1,6 +1,7 @@
 """
 Integration API Endpoints - PACS/EHR/HL7/FHIR
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Dict, Any, List
@@ -14,6 +15,8 @@ from ..services.integration_service import (
     HL7Message,
     FHIRResource
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/integration", tags=["Integration"])
 
@@ -195,9 +198,35 @@ async def receive_webhook(
     event_type = payload.get("type")
     data = payload.get("data", {})
 
-    # TODO: route event types to proper handlers (e.g., update EHR, notify UI)
+    # Route event types to proper handlers
+    try:
+        if event_type == "patient.created" or event_type == "patient.updated":
+            # Handle patient events - update EHR if integrated
+            logger.info(f"Patient event received: {event_type}", extra={"data": data})
+            # Future: Integrate with external EHR system here
+            # await ehr_service.sync_patient(data.get("patient_id"))
+        
+        elif event_type == "prediction.created" or event_type == "prediction.reviewed":
+            # Handle prediction events - notify clinicians
+            logger.info(f"Prediction event received: {event_type}", extra={"data": data})
+            # Future: Send notification to clinician dashboard
+            # await notification_service.notify_clinician(data.get("prediction_id"))
+        
+        elif event_type == "medical_record.created":
+            # Handle medical record events
+            logger.info(f"Medical record event received: {event_type}", extra={"data": data})
+            # Future: Sync with PACS or other imaging systems
+            # await pacs_service.sync_study(data.get("study_id"))
+        
+        else:
+            # Unknown event type - log and continue
+            logger.warning(f"Unknown event type: {event_type}", extra={"data": data})
+    
+    except Exception as e:
+        logger.error(f"Error processing event {event_type}: {str(e)}", exc_info=True)
+        # Continue processing - don't fail the webhook if handler fails
 
     if idempotency_key:
         await IntegrationService.mark_idempotent(idempotency_key)
 
-    return {"status": "ok", "event": event_type}
+    return {"status": "ok", "event": event_type, "processed": True}

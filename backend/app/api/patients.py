@@ -1,15 +1,18 @@
 """
 Patient Management API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
+import csv
+import io
+from datetime import datetime
 
 from ..db.session import get_db
 from ..models.user import User
-from ..models.patient import Patient
+from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
 from ..schemas.patient import PatientCreate, PatientUpdate, PatientResponse
 from ..core.security import get_current_user, require_role
@@ -260,4 +263,114 @@ async def get_patient_medical_records(
         }
         for record in records
     ]
+
+
+@router.post("/import/csv", status_code=status.HTTP_201_CREATED)
+async def import_patients_csv(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("nurse"))
+):
+    """Import patients from CSV file"""
+    # Read CSV file
+    contents = await file.read()
+    text = contents.decode('utf-8')
+    csv_reader = csv.DictReader(io.StringIO(text))
+    
+    imported = []
+    errors = []
+    
+    for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 (1 is header)
+        try:
+            # Parse required fields
+            patient_id = row.get('patient_id') or row.get('patient_id')
+            if not patient_id:
+                errors.append(f"Row {row_num}: Missing patient_id")
+                continue
+            
+            # Check if patient already exists
+            result = await db.execute(
+                select(Patient).where(Patient.patient_id == patient_id)
+            )
+            if result.scalar_one_or_none():
+                errors.append(f"Row {row_num}: Patient {patient_id} already exists")
+                continue
+            
+            # Parse date of birth
+            dob_str = row.get('date_of_birth') or row.get('dob')
+            if not dob_str:
+                errors.append(f"Row {row_num}: Missing date_of_birth")
+                continue
+            
+            try:
+                date_of_birth = datetime.strptime(dob_str, '%Y-%m-%d').date()
+            except ValueError:
+                try:
+                    date_of_birth = datetime.strptime(dob_str, '%d/%m/%Y').date()
+                except ValueError:
+                    errors.append(f"Row {row_num}: Invalid date format for date_of_birth (use YYYY-MM-DD or DD/MM/YYYY)")
+                    continue
+            
+            # Parse gender
+            gender_str = (row.get('gender') or '').lower()
+            try:
+                gender = Gender(gender_str) if gender_str in ['male', 'female', 'other'] else Gender.OTHER
+            except ValueError:
+                gender = Gender.OTHER
+            
+            # Parse email (validate if provided)
+            email = row.get('email') or None
+            if email:
+                email = email.strip()
+                if not email or '@' not in email:  # Basic email validation
+                    email = None
+            
+            # Parse education years
+            education_years = None
+            if row.get('education_years'):
+                try:
+                    education_years = int(row.get('education_years'))
+                except (ValueError, TypeError):
+                    pass
+            
+            # Create patient
+            patient_data = PatientCreate(
+                patient_id=patient_id,
+                first_name=row.get('first_name') or row.get('first_name', '').strip(),
+                last_name=row.get('last_name') or row.get('last_name', '').strip(),
+                date_of_birth=date_of_birth,
+                gender=gender,
+                email=email if email else None,
+                phone=row.get('phone') or None,
+                address=row.get('address') or None,
+                education_years=education_years,
+                medical_history=row.get('medical_history') or None,
+                family_history=row.get('family_history') or None,
+                current_medications=row.get('current_medications') or None,
+            )
+            
+            new_patient = Patient(**patient_data.model_dump())
+            db.add(new_patient)
+            await db.flush()  # Flush to get ID
+            
+            imported.append({
+                "patient_id": new_patient.patient_id,
+                "name": f"{new_patient.first_name} {new_patient.last_name}",
+                "id": new_patient.id
+            })
+            
+        except Exception as e:
+            errors.append(f"Row {row_num}: {str(e)}")
+    
+    await db.commit()
+    
+    # Invalidate cache
+    await invalidate_patient_cache(None)  # Invalidate all patient caches
+    
+    return {
+        "imported": len(imported),
+        "errors": len(errors),
+        "imported_patients": imported,
+        "error_details": errors
+    }
 

@@ -135,6 +135,15 @@ class AIModelService:
             self.model.to(self.device)
             self.model.eval()
             
+            # Initialize XAI service
+            try:
+                from .xai_service import XAIService
+                self.xai_service = XAIService(self.model, self.device)
+                logger.info("XAI service initialized successfully")
+            except Exception as e:
+                logger.warning(f"Could not initialize XAI service: {e}")
+                self.xai_service = None
+            
             # Define feature names for interpretability
             self.feature_names = [
                 # Demographics
@@ -223,15 +232,43 @@ class AIModelService:
                                      alzheimer_prob: float, 
                                      parkinson_prob: float) -> Dict[str, float]:
         """
-        Calculate feature importance using simple attribution
-        In production, use methods like SHAP or Integrated Gradients
+        Calculate feature importance using advanced XAI methods
+        Falls back to simple heuristic if XAI service not available
         """
-        importance = {}
+        # Try to use advanced XAI methods
+        if hasattr(self, 'xai_service') and self.xai_service is not None:
+            try:
+                import torch
+                features_tensor = torch.from_numpy(features).unsqueeze(0).float().to(self.device)
+                
+                # Use Integrated Gradients for attribution
+                alz_attribution = self.xai_service._integrated_gradients(
+                    features_tensor, target_class=0, steps=50
+                )
+                park_attribution = self.xai_service._integrated_gradients(
+                    features_tensor, target_class=1, steps=50
+                )
+                
+                # Combine attributions
+                combined_attribution = abs(alz_attribution) * alzheimer_prob + abs(park_attribution) * parkinson_prob
+                
+                # Convert to dictionary
+                importance = dict(zip(self.feature_names, combined_attribution))
+                
+                # Normalize
+                total = sum(importance.values())
+                if total > 0:
+                    importance = {k: v/total for k, v in importance.items()}
+                
+                # Return top 10
+                sorted_importance = sorted(importance.items(), key=lambda x: x[1], reverse=True)
+                return dict(sorted_importance[:10])
+            except Exception as e:
+                logger.warning(f"XAI method failed, using fallback: {e}")
         
-        # Simple feature importance based on feature values and prediction
-        # This is a placeholder - in production use proper explainability methods
+        # Fallback to simple heuristic
+        importance = {}
         for i, (feat_name, feat_value) in enumerate(zip(self.feature_names, features)):
-            # Simple heuristic importance
             if 'alzheimer' in feat_name.lower() or feat_name in ['mmse_score', 'hippocampal_volume', 'tau_protein']:
                 importance[feat_name] = float(abs(feat_value - 0.5) * alzheimer_prob)
             elif 'parkinson' in feat_name.lower() or feat_name in ['dopamine_level']:
@@ -338,7 +375,7 @@ class AIModelService:
             att_bio = 0.3
             att_cog = 1.0 - (att_mri + att_bio)
 
-            return {
+            result = {
                 'alzheimer': {
                     'risk_score': alzheimer_prob,
                     'risk_level': alzheimer_risk_level,
@@ -359,6 +396,25 @@ class AIModelService:
                 'model_version': '1.0.0',
                 'model_name': 'MultiModalNeuralNetwork'
             }
+            
+            # Add advanced XAI explanations if available
+            if hasattr(self, 'xai_service') and self.xai_service is not None:
+                try:
+                    xai_explanation = self.xai_service.explain_prediction(
+                        features,
+                        result,
+                        self.feature_names,
+                        method='integrated_gradients'
+                    )
+                    result['xai_explanation'] = {
+                        'saliency_maps': xai_explanation.get('saliency_maps', {}),
+                        'top_contributing_features': xai_explanation.get('top_contributing_features', []),
+                        'confidence_analysis': xai_explanation.get('confidence_analysis', {})
+                    }
+                except Exception as e:
+                    logger.warning(f"Could not generate XAI explanation: {e}")
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error during prediction: {e}")

@@ -141,11 +141,39 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_PREDICTIONS: int = 10
     PREDICTION_TIMEOUT: int = 300  # seconds
 
-    # Rate Limiting (per-minute defaults; tunable per-route)
-    RATE_LIMIT_DEFAULT_PER_MINUTE: int = 120
-    RATE_LIMIT_USER_PER_HOUR: int = 1000
-    RATE_LIMIT_LOGIN_PER_MINUTE: int = 10
-    RATE_LIMIT_UPLOAD_PER_MINUTE: int = 10
+    # Rate Limiting Configuration
+    # Per-minute limits for IP-based rate limiting (Redis-based)
+    RATE_LIMIT_DEFAULT_PER_MINUTE: int = Field(
+        default=120,
+        description="Default rate limit per IP address per minute for general endpoints"
+    )
+    # Per-hour limit for authenticated users (by token)
+    RATE_LIMIT_USER_PER_HOUR: int = Field(
+        default=1000,
+        description="Rate limit per authenticated user per hour"
+    )
+    # Specialized limits for sensitive endpoints
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = Field(
+        default=10,
+        description="Rate limit per IP for login attempts (brute-force protection)"
+    )
+    RATE_LIMIT_UPLOAD_PER_MINUTE: int = Field(
+        default=10,
+        description="Rate limit per IP for file upload endpoints"
+    )
+    RATE_LIMIT_PREDICTION_PER_MINUTE: int = Field(
+        default=20,
+        description="Rate limit per user for prediction endpoints (resource-intensive)"
+    )
+    # Rate limiting behavior
+    RATE_LIMIT_ENABLED: bool = Field(
+        default=True,
+        description="Enable/disable rate limiting globally"
+    )
+    RATE_LIMIT_FAIL_OPEN: bool = Field(
+        default=True,
+        description="If Redis is unavailable, allow requests (fail open) vs block (fail closed)"
+    )
 
     # Backup & DR
     BACKUP_DIR: str = "backups"

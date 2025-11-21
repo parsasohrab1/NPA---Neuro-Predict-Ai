@@ -22,9 +22,11 @@ from .middleware.security_middleware import (
     SecurityHeadersMiddleware,
     RateLimitMiddleware,
     RequestLoggingMiddleware,
-    RequestIdMiddleware
+    RequestIdMiddleware,
+    IPWhitelistMiddleware
 )
 from .middleware.metrics_middleware import MetricsMiddleware
+from .middleware.prometheus_middleware import PrometheusMiddleware
 from .services.backup_service import BackupService
 import redis.asyncio as redis
 from .core.logging import setup_json_logging
@@ -200,6 +202,7 @@ app.add_middleware(
 
 # Security Middleware
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(IPWhitelistMiddleware)  # IP Whitelist check for authenticated requests
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RequestIdMiddleware)
 # (Metrics middleware will be added after redis_client initialization)
@@ -207,6 +210,9 @@ try:
     pass
 except Exception:
     logger.warning("Metrics middleware disabled - Redis not available")
+
+# Prometheus Metrics Middleware (no Redis required)
+app.add_middleware(PrometheusMiddleware)
 
 # Rate Limiting Middleware (requires Redis)
 try:

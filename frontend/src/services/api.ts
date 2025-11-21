@@ -87,6 +87,17 @@ export const patientsApi = {
       created_at: string
     }>
   },
+
+  importCSV: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await axios.post(`${API_URL}/patients/import/csv`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
 }
 
 export const predictionsApi = {

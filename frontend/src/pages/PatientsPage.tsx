@@ -125,6 +125,32 @@ export default function PatientsPage() {
     URL.revokeObjectURL(url)
   }
 
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetch('/api/v1/patients/import/csv', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData,
+      })
+      if (!response.ok) {
+        throw new Error('CSV import failed')
+      }
+      return response.json()
+    },
+    onSuccess: (data) => {
+      alert(`Successfully imported ${data.imported} patients${data.errors > 0 ? ` (${data.errors} errors)` : ''}`)
+      // Refresh patients list
+      window.location.reload()
+    },
+    onError: (error) => {
+      alert(`CSV import failed: ${error}`)
+    },
+  })
+
   const handleImport = () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -132,8 +158,7 @@ export default function PatientsPage() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
-        // TODO: Implement CSV import
-        alert('CSV import will be implemented')
+        importMutation.mutate(file)
       }
     }
     input.click()

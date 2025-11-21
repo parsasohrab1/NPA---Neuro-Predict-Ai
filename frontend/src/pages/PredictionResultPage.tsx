@@ -138,8 +138,33 @@ export default function PredictionResultPage() {
   }
 
   const handleExportPDF = async () => {
-    // TODO: Implement PDF export
-    alert('PDF export will be implemented')
+    if (!prediction) return
+    
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/v1/predictions/${prediction.id}/export/pdf`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error('PDF export failed')
+      }
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `prediction_${prediction.id}_report.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      alert(`PDF export failed: ${error}`)
+    }
   }
 
   return (
