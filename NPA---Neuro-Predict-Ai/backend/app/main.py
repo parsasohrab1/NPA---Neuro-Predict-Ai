@@ -11,7 +11,11 @@ from pathlib import Path
 
 from .core.config import settings
 from .db.session import init_db, close_db
-from .api import auth, patients, predictions, reports, models, analytics, users, mock_data
+from .core.cache import cache_service
+from .api import auth, patients, predictions, reports, models, analytics, users, mock_data, monitoring, websocket, optimization
+from .api.integration import fhir, pacs, ehr, hl7v2, devices
+from .api.streaming import realtime
+from .services.streaming.realtime_service import realtime_service
 
 # Configure logging
 logging.basicConfig(
@@ -41,10 +45,32 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
     
+    # Start real-time streaming service
+    try:
+        realtime_service.start()
+        logger.info("Real-time streaming service started")
+    except Exception as e:
+        logger.error(f"Failed to start streaming service: {e}")
+    
     yield
     
     # Shutdown
     logger.info("Shutting down NeuroPredict-AI application...")
+    
+    # Stop real-time streaming service
+    try:
+        realtime_service.stop()
+        logger.info("Real-time streaming service stopped")
+    except Exception as e:
+        logger.error(f"Error stopping streaming service: {e}")
+    
+    # Disconnect cache
+    try:
+        await cache_service.disconnect()
+        logger.info("Cache service disconnected")
+    except Exception as e:
+        logger.error(f"Error disconnecting cache: {e}")
+    
     await close_db()
 
 
@@ -73,6 +99,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Compression Middleware for performance
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Metrics Middleware (for Prometheus)
+if settings.ENVIRONMENT == "production":
+    from .api.middleware import MetricsMiddleware
+    app.add_middleware(MetricsMiddleware)
+
 
 # Exception handlers
 @app.exception_handler(Exception)
@@ -96,6 +131,14 @@ async def health_check():
     }
 
 
+# Prometheus metrics endpoint
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics():
+    """Prometheus metrics endpoint"""
+    from .core.metrics import get_metrics_response
+    return get_metrics_response()
+
+
 @app.get("/", tags=["Root"])
 async def root():
     """Root endpoint"""
@@ -115,7 +158,20 @@ app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(models.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
+app.include_router(monitoring.router, prefix=settings.API_V1_PREFIX)
+app.include_router(websocket.router, prefix=settings.API_V1_PREFIX)
 app.include_router(mock_data.router, prefix=settings.API_V1_PREFIX)  # Mock data for development
+app.include_router(optimization.router, prefix=settings.API_V1_PREFIX)
+
+# Integration routers
+app.include_router(fhir.router, prefix=settings.API_V1_PREFIX)
+app.include_router(pacs.router, prefix=settings.API_V1_PREFIX)
+app.include_router(ehr.router, prefix=settings.API_V1_PREFIX)
+app.include_router(hl7v2.router, prefix=settings.API_V1_PREFIX)
+app.include_router(devices.router, prefix=settings.API_V1_PREFIX)
+
+# Streaming routers
+app.include_router(realtime.router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":

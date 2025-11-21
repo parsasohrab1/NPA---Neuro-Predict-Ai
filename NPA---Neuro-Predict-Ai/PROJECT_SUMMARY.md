@@ -205,10 +205,22 @@ Risk Score  Risk Score
 cd backend
 pytest tests/
 
+# Run all tests with coverage
+pytest --cov=app --cov-report=html
+
+# Run specific test types
+pytest tests/unit/ -m unit          # Unit tests
+pytest tests/integration/ -m integration  # Integration tests
+pytest tests/e2e/ -m e2e           # E2E tests
+pytest tests/performance/ -m performance  # Performance tests
+pytest tests/security/ -m security  # Security tests
+
 # Frontend tests
 cd frontend
 npm test
 ```
+
+📚 **[Complete Testing Guide](docs/TESTING_GUIDE.md)** | 📋 **[Testing Roadmap](docs/TESTING_ROADMAP.md)**
 
 ## 📚 Documentation
 

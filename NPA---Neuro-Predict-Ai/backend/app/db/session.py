@@ -7,14 +7,16 @@ from typing import AsyncGenerator
 
 from ..core.config import settings
 
-# Create async engine
+# Create async engine with optimized connection pooling
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    pool_pre_ping=True,  # Verify connections before using
+    pool_size=20,  # Number of connections to maintain
+    max_overflow=10,  # Additional connections beyond pool_size
+    pool_timeout=30,  # Seconds to wait for connection
+    pool_recycle=3600,  # Recycle connections after 1 hour
 )
 
 # Create async session factory

@@ -1,0 +1,75 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Monday
+    - cron: '0 0 * * 1'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install security tools
+      working-directory: ./NPA---Neuro-Predict-Ai/backend
+      run: |
+        pip install bandit[toml] safety semgrep
+    
+    - name: Run Bandit
+      working-directory: ./NPA---Neuro-Predict-Ai/backend
+      run: |
+        bandit -r app -f json -o security_reports/bandit_report.json || true
+    
+    - name: Run Safety
+      working-directory: ./NPA---Neuro-Predict-Ai/backend
+      run: |
+        safety check --json --output security_reports/safety_report.json || true
+    
+    - name: Run Semgrep
+      working-directory: ./NPA---Neuro-Predict-Ai/backend
+      run: |
+        semgrep --config=auto --json --output=security_reports/semgrep_report.json app || true
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: ./NPA---Neuro-Predict-Ai/backend/security_reports/
+    
+    - name: Comment PR with security findings
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const reports = ['bandit_report.json', 'safety_report.json', 'semgrep_report.json'];
+          let comment = '## Security Scan Results\n\n';
+          
+          for (const report of reports) {
+            const path = `./NPA---Neuro-Predict-Ai/backend/security_reports/${report}`;
+            if (fs.existsSync(path)) {
+              const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+              comment += `### ${report}\n`;
+              // Add findings summary
+              comment += `- Findings: ${data.results?.length || 0}\n\n`;
+            }
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+

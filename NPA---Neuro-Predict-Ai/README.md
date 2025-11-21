@@ -28,7 +28,7 @@ chmod +x setup.sh && ./setup.sh
 # Username: admin | Password: admin123
 ```
 
-📚 **[Complete Getting Started Guide](GETTING_STARTED.md)** | 📖 **[API Documentation](docs/API.md)** | 🏗️ **[Architecture](docs/ARCHITECTURE.md)**
+📚 **[Complete Getting Started Guide](GETTING_STARTED.md)** | 📖 **[API Documentation](docs/API.md)** | 🏗️ **[Architecture](docs/ARCHITECTURE.md)** | 🗺️ **[Project Roadmap](docs/PROJECT_ROADMAP.md)** | 📋 **[Priorities Summary](docs/PRIORITIES_SUMMARY.md)** | 🔒 **[Production Deployment](docs/PRODUCTION_DEPLOYMENT.md)** | 📊 **[Infrastructure Summary](docs/INFRASTRUCTURE_SUMMARY.md)** | 🔗 **[Integration Guide](docs/INTEGRATION_GUIDE.md)** | ⚡ **[Performance Optimization](docs/PERFORMANCE_OPTIMIZATION.md)**
 
 ---
 

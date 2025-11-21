@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     MRI_DIR: str = "uploads/mri"
     
     # AI Model Paths
+    MODELS_DIR: str = "models"
     ALZHEIMER_MODEL_PATH: str = "models/alzheimer_model.pth"
     PARKINSON_MODEL_PATH: str = "models/parkinson_model.pth"
     ENSEMBLE_MODEL_PATH: str = "models/ensemble_model.pth"
@@ -111,9 +112,39 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     
     # External Systems Integration
-    PACS_SERVER_URL: Optional[str] = None
-    EHR_API_URL: Optional[str] = None
-    HL7_FHIR_ENDPOINT: Optional[str] = None
+    # Integration Settings
+    PACS_SERVER_URL: Optional[str] = Field(
+        default=None,
+        description="PACS server URL for DICOM integration"
+    )
+    PACS_AE_TITLE: str = Field(
+        default="NEUROPREDICT",
+        description="Application Entity Title for PACS"
+    )
+    EHR_API_URL: Optional[str] = Field(
+        default=None,
+        description="EHR/HIS API endpoint URL"
+    )
+    EHR_API_KEY: Optional[str] = Field(
+        default=None,
+        description="API key for EHR/HIS authentication"
+    )
+    HL7_FHIR_ENDPOINT: Optional[str] = Field(
+        default=None,
+        description="HL7 FHIR server endpoint"
+    )
+    HL7_FHIR_BASE_URL: str = Field(
+        default="http://localhost:8000/fhir",
+        description="Base URL for FHIR resources"
+    )
+    HL7_SERVER_URL: Optional[str] = Field(
+        default=None,
+        description="HL7 v2 server URL for medical devices"
+    )
+    HL7_AE_TITLE: str = Field(
+        default="NEUROPREDICT",
+        description="Application Entity Title for HL7 v2"
+    )
     
     # Logging
     LOG_LEVEL: str = "INFO"

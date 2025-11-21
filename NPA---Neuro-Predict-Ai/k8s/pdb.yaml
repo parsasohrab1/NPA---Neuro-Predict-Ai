@@ -1,0 +1,23 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: neuropredict-backend-pdb
+  namespace: neuropredict-ai
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: neuropredict-backend
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: neuropredict-postgres-pdb
+  namespace: neuropredict-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: neuropredict-postgres
+
