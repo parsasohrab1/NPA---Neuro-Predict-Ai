@@ -185,7 +185,7 @@ class SecurityLog(Base):
     error_message = Column(Text, nullable=True)
     
     # Additional Context
-    metadata = Column(JSON, nullable=True)
+    meta_data = Column(JSON, nullable=True)
     
     # Timestamp
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)

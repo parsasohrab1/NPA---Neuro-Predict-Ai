@@ -36,7 +36,7 @@ class SupportTicket(Base):
     domain = Column(String(32), nullable=True)  # fe/be/infra/integration
     status = Column(Enum(TicketStatus), nullable=False, default=TicketStatus.OPEN, index=True)
     owner = Column(String(120), nullable=True)  # team/assignee
-    metadata = Column(JSON, nullable=True)
+    meta_data = Column(JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)  # for MTTA

@@ -45,5 +45,3 @@ class NotificationService:
         await asyncio.sleep(0)
         return True
 
-*** End Patch  }``` />
-

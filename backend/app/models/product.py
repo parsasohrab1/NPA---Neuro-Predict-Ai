@@ -19,7 +19,7 @@ class Product(Base):
 	
 	# Specifications and Metadata
 	specs = Column(JSON, nullable=True)  # Arbitrary product specifications
-	metadata = Column(JSON, nullable=True)  # Additional structured info
+	meta_data = Column(JSON, nullable=True)  # Additional structured info
 	
 	# State
 	is_active = Column(Boolean, nullable=False, default=True, index=True)

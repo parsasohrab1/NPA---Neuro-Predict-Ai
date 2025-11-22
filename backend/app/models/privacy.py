@@ -33,7 +33,7 @@ class DSRRequest(Base):
     reason = Column(Text, nullable=True)
     status = Column(Enum(DSRStatus), default=DSRStatus.RECEIVED, nullable=False, index=True)
     result_location = Column(String, nullable=True)  # path to export or note
-    metadata = Column(JSON, nullable=True)
+    meta_data = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

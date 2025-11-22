@@ -7,7 +7,6 @@ from typing import Dict, Any
 
 from ..db.session import get_db
 from ..core.security import require_role
-from ..models.user import User
 from ..services.monitoring_service import MonitoringService
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
@@ -38,7 +37,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
 @router.get("/metrics")
 async def get_metrics(
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin")
+    current_user = Depends(require_role("admin"))
 ) -> Dict[str, Any]:
     """Get system metrics (Prometheus format)"""
     metrics = await MonitoringService.get_metrics(db)
@@ -48,7 +47,7 @@ async def get_metrics(
 @router.get("/metrics/prometheus")
 async def get_prometheus_metrics(
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin")
+    current_user = Depends(require_role("admin"))
 ) -> str:
     """Get metrics in Prometheus format"""
     metrics = await MonitoringService.get_metrics(db)
@@ -58,7 +57,7 @@ async def get_prometheus_metrics(
 @router.get("/kpis")
 async def get_business_kpis(
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin")
+    current_user = Depends(require_role("admin"))
 ) -> Dict[str, Any]:
     """Business-level KPIs for dashboards"""
     return await MonitoringService.get_business_kpis(db)
@@ -67,7 +66,7 @@ async def get_business_kpis(
 @router.get("/slo")
 async def get_slo_status(
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin")
+    current_user = Depends(require_role("admin"))
 ) -> Dict[str, Any]:
     """SLO compliance summary against phase success criteria (p95, p99, error rate, uptime)."""
     return await MonitoringService.get_slo_status(db)

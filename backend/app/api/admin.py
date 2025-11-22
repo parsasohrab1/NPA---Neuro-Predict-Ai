@@ -30,7 +30,7 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 @router.get("/system/overview")
 async def get_system_overview(
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ) -> Dict[str, Any]:
     """
     Overview data for dashboard summary cards and charts.
@@ -98,7 +98,7 @@ async def list_users(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     query = select(User)
     conditions = []
@@ -121,7 +121,7 @@ async def list_users(
 async def create_user(
     body: UserCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     # Uniqueness check
     existing = await db.execute(
@@ -155,7 +155,7 @@ async def update_user(
     user_id: int,
     body: UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -185,7 +185,7 @@ async def update_user(
 # -------- Model Management --------
 @router.get("/models")
 async def list_models(
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     if ModelRegistry is None:
         return {"models": [], "current_model": None, "note": "ModelRegistry unavailable"}
@@ -200,7 +200,7 @@ class ActivateModelRequest(dict):
 @router.post("/models/activate")
 async def activate_model(
     body: Dict[str, str],
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     if "version" not in body:
         raise HTTPException(status_code=400, detail="Missing 'version'")
@@ -223,7 +223,7 @@ async def get_audit_logs(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     query = select(AuditLog)
     conditions = []
@@ -262,7 +262,7 @@ async def get_audit_logs(
 @router.get("/settings/security/password-policy")
 async def get_password_policy(
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     result = await db.execute(
         select(PasswordPolicy).where(
@@ -312,7 +312,7 @@ async def get_password_policy(
 async def update_password_policy(
     body: Dict[str, Any],
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role("admin"),
+    current_user = Depends(require_role("admin")),
 ):
     result = await db.execute(
         select(PasswordPolicy).where(

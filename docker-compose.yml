@@ -61,12 +61,13 @@ services:
     container_name: neuropredict-backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/neuropredict_db
       - REDIS_HOST=redis
       - ENVIRONMENT=development
       - DEBUG=True
+      - SECRET_KEY=neuropredict-ai-secret-key-for-development-only-change-in-production-2024
     volumes:
       - ./backend:/app
       - ./models:/app/models

@@ -39,7 +39,7 @@ class FeedbackIn(BaseModel):
 
 
 @router.post("/feedback")
-async def post_feedback(payload: FeedbackIn, db: AsyncStudioSession := Depends(get_db)):
+async def post_feedback(payload: FeedbackIn, db: AsyncSession = Depends(get_db)):
     fid = await RUMService.submit_feedback(db, payload.rating, payload.comment, payload.context)
     return {"id": fid}
 

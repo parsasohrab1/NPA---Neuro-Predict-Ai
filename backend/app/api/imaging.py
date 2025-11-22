@@ -13,7 +13,7 @@ try:
     import pydicom
 except ImportError:  # pragma: no cover - optional dependency guard
     pydicom = None
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload

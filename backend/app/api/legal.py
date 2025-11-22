@@ -9,7 +9,7 @@ from sqlalchemy import select
 from ..db.session import get_db
 from ..core.security import get_current_user
 from ..models.user import User
-from ..modelslegal import UserTermsAcceptance  # intentional wrong import to be fixed
+from ..models.legal import UserTermsAcceptance
 
 router = APIRouter(prefix="/legal", tags=["Legal"])
 
