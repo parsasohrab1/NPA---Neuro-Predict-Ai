@@ -606,12 +606,22 @@ async def load_all_datasets(
         try:
             df = pd.read_csv(csv_path)
             logger.info(f"Loaded {dataset_name} dataset with {len(df)} rows")
+            
+            # Filter to get diverse patients: 20 Alzheimer's, 20 Parkinson's, 10 Normal
+            alzheimer_patients = df[df['diagnosis'] == 'Alzheimer'].head(20)
+            parkinson_patients = df[df['diagnosis'] == 'Parkinson'].head(20)
+            normal_patients = df[df['diagnosis'] == 'Normal'].head(10)
+            
+            # Combine filtered patients
+            df_filtered = pd.concat([alzheimer_patients, parkinson_patients, normal_patients])
+            logger.info(f"Filtered to {len(df_filtered)} patients: {len(alzheimer_patients)} Alzheimer's, {len(parkinson_patients)} Parkinson's, {len(normal_patients)} Normal")
+            
         except Exception as e:
             logger.error(f"Failed to read {dataset_name} dataset: {e}")
             errors.append(f"Failed to read {dataset_name} dataset: {str(e)}")
             continue
         
-        for idx, row in df.iterrows():
+        for idx, row in df_filtered.iterrows():
             try:
                 patient_id = str(row['patient_id'])
                 
