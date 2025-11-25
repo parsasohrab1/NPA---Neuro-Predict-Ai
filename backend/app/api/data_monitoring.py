@@ -331,27 +331,27 @@ async def get_trends(
     
     radar_data = [
         {
-            'category': 'شناختی',
+            'category': 'Cognitive',
             'alzheimer': (sum(alzheimer_risks) / len(alzheimer_risks) * 100) if alzheimer_risks else 0,
             'parkinson': (sum(parkinson_risks) / len(parkinson_risks) * 100) if parkinson_risks else 0,
         },
         {
-            'category': 'زیستی',
+            'category': 'Biomarker',
             'alzheimer': (sum(alzheimer_risks) / len(alzheimer_risks) * 90) if alzheimer_risks else 0,
             'parkinson': (sum(parkinson_risks) / len(parkinson_risks) * 85) if parkinson_risks else 0,
         },
         {
-            'category': 'تصویری',
+            'category': 'Imaging',
             'alzheimer': (sum(alzheimer_risks) / len(alzheimer_risks) * 95) if alzheimer_risks else 0,
             'parkinson': (sum(parkinson_risks) / len(parkinson_risks) * 70) if parkinson_risks else 0,
         },
         {
-            'category': 'حرکتی',
+            'category': 'Motor',
             'alzheimer': (sum(alzheimer_risks) / len(alzheimer_risks) * 40) if alzheimer_risks else 0,
             'parkinson': (sum(parkinson_risks) / len(parkinson_risks) * 95) if parkinson_risks else 0,
         },
         {
-            'category': 'ژنتیکی',
+            'category': 'Genetic',
             'alzheimer': (sum(alzheimer_risks) / len(alzheimer_risks) * 85) if alzheimer_risks else 0,
             'parkinson': (sum(parkinson_risks) / len(parkinson_risks) * 60) if parkinson_risks else 0,
         },

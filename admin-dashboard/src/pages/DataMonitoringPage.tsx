@@ -73,60 +73,60 @@ export default function DataMonitoringPage() {
     mutationFn: () => dataMonitoringService.loadSampleData(),
     onSuccess: (data) => {
       toast.success(
-        `داده‌های نمونه بارگذاری شد! ${data.records_created} رکورد برای ${data.patients_processed} بیمار ایجاد شد.`
+        `Sample data loaded! ${data.records_created} records created for ${data.patients_processed} patients.`
       )
       queryClient.invalidateQueries({ queryKey: ['data-monitoring'] })
       setShowLoadDataModal(false)
     },
     onError: (error: any) => {
-      toast.error(`خطا در بارگذاری داده‌ها: ${error.response?.data?.detail || error.message}`)
+      toast.error(`Failed to load data: ${error.response?.data?.detail || error.message}`)
     },
   })
 
   const categories = [
     {
       id: 'cognitive' as DataCategory,
-      name: 'شناختی',
+      name: 'Cognitive',
       nameEn: 'Cognitive',
       icon: CpuChipIcon,
       color: 'sky',
-      description: 'MMSE, MoCA, حافظه، توجه',
+      description: 'MMSE, MoCA, Memory, Attention',
       items: ['MMSE Score', 'MoCA Score', 'Memory Score', 'Attention Score', 'Executive Function'],
     },
     {
       id: 'biomarker' as DataCategory,
-      name: 'نشانگرهای زیستی',
+      name: 'Biomarker',
       nameEn: 'Biomarker',
       icon: BeakerIcon,
       color: 'emerald',
-      description: 'آمیلوئید، تائو، دوپامین',
+      description: 'Amyloid, Tau, Dopamine',
       items: ['Amyloid Beta', 'Tau Protein', 'P-Tau', 'Dopamine Level', 'Alpha-Synuclein'],
     },
     {
       id: 'imaging' as DataCategory,
-      name: 'تصویربرداری',
+      name: 'Imaging',
       nameEn: 'Imaging',
       icon: HeartIcon,
       color: 'purple',
-      description: 'MRI، حجم هیپوکامپ، ضخامت قشری',
+      description: 'MRI, Hippocampal Volume, Cortical Thickness',
       items: ['Hippocampal Volume', 'Cortical Thickness', 'Ventricular Volume', 'White Matter', 'Brain Volume'],
     },
     {
       id: 'motor' as DataCategory,
-      name: 'حرکتی',
+      name: 'Motor',
       nameEn: 'Motor',
       icon: BoltIcon,
       color: 'amber',
-      description: 'لرزش، سفتی، حرکت',
+      description: 'Tremor, Rigidity, Movement',
       items: ['Tremor Severity', 'Rigidity', 'Bradykinesia', 'Postural Stability', 'Gait'],
     },
     {
       id: 'genetic' as DataCategory,
-      name: 'ژنتیکی',
+      name: 'Genetic',
       nameEn: 'Genetic',
       icon: ChartBarIcon,
       color: 'rose',
-      description: 'APOE-e4، سابقه خانوادگی',
+      description: 'APOE-e4, Family History',
       items: ['APOE-e4 Status', 'Family History', 'Genetic Risk Score', 'Mutation Analysis'],
     },
   ]
@@ -169,9 +169,9 @@ export default function DataMonitoringPage() {
       <header className="flex flex-col gap-4">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-white">رصد داده‌های بالینی</h1>
+            <h1 className="text-2xl font-semibold text-white">Clinical Data Monitoring</h1>
             <p className="text-sm text-slate-400">
-              نمایش و رصد برخط انواع داده‌های تشخیصی آلزایمر و پارکینسون
+              Real-time monitoring of diagnostic data types for Alzheimer's and Parkinson's disease
             </p>
           </div>
           <button
@@ -179,7 +179,7 @@ export default function DataMonitoringPage() {
             className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
           >
             <ChartBarIcon className="h-5 w-5" />
-            بارگذاری داده نمونه
+            Load Sample Data
           </button>
         </div>
 
@@ -187,7 +187,7 @@ export default function DataMonitoringPage() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <FunnelIcon className="h-5 w-5 text-slate-400" />
-            <span className="text-sm text-slate-400">فیلترها:</span>
+            <span className="text-sm text-slate-400">Filters:</span>
           </div>
 
           {/* Disease Filter */}
@@ -196,9 +196,9 @@ export default function DataMonitoringPage() {
             onChange={(e) => setDiseaseFilter(e.target.value as DiseaseFilter)}
             className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-1.5 text-sm text-white focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
           >
-            <option value="all">همه بیماری‌ها</option>
-            <option value="alzheimer">آلزایمر</option>
-            <option value="parkinson">پارکینسون</option>
+            <option value="all">All Diseases</option>
+            <option value="alzheimer">Alzheimer's</option>
+            <option value="parkinson">Parkinson's</option>
           </select>
 
           {/* Time Range */}
@@ -207,15 +207,15 @@ export default function DataMonitoringPage() {
             onChange={(e) => setTimeRange(e.target.value as any)}
             className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-1.5 text-sm text-white focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
           >
-            <option value="24h">24 ساعت گذشته</option>
-            <option value="7d">7 روز گذشته</option>
-            <option value="30d">30 روز گذشته</option>
-            <option value="90d">90 روز گذشته</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
           </select>
 
-          <div className="mr-auto flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1.5">
+          <div className="ml-auto flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1.5">
             <ClockIcon className="h-4 w-4 text-emerald-400" />
-            <span className="text-xs text-slate-300">به‌روزرسانی خودکار: 30 ثانیه</span>
+            <span className="text-xs text-slate-300">Auto-refresh: 30s</span>
           </div>
         </div>
       </header>
@@ -223,29 +223,31 @@ export default function DataMonitoringPage() {
       {/* Overview Stats */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-          <div className="text-xs uppercase text-slate-400">کل رکوردها</div>
+          <div className="text-xs uppercase text-slate-400">Total Records</div>
           <div className="mt-2 text-3xl font-semibold text-white">
             {overviewQuery.isLoading ? '...' : overview.total_records.toLocaleString()}
           </div>
-          <div className="mt-1 text-xs text-slate-500">در {timeRange === '24h' ? '24 ساعت' : timeRange.replace('d', ' روز')}</div>
+          <div className="mt-1 text-xs text-slate-500">
+            in {timeRange === '24h' ? '24 hours' : timeRange === '7d' ? '7 days' : timeRange === '30d' ? '30 days' : '90 days'}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-          <div className="text-xs uppercase text-slate-400">بیماران فعال</div>
+          <div className="text-xs uppercase text-slate-400">Active Patients</div>
           <div className="mt-2 text-3xl font-semibold text-white">
             {overviewQuery.isLoading ? '...' : overview.total_patients.toLocaleString()}
           </div>
-          <div className="mt-1 text-xs text-emerald-400">● آنلاین</div>
+          <div className="mt-1 text-xs text-emerald-400">● Online</div>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-          <div className="text-xs uppercase text-slate-400">دسته‌های داده</div>
+          <div className="text-xs uppercase text-slate-400">Data Categories</div>
           <div className="mt-2 text-3xl font-semibold text-white">{categories.length}</div>
-          <div className="mt-1 text-xs text-slate-500">شناختی، زیستی، تصویری و...</div>
+          <div className="mt-1 text-xs text-slate-500">Cognitive, Biomarker, Imaging...</div>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-          <div className="text-xs uppercase text-slate-400">کیفیت داده</div>
+          <div className="text-xs uppercase text-slate-400">Data Quality</div>
           <div className="mt-2 text-3xl font-semibold text-white">
             {overviewQuery.isLoading ? '...' : Math.round(overview.data_quality_score || 0)}%
           </div>
@@ -253,7 +255,7 @@ export default function DataMonitoringPage() {
             'mt-1 text-xs',
             (overview.data_quality_score || 0) >= 80 ? 'text-emerald-400' : 'text-amber-400'
           )}>
-            {(overview.data_quality_score || 0) >= 80 ? 'عالی' : 'قابل قبول'}
+            {(overview.data_quality_score || 0) >= 80 ? 'Excellent' : 'Acceptable'}
           </div>
         </div>
       </div>
@@ -293,7 +295,7 @@ export default function DataMonitoringPage() {
                     <div className="text-2xl font-semibold text-white">
                       {overviewQuery.isLoading ? '...' : categoryStats.count.toLocaleString()}
                     </div>
-                    <div className="text-xs text-slate-500">رکورد ثبت شده</div>
+                    <div className="text-xs text-slate-500">Records</div>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-1">
@@ -330,13 +332,13 @@ export default function DataMonitoringPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-white">
-              جزئیات داده‌های {categories.find((c) => c.id === selectedCategory)?.name}
+              {categories.find((c) => c.id === selectedCategory)?.name} Data Details
             </h2>
             <button
               onClick={() => setSelectedCategory('all')}
               className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:border-slate-600 hover:text-white"
             >
-              بازگشت
+              Back
             </button>
           </div>
 
@@ -344,7 +346,7 @@ export default function DataMonitoringPage() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Time Series Chart */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-              <h3 className="text-sm font-semibold text-white">روند زمانی</h3>
+              <h3 className="text-sm font-semibold text-white">Time Series</h3>
               <div className="mt-4 h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={categoryDataQuery.data.time_series || []}>
@@ -368,14 +370,14 @@ export default function DataMonitoringPage() {
                       dataKey="avg_value"
                       stroke="#38bdf8"
                       strokeWidth={2}
-                      name="میانگین"
+                      name="Average"
                     />
                     <Line
                       type="monotone"
                       dataKey="count"
                       stroke="#10b981"
                       strokeWidth={2}
-                      name="تعداد"
+                      name="Count"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -384,7 +386,7 @@ export default function DataMonitoringPage() {
 
             {/* Distribution Chart */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-              <h3 className="text-sm font-semibold text-white">توزیع مقادیر</h3>
+              <h3 className="text-sm font-semibold text-white">Value Distribution</h3>
               <div className="mt-4 h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={categoryDataQuery.data.distribution || []}>
@@ -402,7 +404,7 @@ export default function DataMonitoringPage() {
                         borderRadius: '8px',
                       }}
                     />
-                    <Bar dataKey="count" fill="#a78bfa" name="تعداد" />
+                    <Bar dataKey="count" fill="#a78bfa" name="Count" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -415,23 +417,23 @@ export default function DataMonitoringPage() {
               <table className="min-w-full divide-y divide-slate-800">
                 <thead className="bg-slate-900/80">
                   <tr>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">
-                      نوع داده
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-400">
+                      Data Type
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">
-                      میانگین
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-400">
+                      Average
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">
-                      حداقل
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-400">
+                      Minimum
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">
-                      حداکثر
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-400">
+                      Maximum
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">
-                      تعداد
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-400">
+                      Count
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">
-                      آخرین به‌روزرسانی
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-400">
+                      Last Updated
                     </th>
                   </tr>
                 </thead>
@@ -469,20 +471,20 @@ export default function DataMonitoringPage() {
       {selectedCategory === 'all' && (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">فعالیت اخیر</h2>
+            <h2 className="text-xl font-semibold text-white">Recent Activity</h2>
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
-              <span className="text-xs text-slate-400">زنده</span>
+              <span className="text-xs text-slate-400">Live</span>
             </div>
           </div>
 
           <div className="mt-4 space-y-3">
             {recentDataQuery.isLoading && (
-              <p className="text-sm text-slate-400">در حال بارگذاری...</p>
+              <p className="text-sm text-slate-400">Loading...</p>
             )}
 
             {recentDataQuery.data && recentDataQuery.data.length === 0 && (
-              <p className="text-sm text-slate-400">فعالیت اخیری وجود ندارد</p>
+              <p className="text-sm text-slate-400">No recent activity</p>
             )}
 
             {recentDataQuery.data?.map((activity: any, idx: number) => {
@@ -507,13 +509,13 @@ export default function DataMonitoringPage() {
                   <div className="flex-1">
                     <div className="text-sm font-medium text-white">{activity.description}</div>
                     <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
-                      <span>بیمار: {activity.patient_name || activity.patient_id}</span>
+                      <span>Patient: {activity.patient_name || activity.patient_id}</span>
                       <span>•</span>
                       <span>{activity.metric_type}</span>
                       {activity.value && (
                         <>
                           <span>•</span>
-                          <span>مقدار: {activity.value}</span>
+                          <span>Value: {activity.value}</span>
                         </>
                       )}
                     </div>
@@ -532,7 +534,7 @@ export default function DataMonitoringPage() {
       {/* Trends Summary */}
       {selectedCategory === 'all' && trendsQuery.data && (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-          <h2 className="text-xl font-semibold text-white">روندهای کلی</h2>
+          <h2 className="text-xl font-semibold text-white">Overall Trends</h2>
 
           <div className="mt-6 h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -541,14 +543,14 @@ export default function DataMonitoringPage() {
                 <PolarAngleAxis dataKey="category" stroke="#94a3b8" tick={{ fontSize: 12 }} />
                 <PolarRadiusAxis stroke="#94a3b8" />
                 <Radar
-                  name="آلزایمر"
+                  name="Alzheimer"
                   dataKey="alzheimer"
                   stroke="#f59e0b"
                   fill="#f59e0b"
                   fillOpacity={0.3}
                 />
                 <Radar
-                  name="پارکینسون"
+                  name="Parkinson"
                   dataKey="parkinson"
                   stroke="#8b5cf6"
                   fill="#8b5cf6"
@@ -572,19 +574,19 @@ export default function DataMonitoringPage() {
       {showLoadDataModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
-            <h3 className="text-xl font-semibold text-white">بارگذاری داده‌های نمونه</h3>
+            <h3 className="text-xl font-semibold text-white">Load Sample Data</h3>
             <p className="mt-2 text-sm text-slate-400">
-              این عملیات رکوردهای پزشکی جامع با داده‌های کامل برای تمام دسته‌بندی‌ها (شناختی، زیستی، تصویری، ژنتیکی) ایجاد می‌کند.
+              This will create comprehensive medical records with complete data for all categories (Cognitive, Biomarker, Imaging, Genetic).
             </p>
 
             <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
-              <p className="text-xs text-slate-400 mb-2">داده‌های ایجاد شده:</p>
+              <p className="text-xs text-slate-400 mb-2">Data to be created:</p>
               <ul className="space-y-1 text-sm text-slate-300">
-                <li>• 3-5 رکورد برای هر بیمار</li>
-                <li>• داده‌های شناختی: MMSE، MoCA، حافظه، توجه</li>
-                <li>• نشانگرهای زیستی: آمیلوئید، تائو، دوپامین</li>
-                <li>• داده‌های تصویربرداری: MRI، حجم مغز</li>
-                <li>• اطلاعات ژنتیکی: APOE-e4</li>
+                <li>• 3-5 records per patient</li>
+                <li>• Cognitive data: MMSE, MoCA, Memory, Attention</li>
+                <li>• Biomarkers: Amyloid, Tau, Dopamine</li>
+                <li>• Imaging data: MRI, Brain volume</li>
+                <li>• Genetic info: APOE-e4</li>
               </ul>
             </div>
 
@@ -594,14 +596,14 @@ export default function DataMonitoringPage() {
                 className="flex-1 rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
                 disabled={loadSampleDataMutation.isPending}
               >
-                لغو
+                Cancel
               </button>
               <button
                 onClick={() => loadSampleDataMutation.mutate()}
                 className="flex-1 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400"
                 disabled={loadSampleDataMutation.isPending}
               >
-                {loadSampleDataMutation.isPending ? 'در حال بارگذاری...' : 'بارگذاری'}
+                {loadSampleDataMutation.isPending ? 'Loading...' : 'Load Data'}
               </button>
             </div>
           </div>
