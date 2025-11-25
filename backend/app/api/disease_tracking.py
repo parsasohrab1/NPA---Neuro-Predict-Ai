@@ -37,7 +37,7 @@ async def get_patient_features(
     patient_id: int,
     days: int = Query(default=365, ge=1, le=3650),
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("doctor")),
+    # current_user = Depends(require_role("doctor")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
     Get all features for a patient over time with trends and alerts
@@ -238,7 +238,7 @@ async def predict_future_risk(
     patient_id: int,
     months_ahead: int = Query(default=12, ge=1, le=60),
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("doctor")),
+    # current_user = Depends(require_role("doctor")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
     Predict future disease risk based on current trends
@@ -348,7 +348,7 @@ async def predict_future_risk(
 async def get_recommendations(
     patient_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("doctor")),
+    # current_user = Depends(require_role("doctor")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
     Get prevention and control recommendations based on patient's current status
@@ -511,7 +511,7 @@ async def health_check():
 @router.get("/all-patients/summary")
 async def get_all_patients_summary(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("doctor")),
+    # current_user = Depends(require_role("doctor")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
     Get summary of all patients with their risk levels and alerts
@@ -573,7 +573,7 @@ async def get_all_patients_summary(
 @router.post("/load-all-datasets")
 async def load_all_datasets(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("admin")),
+    # current_user = Depends(require_role("admin")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
     Load all synthetic and real data from CSV files into disease tracking
@@ -726,7 +726,7 @@ async def load_all_datasets(
 @router.post("/add-default-data")
 async def add_default_data_for_all_patients(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("admin")),
+    # current_user = Depends(require_role("admin")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
     Add default medical records and predictions for all patients who don't have any
