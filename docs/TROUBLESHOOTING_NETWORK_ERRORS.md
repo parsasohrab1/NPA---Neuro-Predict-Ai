@@ -13,16 +13,30 @@
 
 **Problem**: Frontend is configured for HTTPS but backend is running on HTTP (or vice versa).
 
+**Check which protocol your backend is using**:
+```powershell
+# Test HTTP
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/disease-tracking/health" -UseBasicParsing
+
+# Test HTTPS
+# (If you get SSL errors, the backend IS using HTTPS)
+```
+
 **Solution**:
-- Check `admin-dashboard/src/config/api.ts` - should use `http://localhost:8000` for local development
-- Backend runs on HTTP by default (port 8000)
-- Both should match: either both HTTP or both HTTPS
+- Check `admin-dashboard/src/config/api.ts`
+- **If backend uses HTTPS**: `const API_BASE_URL = 'https://localhost:8000'`
+- **If backend uses HTTP**: `const API_BASE_URL = 'http://localhost:8000'`
+- Both frontend and backend MUST use the same protocol
+
+**Current Configuration**: Backend uses **HTTPS** with self-signed certificate
 
 **How to fix**:
 ```typescript
 // admin-dashboard/src/config/api.ts
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8000'
 ```
+
+**IMPORTANT**: After changing this file, you MUST restart the frontend dev server!
 
 #### 2. Backend Not Running
 
