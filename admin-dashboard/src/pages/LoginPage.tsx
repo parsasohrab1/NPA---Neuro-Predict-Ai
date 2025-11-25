@@ -16,9 +16,15 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const response = await axios.post('/api/v1/auth/login', {
-        email,
-        password,
+      // OAuth2 expects form data with 'username' field
+      const formData = new URLSearchParams()
+      formData.append('username', email)
+      formData.append('password', password)
+
+      const response = await axios.post('/api/v1/auth/login', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       })
 
       if (response.data.access_token) {

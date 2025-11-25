@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
+from http import HTTPStatus
 
 from .core.config import settings
 from .db.session import init_db, close_db
@@ -264,14 +265,14 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "path": request.url.path,
             "method": request.method,
             "status_code": exc.status_code,
-            "error_code": getattr(exc, "code", None) or status.HTTPStatus(exc.status_code).phrase.replace(" ", "_").upper(),
+            "error_code": getattr(exc, "code", None) or HTTPStatus(exc.status_code).phrase.replace(" ", "_").upper(),
         },
     )
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "detail": exc.detail if isinstance(exc.detail, str) else "HTTP error",
-            "code": getattr(exc, "code", None) or status.HTTPStatus(exc.status_code).phrase.replace(" ", "_").upper(),
+            "code": getattr(exc, "code", None) or HTTPStatus(exc.status_code).phrase.replace(" ", "_").upper(),
             "trace_id": getattr(request.state, "request_id", None),
         },
         headers=exc.headers or None,

@@ -15,16 +15,16 @@ import Analysis3DPage from './pages/Analysis3DPage'
 import LoginPage from './pages/LoginPage'
 import TestPage from './pages/TestPage'
 
-// Protected Route wrapper
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
-  
-  if (!token) {
-    return <Navigate to="/login" replace />
-  }
-  
-  return <>{children}</>
-}
+// Protected Route wrapper (disabled)
+// function ProtectedRoute({ children }: { children: React.ReactNode }) {
+//   const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+//   
+//   if (!token) {
+//     return <Navigate to="/login" replace />
+//   }
+//   
+//   return <>{children}</>
+// }
 
 export const router = createBrowserRouter([
   {
@@ -33,11 +33,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: (
-      <ProtectedRoute>
-        <AdminLayout />
-      </ProtectedRoute>
-    ),
+    element: <AdminLayout />,
     children: [
       { index: true, element: <SystemOverview /> },
       { path: 'reports', element: <ReportsPage /> },

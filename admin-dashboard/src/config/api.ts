@@ -1,8 +1,9 @@
 import axios from 'axios'
 
 // Configure axios base URL
-// In development, proxy to backend if needed, or use full URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8000'
+// In development, use Vite proxy (empty baseURL = same origin, which Vite proxies to backend)
+// In production, use environment variable
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 axios.defaults.baseURL = API_BASE_URL
 axios.defaults.headers.common['Content-Type'] = 'application/json'

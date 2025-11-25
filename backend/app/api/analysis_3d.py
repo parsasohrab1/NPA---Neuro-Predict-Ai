@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from ..core.security import require_role
 from ..db.session import get_db
-from ..models.patient import Patient, PatientGender
+from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
 from ..models.prediction import Prediction, DiseaseType, RiskLevel
 

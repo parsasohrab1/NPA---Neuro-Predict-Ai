@@ -19,6 +19,9 @@ from ..db.session import get_db
 from ..models.security import IPWhitelist, SecurityLog
 from ..services.security_service import SecurityService
 
+# Initialize logger at module level
+logger = logging.getLogger("app.middleware")
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to all responses"""

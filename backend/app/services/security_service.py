@@ -242,7 +242,8 @@ class SecurityService:
                 require_uppercase=True,
                 require_lowercase=True,
                 require_digits=True,
-                require_special_chars=True
+                require_special_chars=True,
+                special_chars="!@#$%^&*()_+-=[]{}|;:,.<>?"
             )
         
         # Check length
