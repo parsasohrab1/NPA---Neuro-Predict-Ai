@@ -586,7 +586,7 @@ async def load_all_datasets(
     
     logger = logging.getLogger(__name__)
     
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent  # /app/
     synthetic_csv = project_root / 'data' / 'data' / 'csv' / 'sample_dataset_complete.csv'
     real_csv = project_root / 'data' / 'real_data' / 'csv' / 'real_dataset_complete.csv'
     
