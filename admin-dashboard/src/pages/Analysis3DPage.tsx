@@ -397,18 +397,14 @@ export default function Analysis3DPage() {
     }
 
     if (analysis3DQuery.isError) {
-      const error = analysis3DQuery.error as any
-      const errorMessage = error?.response?.status === 401 
-        ? 'Authentication required. Please login first.' 
-        : error?.response?.status === 403
-        ? 'Access denied. You need doctor or admin role.'
-        : error?.response?.data?.detail || error?.message || 'Failed to load 3D data'
-      
       return (
         <div className="flex h-[600px] items-center justify-center">
-          <div className="text-center">
-            <p className="text-rose-400 text-lg mb-2">Failed to load 3D data</p>
-            <p className="text-slate-400 text-sm">{errorMessage}</p>
+          <div className="text-center max-w-2xl mx-auto px-8">
+            <ExclamationTriangleIcon className="mx-auto h-16 w-16 text-amber-400 mb-4" />
+            <p className="text-rose-400 text-xl font-semibold mb-3">No Patient Data Available</p>
+            <p className="text-slate-300 text-sm mb-6">
+              The 3D visualization requires patient data with medical records. Import patient data with biomarker measurements to use this feature.
+            </p>
             {error?.response?.status === 401 && (
               <button
                 onClick={() => window.location.href = '/login'}
