@@ -397,9 +397,27 @@ export default function Analysis3DPage() {
     }
 
     if (analysis3DQuery.isError) {
+      const error = analysis3DQuery.error as any
+      const errorMessage = error?.response?.status === 401 
+        ? 'Authentication required. Please login first.' 
+        : error?.response?.status === 403
+        ? 'Access denied. You need doctor or admin role.'
+        : error?.response?.data?.detail || error?.message || 'Failed to load 3D data'
+      
       return (
         <div className="flex h-[600px] items-center justify-center">
-          <p className="text-rose-400">Failed to load 3D data</p>
+          <div className="text-center">
+            <p className="text-rose-400 text-lg mb-2">Failed to load 3D data</p>
+            <p className="text-slate-400 text-sm">{errorMessage}</p>
+            {error?.response?.status === 401 && (
+              <button
+                onClick={() => window.location.href = '/login'}
+                className="mt-4 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors"
+              >
+                Go to Login
+              </button>
+            )}
+          </div>
         </div>
       )
     }
