@@ -692,11 +692,19 @@ async def load_all_datasets(
                 alzheimer_level = RiskLevel.HIGH if alzheimer_risk >= 0.66 else RiskLevel.MEDIUM if alzheimer_risk >= 0.33 else RiskLevel.LOW
                 parkinson_level = RiskLevel.HIGH if parkinson_risk >= 0.66 else RiskLevel.MEDIUM if parkinson_risk >= 0.33 else RiskLevel.LOW
                 
-                # Create prediction
+                # Determine disease type based on diagnosis
                 from ..models.prediction import DiseaseType
+                if diagnosis == 'Alzheimer':
+                    disease_type = DiseaseType.ALZHEIMER
+                elif diagnosis == 'Parkinson':
+                    disease_type = DiseaseType.PARKINSON
+                else:
+                    disease_type = DiseaseType.BOTH
+                
+                # Create prediction
                 prediction = Prediction(
                     patient_id=patient.id,
-                    disease_type=DiseaseType.BOTH,
+                    disease_type=disease_type,
                     alzheimer_risk_score=alzheimer_risk,
                     parkinson_risk_score=parkinson_risk,
                     alzheimer_risk_level=alzheimer_level,
