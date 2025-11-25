@@ -57,6 +57,8 @@ async def get_3d_analysis_data(
         return generate_correlation_plot(rows)
     elif analysis_type == "feature-space":
         return generate_feature_space_plot(rows)
+    elif analysis_type == "quality-control":
+        return generate_quality_control_view(rows)
     
     return {"traces": [], "stats": {}}
 
@@ -418,6 +420,143 @@ def get_feature_value(patient, medical_record, prediction, feature_name: str) ->
             return age
     
     return None
+
+
+def generate_quality_control_view(rows) -> Dict[str, Any]:
+    """Generate quality control comparison view for imaging pipelines"""
+    
+    # Define the three main pipelines with sample data
+    pipelines = [
+        {
+            "name": "FreeSurfer",
+            "description": "Brain Segmentation & Volumetry",
+            "acceptable": {
+                "patient_id": "PT001",
+                "patient_name": "Sample Patient A",
+                "scan_date": "2024-01-15",
+                "image_url": "/static/qc/freesurfer_acceptable.png",  # Placeholder
+                "metrics": {
+                    "SNR": 28.5,
+                    "Euler_Number": -12.0,
+                    "Cortical_Thickness_Mean": 2.45,
+                    "WM_Segmentation_Quality": 0.95,
+                    "Pial_Surface_Quality": 0.92,
+                },
+                "notes": "High quality segmentation with accurate pial and white matter surfaces. All subcortical structures properly delineated.",
+            },
+            "discarded": {
+                "patient_id": "PT042",
+                "patient_name": "Sample Patient B",
+                "scan_date": "2024-02-03",
+                "image_url": "/static/qc/freesurfer_discarded.png",  # Placeholder
+                "metrics": {
+                    "SNR": 15.2,
+                    "Euler_Number": -89.0,
+                    "Cortical_Thickness_Mean": 3.12,
+                    "WM_Segmentation_Quality": 0.62,
+                    "Pial_Surface_Quality": 0.58,
+                },
+                "issues": [
+                    "Significant segmentation error in posterior ventricular region",
+                    "Incorrect boundary detection between WM and CSF",
+                    "Unrealistic cortical thickness values in temporal lobe",
+                    "Poor Euler number indicates topology defects",
+                    "Motion artifacts affecting surface reconstruction",
+                ],
+                "notes": "Failed quality control due to multiple topology errors and incorrect tissue classification in ventricles.",
+            },
+        },
+        {
+            "name": "LPA",
+            "description": "Lesion & White Matter Hyperintensity Analysis",
+            "acceptable": {
+                "patient_id": "PT007",
+                "patient_name": "Sample Patient C",
+                "scan_date": "2024-01-20",
+                "image_url": "/static/qc/lpa_acceptable.png",  # Placeholder
+                "metrics": {
+                    "Lesion_Count": 8,
+                    "Total_Lesion_Volume": 2.3,
+                    "Dice_Coefficient": 0.89,
+                    "False_Positive_Rate": 0.08,
+                    "Sensitivity": 0.91,
+                },
+                "notes": "Accurate detection of periventricular white matter hyperintensities. Minimal false positives. Lesion boundaries well-defined.",
+            },
+            "discarded": {
+                "patient_id": "PT055",
+                "patient_name": "Sample Patient D",
+                "scan_date": "2024-02-18",
+                "image_url": "/static/qc/lpa_discarded.png",  # Placeholder
+                "metrics": {
+                    "Lesion_Count": 127,
+                    "Total_Lesion_Volume": 45.8,
+                    "Dice_Coefficient": 0.42,
+                    "False_Positive_Rate": 0.73,
+                    "Sensitivity": 0.52,
+                },
+                "issues": [
+                    "Extensive over-segmentation of normal white matter as lesions",
+                    "Poor tissue contrast leading to false positive detections",
+                    "Unrealistic total lesion volume (>40ml)",
+                    "Low Dice coefficient indicates poor agreement with manual segmentation",
+                    "Diffuse highlighting not consistent with expected WMH patterns",
+                ],
+                "notes": "Rejected due to severe over-segmentation. FLAIR sequence may have insufficient quality or incorrect parameters.",
+            },
+        },
+        {
+            "name": "TRACULA",
+            "description": "Diffusion Tractography & White Matter Pathways",
+            "acceptable": {
+                "patient_id": "PT012",
+                "patient_name": "Sample Patient E",
+                "scan_date": "2024-01-25",
+                "image_url": "/static/qc/tracula_acceptable.png",  # Placeholder
+                "metrics": {
+                    "FA_Mean": 0.42,
+                    "Tract_Volume": 15600,
+                    "Streamline_Count": 5200,
+                    "Anatomical_Plausibility": 0.94,
+                    "Connection_Strength": 0.88,
+                },
+                "notes": "Well-formed coherent fiber tracts. Major pathways (CST, ILF, SLF) correctly reconstructed with anatomically plausible trajectories.",
+            },
+            "discarded": {
+                "patient_id": "PT068",
+                "patient_name": "Sample Patient F",
+                "scan_date": "2024-03-05",
+                "image_url": "/static/qc/tracula_discarded.png",  # Placeholder
+                "metrics": {
+                    "FA_Mean": 0.28,
+                    "Tract_Volume": 8900,
+                    "Streamline_Count": 1850,
+                    "Anatomical_Plausibility": 0.51,
+                    "Connection_Strength": 0.44,
+                },
+                "issues": [
+                    "Fragmented and discontinuous fiber tracts",
+                    "Missing major white matter pathways (corpus callosum incomplete)",
+                    "Spurious tracts with non-anatomical trajectories",
+                    "Low FA values indicate poor diffusion signal quality",
+                    "Insufficient streamline density for reliable connectivity analysis",
+                ],
+                "notes": "Tractography failed quality control. Possible motion artifacts or insufficient b-values in DTI acquisition.",
+            },
+        },
+    ]
+    
+    stats = {
+        "total_points": len(rows),
+        "alzheimer_count": sum(1 for _, _, p in rows if p and p.disease_type == DiseaseType.ALZHEIMER),
+        "parkinson_count": sum(1 for _, _, p in rows if p and p.disease_type == DiseaseType.PARKINSON),
+        "normal_count": sum(1 for _, _, p in rows if not p or p.risk_level == RiskLevel.LOW),
+    }
+    
+    return {
+        "qc_data": {"pipelines": pipelines},
+        "stats": stats,
+    }
 
 
 @router.post("/load-sample-data", status_code=status.HTTP_201_CREATED)

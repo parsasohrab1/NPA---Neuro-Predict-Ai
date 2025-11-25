@@ -7,11 +7,352 @@ import {
   BeakerIcon,
   CpuChipIcon,
   ArrowPathIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 import { analysis3DService } from '../services/analysis3D'
 
-type AnalysisType = 'scatter' | 'surface' | 'correlation' | 'feature-space'
+interface QualityControlData {
+  pipelines: Array<{
+    name: string
+    description: string
+    acceptable: {
+      patient_id: string
+      patient_name: string
+      scan_date: string
+      image_url: string
+      metrics: Record<string, number>
+      notes: string
+    }
+    discarded: {
+      patient_id: string
+      patient_name: string
+      scan_date: string
+      image_url: string
+      metrics: Record<string, number>
+      issues: string[]
+      notes: string
+    }
+  }>
+}
+
+function QualityControlView({ data }: { data?: any }) {
+  const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'detail'>('grid')
+
+  if (!data?.qc_data) {
+    return (
+      <div className="flex h-[600px] items-center justify-center">
+        <p className="text-slate-400">No quality control data available</p>
+      </div>
+    )
+  }
+
+  const qcData: QualityControlData = data.qc_data
+
+  return (
+    <div className="space-y-6">
+      {/* View Mode Toggle */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setViewMode('grid')}
+          className={clsx(
+            'rounded-lg px-4 py-2 text-sm font-medium transition',
+            viewMode === 'grid'
+              ? 'bg-sky-500 text-white'
+              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          )}
+        >
+          Grid View
+        </button>
+        <button
+          onClick={() => setViewMode('detail')}
+          className={clsx(
+            'rounded-lg px-4 py-2 text-sm font-medium transition',
+            viewMode === 'detail'
+              ? 'bg-sky-500 text-white'
+              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          )}
+        >
+          Detailed View
+        </button>
+      </div>
+
+      {/* Grid View */}
+      {viewMode === 'grid' && (
+        <div className="space-y-4">
+          {/* Header Row */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-center">
+              <div className="text-sm font-semibold text-slate-300">Pipeline</div>
+            </div>
+            {qcData.pipelines.map((pipeline) => (
+              <div
+                key={pipeline.name}
+                className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-center"
+              >
+                <div className="text-sm font-semibold text-white">{pipeline.name}</div>
+                <div className="mt-1 text-xs text-slate-400">{pipeline.description}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Acceptable Row */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="flex items-center justify-center rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-3">
+              <div className="flex items-center gap-2">
+                <CheckCircleIcon className="h-5 w-5 text-emerald-400" />
+                <span className="font-semibold text-emerald-400">Acceptable</span>
+              </div>
+            </div>
+            {qcData.pipelines.map((pipeline) => (
+              <div
+                key={`acceptable-${pipeline.name}`}
+                className="group cursor-pointer rounded-lg border border-slate-700 bg-slate-900/60 p-3 transition hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/20"
+                onClick={() => {
+                  setSelectedPipeline(pipeline.name)
+                  setViewMode('detail')
+                }}
+              >
+                <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-slate-800">
+                  {pipeline.acceptable.image_url ? (
+                    <img
+                      src={pipeline.acceptable.image_url}
+                      alt={`${pipeline.name} acceptable`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-slate-600">
+                      <BeakerIcon className="h-12 w-12" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+                </div>
+                <div className="mt-2 space-y-1">
+                  <div className="text-xs text-slate-400">
+                    Patient: {pipeline.acceptable.patient_name}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {pipeline.acceptable.scan_date}
+                  </div>
+                  {Object.entries(pipeline.acceptable.metrics).slice(0, 2).map(([key, value]) => (
+                    <div key={key} className="flex justify-between text-xs">
+                      <span className="text-slate-500">{key}:</span>
+                      <span className="font-mono text-emerald-400">{value.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Discarded Row */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="flex items-center justify-center rounded-lg border border-rose-900/50 bg-rose-950/30 p-3">
+              <div className="flex items-center gap-2">
+                <XCircleIcon className="h-5 w-5 text-rose-400" />
+                <span className="font-semibold text-rose-400">Discarded</span>
+              </div>
+            </div>
+            {qcData.pipelines.map((pipeline) => (
+              <div
+                key={`discarded-${pipeline.name}`}
+                className="group cursor-pointer rounded-lg border border-slate-700 bg-slate-900/60 p-3 transition hover:border-rose-500 hover:shadow-lg hover:shadow-rose-500/20"
+                onClick={() => {
+                  setSelectedPipeline(pipeline.name)
+                  setViewMode('detail')
+                }}
+              >
+                <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-slate-800">
+                  {pipeline.discarded.image_url ? (
+                    <img
+                      src={pipeline.discarded.image_url}
+                      alt={`${pipeline.name} discarded`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-slate-600">
+                      <BeakerIcon className="h-12 w-12" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+                </div>
+                <div className="mt-2 space-y-1">
+                  <div className="text-xs text-slate-400">
+                    Patient: {pipeline.discarded.patient_name}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {pipeline.discarded.scan_date}
+                  </div>
+                  {pipeline.discarded.issues.slice(0, 2).map((issue, idx) => (
+                    <div key={idx} className="flex items-start gap-1 text-xs text-rose-400">
+                      <ExclamationTriangleIcon className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                      <span className="line-clamp-1">{issue}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Detailed View */}
+      {viewMode === 'detail' && (
+        <div className="space-y-6">
+          {qcData.pipelines.map((pipeline) => (
+            <div
+              key={pipeline.name}
+              className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6"
+            >
+              <h3 className="mb-4 text-xl font-semibold text-white">
+                {pipeline.name} - {pipeline.description}
+              </h3>
+              
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Acceptable */}
+                <div className="space-y-4 rounded-lg border border-emerald-900/50 bg-emerald-950/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircleIcon className="h-6 w-6 text-emerald-400" />
+                    <h4 className="text-lg font-semibold text-emerald-400">Acceptable Result</h4>
+                  </div>
+                  
+                  <div className="aspect-video overflow-hidden rounded-lg bg-slate-800">
+                    {pipeline.acceptable.image_url ? (
+                      <img
+                        src={pipeline.acceptable.image_url}
+                        alt={`${pipeline.name} acceptable`}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-slate-600">
+                        <BeakerIcon className="h-16 w-16" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm">
+                      <span className="text-slate-400">Patient:</span>
+                      <span className="ml-2 font-medium text-white">
+                        {pipeline.acceptable.patient_name}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-slate-400">ID:</span>
+                      <span className="ml-2 font-mono text-white">
+                        {pipeline.acceptable.patient_id}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-slate-400">Scan Date:</span>
+                      <span className="ml-2 text-white">{pipeline.acceptable.scan_date}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-slate-300">Quality Metrics:</div>
+                    <div className="space-y-1">
+                      {Object.entries(pipeline.acceptable.metrics).map(([key, value]) => (
+                        <div key={key} className="flex justify-between text-sm">
+                          <span className="text-slate-400">{key}:</span>
+                          <span className="font-mono text-emerald-400">{value.toFixed(3)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {pipeline.acceptable.notes && (
+                    <div className="rounded-lg bg-slate-800/50 p-3 text-sm text-slate-300">
+                      <div className="mb-1 font-semibold text-slate-200">Notes:</div>
+                      {pipeline.acceptable.notes}
+                    </div>
+                  )}
+                </div>
+
+                {/* Discarded */}
+                <div className="space-y-4 rounded-lg border border-rose-900/50 bg-rose-950/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <XCircleIcon className="h-6 w-6 text-rose-400" />
+                    <h4 className="text-lg font-semibold text-rose-400">Discarded Result</h4>
+                  </div>
+                  
+                  <div className="aspect-video overflow-hidden rounded-lg bg-slate-800">
+                    {pipeline.discarded.image_url ? (
+                      <img
+                        src={pipeline.discarded.image_url}
+                        alt={`${pipeline.name} discarded`}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-slate-600">
+                        <BeakerIcon className="h-16 w-16" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm">
+                      <span className="text-slate-400">Patient:</span>
+                      <span className="ml-2 font-medium text-white">
+                        {pipeline.discarded.patient_name}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-slate-400">ID:</span>
+                      <span className="ml-2 font-mono text-white">
+                        {pipeline.discarded.patient_id}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-slate-400">Scan Date:</span>
+                      <span className="ml-2 text-white">{pipeline.discarded.scan_date}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-slate-300">Quality Metrics:</div>
+                    <div className="space-y-1">
+                      {Object.entries(pipeline.discarded.metrics).map(([key, value]) => (
+                        <div key={key} className="flex justify-between text-sm">
+                          <span className="text-slate-400">{key}:</span>
+                          <span className="font-mono text-rose-400">{value.toFixed(3)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-rose-300">Issues Detected:</div>
+                    <ul className="space-y-1">
+                      {pipeline.discarded.issues.map((issue, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-rose-300">
+                          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                          {issue}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {pipeline.discarded.notes && (
+                    <div className="rounded-lg bg-slate-800/50 p-3 text-sm text-slate-300">
+                      <div className="mb-1 font-semibold text-slate-200">Notes:</div>
+                      {pipeline.discarded.notes}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type AnalysisType = 'scatter' | 'surface' | 'correlation' | 'feature-space' | 'quality-control'
 type DiseaseFilter = 'all' | 'alzheimer' | 'parkinson' | 'normal'
 
 export default function Analysis3DPage() {
@@ -191,6 +532,10 @@ export default function Analysis3DPage() {
       )
     }
 
+    if (analysisType === 'quality-control') {
+      return <QualityControlView data={data} />
+    }
+
     return null
   }
 
@@ -218,6 +563,12 @@ export default function Analysis3DPage() {
       name: 'Feature Space',
       icon: CpuChipIcon,
       description: 'PCA-based clustering',
+    },
+    {
+      id: 'quality-control' as AnalysisType,
+      name: 'Quality Control',
+      icon: ChartBarIcon,
+      description: 'Imaging pipeline QC comparison',
     },
   ]
 
