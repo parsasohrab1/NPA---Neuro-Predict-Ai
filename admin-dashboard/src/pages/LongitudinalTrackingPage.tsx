@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
+import { toast } from 'react-hot-toast'
 import {
   Line,
   LineChart,
@@ -86,9 +87,11 @@ type HeatmapPreviewState = {
 }
 
 export default function LongitudinalTrackingPage() {
+  const queryClient = useQueryClient()
   const [patientIdInput, setPatientIdInput] = useState('')
   const [activePatientId, setActivePatientId] = useState<number | null>(null)
   const [selectedEpisodeId, setSelectedEpisodeId] = useState<number | null>(null)
+  const [showLoadDataModal, setShowLoadDataModal] = useState(false)
   const [trendMetricKey, setTrendMetricKey] = useState<string | null>(null)
   const [trendMetricCategory, setTrendMetricCategory] = useState<MetricCategory | undefined>(undefined)
   const [comparisonSelection, setComparisonSelection] = useState<number[]>([])
@@ -286,6 +289,20 @@ export default function LongitudinalTrackingPage() {
       }))
       setScheduleError(null)
       setExpandedScheduleId(null)
+    },
+  })
+
+  const loadSampleDataMutation = useMutation({
+    mutationFn: () => longitudinalService.loadSampleData(),
+    onSuccess: (data) => {
+      toast.success(
+        `Sample data loaded! ${data.total_episodes} episodes, ${data.total_visits} visits, ${data.total_metrics} metrics created.`
+      )
+      queryClient.invalidateQueries({ queryKey: ['longitudinal'] })
+      setShowLoadDataModal(false)
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to load sample data: ${error.response?.data?.detail || error.message}`)
     },
   })
 
@@ -675,11 +692,20 @@ export default function LongitudinalTrackingPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-white">Longitudinal Tracking</h1>
-        <p className="text-sm text-slate-400">
-          Explore patient episodes, visit timelines, and progression trends across cognitive, biomarker, and imaging metrics.
-        </p>
+      <header className="flex items-center justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold text-white">Longitudinal Tracking</h1>
+          <p className="text-sm text-slate-400">
+            Explore patient episodes, visit timelines, and progression trends across cognitive, biomarker, and imaging metrics.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowLoadDataModal(true)}
+          className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+        >
+          <PlusIcon className="h-5 w-5" />
+          Load Sample Data
+        </button>
       </header>
 
       <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-sm">
@@ -1016,6 +1042,15 @@ export default function LongitudinalTrackingPage() {
           </div>
         </section>
       )}
+
+      {/* Load Sample Data Modal */}
+      <LoadSampleDataModal
+        isOpen={showLoadDataModal}
+        onClose={() => setShowLoadDataModal(false)}
+        onConfirm={() => loadSampleDataMutation.mutate()}
+        isPending={loadSampleDataMutation.isPending}
+      />
+
       {heatmapPreview && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 px-4">
           <div className="w-full max-w-4xl rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
@@ -1989,11 +2024,60 @@ function CohortAnalysisPanel({ episodeId, reports }: CohortAnalysisPanelProps) {
                   : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
               )}
             >
-              {alert.message}
-            </div>
-          ))}
+            {alert.message}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+  )
+}
+
+// Load Sample Data Modal Component
+function LoadSampleDataModal({ isOpen, onClose, onConfirm, isPending }: {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: () => void
+  isPending: boolean
+}) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <h3 className="text-xl font-semibold text-white">Load Sample Data</h3>
+        <p className="mt-2 text-sm text-slate-400">
+          This will create sample episodes, visits, and metrics for existing patients in the database.
+          This is useful for testing the Longitudinal Tracking features.
+        </p>
+
+        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+          <p className="text-xs text-slate-400 mb-2">What will be created:</p>
+          <ul className="space-y-1 text-sm text-slate-300">
+            <li>• 1-2 episodes per patient</li>
+            <li>• 4-8 visits per episode</li>
+            <li>• Multiple metrics per visit (cognitive, biomarker, imaging, functional)</li>
+            <li>• Progression scores for each visit</li>
+          </ul>
         </div>
-      )}
+
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+            disabled={isPending}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400"
+            disabled={isPending}
+          >
+            {isPending ? 'Loading...' : 'Load Data'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

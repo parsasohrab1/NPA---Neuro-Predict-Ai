@@ -358,5 +358,10 @@ export const longitudinalService = {
     const response = await axios.get(`${API_BASE}/reports/schedules/${scheduleId}/monitoring`)
     return response.data
   },
+
+  async loadSampleData() {
+    const response = await axios.post(`${API_BASE}/load-sample-data`)
+    return response.data
+  },
 }
 

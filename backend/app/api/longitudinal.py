@@ -571,3 +571,165 @@ async def get_schedule_monitoring(
     return stats
 
 
+@router.post(
+    "/load-sample-data",
+    status_code=status.HTTP_201_CREATED,
+    summary="Load sample longitudinal data for testing",
+)
+async def load_sample_data(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role("admin")),
+):
+    """
+    Load sample episodes, visits, and metrics for longitudinal tracking testing.
+    Creates data for existing patients in the database.
+    """
+    from sqlalchemy import select
+    from ..models.patient import Patient
+    from ..models.longitudinal import (
+        LongitudinalEpisode,
+        LongitudinalVisit,
+        LongitudinalMetric,
+        LongitudinalEpisodeStatus,
+        LongitudinalVisitType,
+        MetricCategory,
+    )
+    from datetime import datetime, timedelta
+    import random
+    
+    # Get all patients
+    result = await db.execute(select(Patient).limit(10))
+    patients = result.scalars().all()
+    
+    if not patients:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No patients found. Please create patients first."
+        )
+    
+    total_episodes = 0
+    total_visits = 0
+    total_metrics = 0
+    
+    for patient in patients:
+        # Check if patient already has episodes
+        existing_result = await db.execute(
+            select(LongitudinalEpisode).where(LongitudinalEpisode.patient_id == patient.id)
+        )
+        if existing_result.scalar_one_or_none():
+            continue
+        
+        # Create 1-2 episodes per patient
+        num_episodes = random.randint(1, 2)
+        
+        for ep_idx in range(num_episodes):
+            start_date = datetime.now() - timedelta(days=random.randint(180, 365))
+            
+            episode = LongitudinalEpisode(
+                patient_id=patient.id,
+                title=f"Episode {ep_idx + 1} - Cognitive Monitoring",
+                start_date=start_date,
+                status=LongitudinalEpisodeStatus.ACTIVE if ep_idx == 0 else LongitudinalEpisodeStatus.COMPLETED,
+            )
+            
+            db.add(episode)
+            await db.flush()
+            total_episodes += 1
+            
+            # Create 4-8 visits per episode
+            num_visits = random.randint(4, 8)
+            
+            for visit_idx in range(num_visits):
+                days_from_start = (visit_idx + 1) * random.randint(20, 40)
+                visit_date = start_date + timedelta(days=days_from_start)
+                
+                visit_type = (
+                    LongitudinalVisitType.BASELINE if visit_idx == 0
+                    else random.choice([
+                        LongitudinalVisitType.FOLLOWUP,
+                        LongitudinalVisitType.IMAGING,
+                        LongitudinalVisitType.LAB,
+                        LongitudinalVisitType.THERAPY,
+                    ])
+                )
+                
+                # Calculate progression score (slightly declining over time)
+                base_score = 0.9
+                decline_rate = 0.02 * visit_idx
+                noise = random.uniform(-0.05, 0.05)
+                progression_score = max(0.5, base_score - decline_rate + noise)
+                
+                visit = LongitudinalVisit(
+                    episode_id=episode.id,
+                    visit_date=visit_date,
+                    visit_type=visit_type,
+                    progression_score=progression_score,
+                    notes=f"Visit {visit_idx + 1} - {visit_type.value.capitalize()} assessment",
+                )
+                
+                db.add(visit)
+                await db.flush()
+                total_visits += 1
+                
+                # Create metrics for each visit
+                # Cognitive metrics
+                cognitive_metrics = [
+                    ("mmse_score", random.uniform(20, 30), "points", MetricCategory.COGNITIVE),
+                    ("moca_score", random.uniform(18, 28), "points", MetricCategory.COGNITIVE),
+                    ("memory_recall", random.uniform(0.6, 1.0), "ratio", MetricCategory.COGNITIVE),
+                    ("attention_span", random.uniform(0.5, 1.0), "ratio", MetricCategory.COGNITIVE),
+                ]
+                
+                # Biomarker metrics
+                biomarker_metrics = [
+                    ("amyloid_beta", random.uniform(300, 600), "pg/mL", MetricCategory.BIOMARKER),
+                    ("tau_protein", random.uniform(200, 400), "pg/mL", MetricCategory.BIOMARKER),
+                    ("dopamine_level", random.uniform(50, 100), "ng/mL", MetricCategory.BIOMARKER),
+                ]
+                
+                # Imaging metrics
+                imaging_metrics = [
+                    ("hippocampal_volume", random.uniform(2500, 4000), "mm³", MetricCategory.IMAGING),
+                    ("cortical_thickness", random.uniform(2.0, 3.5), "mm", MetricCategory.IMAGING),
+                    ("ventricular_volume", random.uniform(30000, 50000), "mm³", MetricCategory.IMAGING),
+                ]
+                
+                # Functional metrics
+                functional_metrics = [
+                    ("daily_activities_score", random.uniform(0.6, 1.0), "ratio", MetricCategory.FUNCTIONAL),
+                    ("mobility_score", random.uniform(0.5, 1.0), "ratio", MetricCategory.FUNCTIONAL),
+                ]
+                
+                all_metrics = cognitive_metrics + biomarker_metrics + imaging_metrics + functional_metrics
+                
+                for metric_key, metric_value, unit, category in all_metrics:
+                    # Add some temporal variation (slight decline over visits)
+                    temporal_factor = 1 - (visit_idx * 0.01)
+                    adjusted_value = metric_value * temporal_factor
+                    
+                    # Calculate z-score (simplified)
+                    z_score = (adjusted_value - metric_value) / (metric_value * 0.1)
+                    
+                    metric = LongitudinalMetric(
+                        visit_id=visit.id,
+                        metric_type=category,
+                        metric_key=metric_key,
+                        metric_value=adjusted_value,
+                        unit=unit,
+                        z_score=z_score,
+                    )
+                    
+                    db.add(metric)
+                    total_metrics += 1
+    
+    await db.commit()
+    
+    return {
+        "message": "Sample longitudinal data loaded successfully",
+        "total_patients": len(patients),
+        "total_episodes": total_episodes,
+        "total_visits": total_visits,
+        "total_metrics": total_metrics,
+    }
+
+
