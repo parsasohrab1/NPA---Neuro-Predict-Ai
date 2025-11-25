@@ -9,6 +9,7 @@ import AuditLogs from './pages/AuditLogs'
 import SystemSettings from './pages/SystemSettings'
 import ReportsPage from './pages/ReportsPage'
 import LongitudinalTrackingPage from './pages/LongitudinalTrackingPage'
+import DiseaseTrackingDashboard from './pages/DiseaseTrackingDashboard'
 import TestPage from './pages/TestPage'
 
 export const router = createBrowserRouter([
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { index: true, element: <SystemOverview /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'longitudinal', element: <LongitudinalTrackingPage /> },
+      { path: 'disease-tracking', element: <DiseaseTrackingDashboard /> },
       { path: 'users', element: <UsersManagement /> },
       { path: 'roles', element: <RolesPermissions /> },
       { path: 'models', element: <ModelManagement /> },
