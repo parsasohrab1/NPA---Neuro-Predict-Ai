@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
 from ..core.security import require_role, get_current_user
-from ..models.patient import Patient
+from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
 from ..models.prediction import Prediction
 from ..services.ai_model_service import AIModelService
@@ -628,9 +628,9 @@ async def load_all_datasets(
                 dob = datetime.now().date().replace(year=datetime.now().year - age)
                 gender_str = str(row['gender']).lower()
                 gender = (
-                    Patient.Gender.MALE if gender_str == 'male'
-                    else Patient.Gender.FEMALE if gender_str == 'female'
-                    else Patient.Gender.OTHER
+                    Gender.MALE if gender_str == 'male'
+                    else Gender.FEMALE if gender_str == 'female'
+                    else Gender.OTHER
                 )
                 
                 patient = Patient(
