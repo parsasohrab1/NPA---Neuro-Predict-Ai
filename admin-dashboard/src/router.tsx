@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import AdminLayout from './layouts/AdminLayout'
 import SystemOverview from './pages/SystemOverview'
@@ -12,12 +12,32 @@ import LongitudinalTrackingPage from './pages/LongitudinalTrackingPage'
 import DiseaseTrackingDashboard from './pages/DiseaseTrackingDashboard'
 import DataMonitoringPage from './pages/DataMonitoringPage'
 import Analysis3DPage from './pages/Analysis3DPage'
+import LoginPage from './pages/LoginPage'
 import TestPage from './pages/TestPage'
+
+// Protected Route wrapper
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+  
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+  
+  return <>{children}</>
+}
 
 export const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
     path: '/',
-    element: <AdminLayout />,
+    element: (
+      <ProtectedRoute>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <SystemOverview /> },
       { path: 'reports', element: <ReportsPage /> },
