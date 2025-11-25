@@ -505,7 +505,7 @@ async def get_recommendations(
 @router.get("/all-patients/summary")
 async def get_all_patients_summary(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("doctor")),
+    current_user = Depends(require_role("nurse")),
 ) -> Dict[str, Any]:
     """
     Get summary of all patients with their risk levels and alerts

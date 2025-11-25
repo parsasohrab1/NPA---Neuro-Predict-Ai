@@ -464,3 +464,37 @@ async def logout(
 
     return {"message": "Logged out"}
 
+
+@router.get("/test-token", response_model=Token)
+async def get_test_token():
+    """
+    Get a test token for development/testing purposes
+    WARNING: Only use in development environment!
+    """
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Test tokens are not available in production"
+        )
+    
+    # Create a test token with admin role
+    access_token = create_access_token(
+        data={
+            "sub": "test_admin@example.com",
+            "user_id": 999,
+            "role": "admin",
+        }
+    )
+    
+    refresh_token = create_refresh_token(
+        data={
+            "sub": "test_admin@example.com",
+            "user_id": 999,
+        }
+    )
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
