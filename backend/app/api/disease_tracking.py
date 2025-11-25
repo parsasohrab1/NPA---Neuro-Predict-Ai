@@ -502,10 +502,16 @@ async def get_recommendations(
     }
 
 
+@router.get("/health")
+async def health_check():
+    """Health check endpoint to verify API is running"""
+    return {"status": "ok", "message": "Disease tracking API is running"}
+
+
 @router.get("/all-patients/summary")
 async def get_all_patients_summary(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("nurse")),
+    current_user = Depends(require_role("doctor")),
 ) -> Dict[str, Any]:
     """
     Get summary of all patients with their risk levels and alerts

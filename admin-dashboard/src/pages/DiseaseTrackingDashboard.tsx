@@ -292,11 +292,27 @@ export default function DiseaseTrackingDashboard() {
       {/* Error Message */}
       {patientsError && (
         <div className="rounded-2xl border border-rose-800 bg-rose-900/20 p-4">
-          <div className="flex items-center gap-2 text-rose-400">
-            <ExclamationTriangleIcon className="h-5 w-5" />
-            <span>
-              Failed to load patients. Please check your connection and try again.
-            </span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-rose-400">
+              <ExclamationTriangleIcon className="h-5 w-5" />
+              <span className="font-semibold">
+                Failed to load patients
+              </span>
+            </div>
+            <div className="text-sm text-rose-300">
+              {(patientsError as any)?.response?.status === 401 ? (
+                <span>Authentication required. Please log in.</span>
+              ) : (patientsError as any)?.response?.status === 403 ? (
+                <span>Permission denied. You need doctor or admin role.</span>
+              ) : (patientsError as any)?.response?.data?.detail ? (
+                <span>{(patientsError as any).response.data.detail}</span>
+              ) : (
+                <span>Please check your connection and try again. Error: {(patientsError as any)?.message}</span>
+              )}
+            </div>
+            <div className="text-xs text-slate-500 mt-2">
+              Tip: Make sure the backend is running on port 8000 and you have the required permissions.
+            </div>
           </div>
         </div>
       )}
