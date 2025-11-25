@@ -62,6 +62,7 @@ export default function DiseaseTrackingDashboard() {
   const [showAddPatientModal, setShowAddPatientModal] = useState(false)
   const [showAddDataModal, setShowAddDataModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showLoadDataConfirm, setShowLoadDataConfirm] = useState(false)
   const queryClient = useQueryClient()
 
   // Get all patients summary
@@ -138,21 +139,23 @@ export default function DiseaseTrackingDashboard() {
     },
   })
 
-  // Add default data mutation
-  const addDefaultDataMutation = useMutation({
-    mutationFn: () => diseaseTrackingApi.addDefaultDataForAllPatients(),
+  // Load all datasets mutation
+  const loadAllDatasetsMutation = useMutation({
+    mutationFn: () => diseaseTrackingApi.loadAllDatasets(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      setShowLoadDataConfirm(false)
       setNotification({
         type: 'success',
-        message: `Default data added! ${data.added_records} records and ${data.added_predictions} predictions created.`,
+        message: `All datasets loaded! ${data.total_patients} patients, ${data.total_records} records, ${data.total_predictions} predictions created.`,
       })
       setTimeout(() => setNotification(null), 5000)
     },
     onError: (error: any) => {
+      setShowLoadDataConfirm(false)
       setNotification({
         type: 'error',
-        message: error.response?.data?.detail || 'Failed to add default data',
+        message: error.response?.data?.detail || 'Failed to load datasets',
       })
       setTimeout(() => setNotification(null), 5000)
     },
@@ -266,17 +269,12 @@ export default function DiseaseTrackingDashboard() {
             </button>
           )}
           <button
-            onClick={() => {
-              if (confirm('Add default medical data for all patients without records?')) {
-                addDefaultDataMutation.mutate()
-              }
-            }}
-            disabled={addDefaultDataMutation.isPending}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors"
-            title="Add default medical records and predictions for all patients"
+            onClick={() => setShowLoadDataConfirm(true)}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+            title="Load all synthetic and real datasets"
           >
             <PlusIcon className="h-5 w-5" />
-            {addDefaultDataMutation.isPending ? 'Adding...' : 'Add Default Data'}
+            Load All Data
           </button>
           <select
             value={refreshInterval}
@@ -923,6 +921,36 @@ export default function DiseaseTrackingDashboard() {
               onCancel={() => setShowAddPatientModal(false)}
               isLoading={createPatientMutation.isPending}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Load All Data Confirmation Modal */}
+      {showLoadDataConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-lg">
+            <h2 className="text-2xl font-bold text-white mb-4">Load All Datasets?</h2>
+            <p className="text-slate-300 mb-6">
+              This will load all synthetic and real data from CSV files into the disease tracking system.
+              <br /><br />
+              <strong>Note:</strong> This may take a few minutes and will create ~200 patients with their medical records and predictions.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowLoadDataConfirm(false)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                disabled={loadAllDatasetsMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => loadAllDatasetsMutation.mutate()}
+                disabled={loadAllDatasetsMutation.isPending}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loadAllDatasetsMutation.isPending ? 'Loading...' : 'Load All Data'}
+              </button>
+            </div>
           </div>
         </div>
       )}

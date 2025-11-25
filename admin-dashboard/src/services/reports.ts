@@ -128,6 +128,16 @@ export const reportsService = {
     })
     return response.data as ReportExportResponse
   },
+
+  async loadSampleData() {
+    const response = await axios.post(`${API_BASE}/load-sample-data`)
+    return response.data
+  },
+
+  async getStats() {
+    const response = await axios.get(`${API_BASE}/stats`)
+    return response.data
+  },
 }
 
 

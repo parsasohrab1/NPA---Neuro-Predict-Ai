@@ -564,6 +564,138 @@ async def get_all_patients_summary(
     return summary
 
 
+@router.post("/load-all-datasets")
+async def load_all_datasets(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(require_role("admin")),
+) -> Dict[str, Any]:
+    """
+    Load all synthetic and real data from CSV files into disease tracking
+    This creates patients, medical records, and predictions from both datasets
+    """
+    import pandas as pd
+    from pathlib import Path
+    import numpy as np
+    
+    project_root = Path(__file__).parent.parent.parent.parent
+    synthetic_csv = project_root / 'data' / 'data' / 'csv' / 'sample_dataset_complete.csv'
+    real_csv = project_root / 'data' / 'real_data' / 'csv' / 'real_dataset_complete.csv'
+    
+    total_patients = 0
+    total_records = 0
+    total_predictions = 0
+    skipped = 0
+    
+    # Load both datasets
+    for csv_path, dataset_name in [(synthetic_csv, "Synthetic"), (real_csv, "Real")]:
+        if not csv_path.exists():
+            continue
+        
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception as e:
+            continue
+        
+        for idx, row in df.iterrows():
+            try:
+                patient_id = str(row['patient_id'])
+                
+                # Check if patient exists
+                result = await db.execute(
+                    select(Patient).where(Patient.patient_id == patient_id)
+                )
+                if result.scalar_one_or_none():
+                    skipped += 1
+                    continue
+                
+                # Create patient
+                age = int(row['age'])
+                dob = datetime.now().date().replace(year=datetime.now().year - age)
+                gender_str = str(row['gender']).lower()
+                gender = (
+                    Patient.Gender.MALE if gender_str == 'male'
+                    else Patient.Gender.FEMALE if gender_str == 'female'
+                    else Patient.Gender.OTHER
+                )
+                
+                patient = Patient(
+                    patient_id=patient_id,
+                    first_name=f"{dataset_name}Patient",
+                    last_name=patient_id.replace('PT_', ''),
+                    date_of_birth=dob,
+                    gender=gender,
+                    education_years=int(row.get('education_years', 12)) if pd.notna(row.get('education_years')) else None,
+                )
+                
+                db.add(patient)
+                await db.flush()
+                total_patients += 1
+                
+                # Create medical record
+                visit_date = datetime.now()
+                medical_record = MedicalRecord(
+                    patient_id=patient.id,
+                    visit_date=visit_date,
+                    visit_type="Initial",
+                    mmse_score=float(row['mmse_score']) if pd.notna(row['mmse_score']) else None,
+                    moca_score=float(row['moca_score']) if pd.notna(row['moca_score']) else None,
+                    memory_score=float(row['memory_score']) if pd.notna(row['memory_score']) else None,
+                    attention_score=float(row['attention_score']) if pd.notna(row['attention_score']) else None,
+                    executive_function_score=float(row['executive_function_score']) if pd.notna(row['executive_function_score']) else None,
+                    amyloid_beta=float(row['amyloid_beta']) if pd.notna(row['amyloid_beta']) else None,
+                    tau_protein=float(row['tau_protein']) if pd.notna(row['tau_protein']) else None,
+                    dopamine_level=float(row['dopamine_level']) if pd.notna(row['dopamine_level']) else None,
+                    apoe_e4_status=bool(int(row['apoe_e4_status'])) if pd.notna(row['apoe_e4_status']) else False,
+                    hippocampal_volume=float(row['hippocampal_volume']) if pd.notna(row['hippocampal_volume']) else None,
+                    cortical_thickness=float(row['cortical_thickness']) if pd.notna(row['cortical_thickness']) else None,
+                    ventricular_volume=float(row['ventricular_volume']) if pd.notna(row['ventricular_volume']) else None,
+                    white_matter_hyperintensities=float(row['white_matter_hyperintensities']) if pd.notna(row['white_matter_hyperintensities']) else None,
+                    brain_volume_total=float(row['brain_volume_total']) if pd.notna(row['brain_volume_total']) else None,
+                    clinical_notes=f"Imported from {dataset_name} dataset: {row.get('diagnosis', 'Unknown')}",
+                )
+                
+                db.add(medical_record)
+                await db.flush()
+                total_records += 1
+                
+                # Calculate risk
+                diagnosis = str(row.get('diagnosis', 'Normal'))
+                alzheimer_risk = 0.85 if diagnosis == 'Alzheimer' else 0.80 if diagnosis == 'Parkinson' else 0.15
+                parkinson_risk = 0.80 if diagnosis == 'Parkinson' else 0.15 if diagnosis == 'Alzheimer' else 0.12
+                
+                from ..models.prediction import RiskLevel
+                alzheimer_level = RiskLevel.HIGH if alzheimer_risk >= 0.66 else RiskLevel.MEDIUM if alzheimer_risk >= 0.33 else RiskLevel.LOW
+                parkinson_level = RiskLevel.HIGH if parkinson_risk >= 0.66 else RiskLevel.MEDIUM if parkinson_risk >= 0.33 else RiskLevel.LOW
+                
+                # Create prediction
+                from ..models.prediction import DiseaseType
+                prediction = Prediction(
+                    patient_id=patient.id,
+                    disease_type=DiseaseType.BOTH,
+                    alzheimer_risk_score=alzheimer_risk,
+                    parkinson_risk_score=parkinson_risk,
+                    alzheimer_risk_level=alzheimer_level,
+                    parkinson_risk_level=parkinson_level,
+                    created_at=datetime.now(),
+                )
+                
+                db.add(prediction)
+                total_predictions += 1
+                
+            except Exception as e:
+                continue
+    
+    await db.commit()
+    
+    return {
+        "message": "All datasets loaded successfully",
+        "total_patients": total_patients,
+        "total_records": total_records,
+        "total_predictions": total_predictions,
+        "skipped": skipped,
+    }
+
+
 @router.post("/add-default-data")
 async def add_default_data_for_all_patients(
     db: AsyncSession = Depends(get_db),

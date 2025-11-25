@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { ArrowDownTrayIcon, FunnelIcon } from '@heroicons/react/24/outline'
+import { ArrowDownTrayIcon, FunnelIcon, PlusCircleIcon } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
+import { toast } from 'react-hot-toast'
 
 import {
   reportsService,
@@ -23,7 +24,9 @@ const exportFormats: Array<{ value: 'pdf' | 'excel' | 'csv'; label: string }> = 
 ]
 
 export default function ReportsPage() {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<ActiveTab>('clinical')
+  const [showLoadDataModal, setShowLoadDataModal] = useState(false)
 
   const [clinicalFilters, setClinicalFilters] = useState({
     patientId: '',
@@ -63,6 +66,26 @@ export default function ReportsPage() {
     queryKey: ['reports', 'management', appliedManagementFilters],
     queryFn: () => reportsService.fetchManagement(appliedManagementFilters!),
     enabled: Boolean(appliedManagementFilters),
+  })
+
+  const statsQuery = useQuery({
+    queryKey: ['reports', 'stats'],
+    queryFn: () => reportsService.getStats(),
+    staleTime: 30000, // 30 seconds
+  })
+
+  const loadSampleDataMutation = useMutation({
+    mutationFn: () => reportsService.loadSampleData(),
+    onSuccess: (data) => {
+      toast.success(
+        `Sample data loaded! ${data.total_patients} patients, ${data.total_predictions} predictions created.`
+      )
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      setShowLoadDataModal(false)
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to load sample data: ${error.response?.data?.detail || error.message}`)
+    },
   })
 
   const handleGenerate = () => {
@@ -450,11 +473,48 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-white">Reports Center</h1>
-        <p className="text-sm text-slate-400">
-          Generate clinical, research, and operational reports powered by live NeuroPredict data.
-        </p>
+      <header className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Reports Center</h1>
+            <p className="text-sm text-slate-400">
+              Generate clinical, research, and operational reports powered by live NeuroPredict data.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowLoadDataModal(true)}
+            className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+          >
+            <PlusCircleIcon className="h-5 w-5" />
+            Load Sample Data
+          </button>
+        </div>
+
+        {statsQuery.data && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase text-slate-400">Total Patients</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{statsQuery.data.total_patients}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase text-slate-400">Total Predictions</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{statsQuery.data.total_predictions}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase text-slate-400">Medical Records</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{statsQuery.data.total_medical_records}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase text-slate-400">Status</div>
+              <div className={clsx(
+                "mt-2 text-sm font-semibold uppercase",
+                statsQuery.data.status === 'ready' ? 'text-emerald-400' : 'text-amber-400'
+              )}>
+                {statsQuery.data.status === 'ready' ? 'Ready' : 'No Data'}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-sm">
@@ -501,6 +561,47 @@ export default function ReportsPage() {
           <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-6">{renderReportContent()}</div>
         </div>
       </div>
+
+      {/* Load Sample Data Modal */}
+      {showLoadDataModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+            <h3 className="text-xl font-semibold text-white">Load Sample Data</h3>
+            <p className="mt-2 text-sm text-slate-400">
+              This will create 10 sample patients with medical records and predictions for testing the Reports feature.
+              Existing data will not be affected.
+            </p>
+
+            {statsQuery.data && (
+              <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                <p className="text-xs text-slate-400">Current database status:</p>
+                <ul className="mt-2 space-y-1 text-sm text-slate-300">
+                  <li>• {statsQuery.data.total_patients} patients</li>
+                  <li>• {statsQuery.data.total_predictions} predictions</li>
+                  <li>• {statsQuery.data.total_medical_records} medical records</li>
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowLoadDataModal(false)}
+                className="flex-1 rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+                disabled={loadSampleDataMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => loadSampleDataMutation.mutate()}
+                className="flex-1 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400"
+                disabled={loadSampleDataMutation.isPending}
+              >
+                {loadSampleDataMutation.isPending ? 'Loading...' : 'Load Data'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

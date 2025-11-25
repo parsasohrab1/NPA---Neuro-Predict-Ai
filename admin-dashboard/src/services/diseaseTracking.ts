@@ -188,6 +188,17 @@ const diseaseTrackingApi = {
     const response = await axios.post('/api/v1/disease-tracking/add-default-data')
     return response.data
   },
+
+  async loadAllDatasets(): Promise<{
+    message: string
+    total_patients: number
+    total_records: number
+    total_predictions: number
+    skipped: number
+  }> {
+    const response = await axios.post('/api/v1/disease-tracking/load-all-datasets')
+    return response.data
+  },
 }
 
 export default diseaseTrackingApi

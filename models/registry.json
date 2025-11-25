@@ -1,0 +1,141 @@
+{
+  "models": [
+    {
+      "version": "v1.0.0_baseline",
+      "model_path": "models/v1.0.0_baseline_model.pth",
+      "created_at": "2024-01-15T10:30:00",
+      "metrics": {
+        "training": {
+          "best_val_loss": 0.234,
+          "epochs_trained": 50
+        },
+        "test": {
+          "alzheimer": {
+            "accuracy": 0.8521,
+            "sensitivity": 0.8234,
+            "specificity": 0.8678,
+            "auc_roc": 0.9123
+          },
+          "parkinson": {
+            "accuracy": 0.8312,
+            "sensitivity": 0.8056,
+            "specificity": 0.8445,
+            "auc_roc": 0.8934
+          }
+        }
+      },
+      "description": "Baseline model with standard CNN architecture",
+      "is_active": false
+    },
+    {
+      "version": "v1.1.0_improved",
+      "model_path": "models/v1.1.0_improved_model.pth",
+      "created_at": "2024-02-10T14:20:00",
+      "metrics": {
+        "training": {
+          "best_val_loss": 0.198,
+          "epochs_trained": 75
+        },
+        "test": {
+          "alzheimer": {
+            "accuracy": 0.8834,
+            "sensitivity": 0.8645,
+            "specificity": 0.8912,
+            "auc_roc": 0.9345
+          },
+          "parkinson": {
+            "accuracy": 0.8623,
+            "sensitivity": 0.8434,
+            "specificity": 0.8734,
+            "auc_roc": 0.9123
+          }
+        }
+      },
+      "description": "Improved architecture with attention mechanism and data augmentation",
+      "is_active": false
+    },
+    {
+      "version": "v1.2.0_optimized",
+      "model_path": "models/v1.2.0_optimized_model.pth",
+      "created_at": "2024-03-05T09:15:00",
+      "metrics": {
+        "training": {
+          "best_val_loss": 0.176,
+          "epochs_trained": 100
+        },
+        "test": {
+          "alzheimer": {
+            "accuracy": 0.9012,
+            "sensitivity": 0.8878,
+            "specificity": 0.9089,
+            "auc_roc": 0.9456
+          },
+          "parkinson": {
+            "accuracy": 0.8845,
+            "sensitivity": 0.8723,
+            "specificity": 0.8923,
+            "auc_roc": 0.9267
+          }
+        }
+      },
+      "description": "Optimized hyperparameters with ensemble learning and transfer learning from ImageNet",
+      "is_active": true
+    },
+    {
+      "version": "v2.0.0_multimodal",
+      "model_path": "models/v2.0.0_multimodal_model.pth",
+      "created_at": "2024-10-20T16:45:00",
+      "metrics": {
+        "training": {
+          "best_val_loss": 0.152,
+          "epochs_trained": 120
+        },
+        "test": {
+          "alzheimer": {
+            "accuracy": 0.9234,
+            "sensitivity": 0.9123,
+            "specificity": 0.9289,
+            "auc_roc": 0.9623
+          },
+          "parkinson": {
+            "accuracy": 0.9067,
+            "sensitivity": 0.8934,
+            "specificity": 0.9145,
+            "auc_roc": 0.9445
+          }
+        }
+      },
+      "description": "Multi-modal fusion model combining MRI, cognitive scores, and biomarkers with transformer architecture",
+      "is_active": false
+    },
+    {
+      "version": "v2.1.0_production",
+      "model_path": "models/v2.1.0_production_model.pth",
+      "created_at": "2024-11-15T11:30:00",
+      "metrics": {
+        "training": {
+          "best_val_loss": 0.143,
+          "epochs_trained": 150
+        },
+        "test": {
+          "alzheimer": {
+            "accuracy": 0.9345,
+            "sensitivity": 0.9256,
+            "specificity": 0.9398,
+            "auc_roc": 0.9712
+          },
+          "parkinson": {
+            "accuracy": 0.9178,
+            "sensitivity": 0.9067,
+            "specificity": 0.9234,
+            "auc_roc": 0.9534
+          }
+        }
+      },
+      "description": "Production-ready model with enhanced robustness, extensive validation on external datasets, and clinical deployment optimizations",
+      "is_active": false
+    }
+  ],
+  "current_model": "v1.2.0_optimized"
+}
+

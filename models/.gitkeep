@@ -1,0 +1,4 @@
+# This directory contains trained AI models
+# Model files (.pth, .pkl) are gitignored
+# Only registry.json is tracked for version control
+
