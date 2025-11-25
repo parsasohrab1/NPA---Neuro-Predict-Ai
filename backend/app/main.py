@@ -17,7 +17,7 @@ from .api import (
     auth, patients, predictions, imaging, reports, longitudinal,
     security, monitoring, integration, backup, products, admin, system, maintenance,
     notifications, comments, privacy, jobs, rum, ops, support, legal, webhooks,
-    disease_tracking, data_monitoring
+    disease_tracking, data_monitoring, analysis_3d
 )
 from .middleware.security_middleware import (
     SecurityHeadersMiddleware,
@@ -349,6 +349,7 @@ app.include_router(legal.router, prefix=settings.API_V1_PREFIX)
 app.include_router(webhooks.router, prefix=settings.API_V1_PREFIX)
 app.include_router(disease_tracking.router, prefix=settings.API_V1_PREFIX)
 app.include_router(data_monitoring.router, prefix=settings.API_V1_PREFIX)
+app.include_router(analysis_3d.router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":

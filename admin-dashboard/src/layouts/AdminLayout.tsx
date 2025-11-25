@@ -9,6 +9,7 @@ import {
   ArrowTrendingUpIcon,
   HeartIcon,
   ChartBarIcon,
+  CubeIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 import { useEffect } from 'react'
@@ -65,6 +66,7 @@ const navigation = [
   { name: 'System Overview', icon: HomeModernIcon, to: '/' },
   { name: 'Disease Tracking', icon: HeartIcon, to: '/disease-tracking' },
   { name: 'Data Monitoring', icon: ChartBarIcon, to: '/data-monitoring' },
+  { name: '3D Analysis', icon: CubeIcon, to: '/3d-analysis' },
   { name: 'Reports', icon: ClipboardDocumentListIcon, to: '/reports' },
   { name: 'Longitudinal', icon: ArrowTrendingUpIcon, to: '/longitudinal' },
   { name: 'Users', icon: UsersIcon, to: '/users' },
