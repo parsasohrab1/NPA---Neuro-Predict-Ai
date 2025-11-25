@@ -15,6 +15,7 @@ from ..models.user import User
 from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
 from ..schemas.patient import PatientCreate, PatientUpdate, PatientResponse
+from ..schemas.medical_record import MedicalRecordCreate
 from ..core.security import get_current_user, require_role
 from ..core.cache import generate_cache_key, get_cached_response, set_cached_response, invalidate_patient_cache
 
@@ -263,6 +264,46 @@ async def get_patient_medical_records(
         }
         for record in records
     ]
+
+
+@router.post("/{patient_id}/medical-records", status_code=status.HTTP_201_CREATED)
+async def create_medical_record(
+    patient_id: int,
+    record_data: MedicalRecordCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("nurse"))
+):
+    """Create a new medical record for a patient"""
+    # Verify patient exists
+    result = await db.execute(select(Patient).where(Patient.id == patient_id))
+    patient = result.scalar_one_or_none()
+    
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient with ID {patient_id} not found"
+        )
+    
+    # Create medical record
+    medical_record = MedicalRecord(
+        patient_id=patient_id,
+        **record_data.model_dump()
+    )
+    
+    db.add(medical_record)
+    await db.commit()
+    await db.refresh(medical_record)
+    
+    # Invalidate cache
+    await invalidate_patient_cache(patient_id)
+    
+    return {
+        "id": medical_record.id,
+        "patient_id": medical_record.patient_id,
+        "visit_date": medical_record.visit_date.isoformat() if medical_record.visit_date else None,
+        "visit_type": medical_record.visit_type,
+        "created_at": medical_record.created_at.isoformat() if medical_record.created_at else None,
+    }
 
 
 @router.post("/import/csv", status_code=status.HTTP_201_CREATED)

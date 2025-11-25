@@ -128,6 +128,23 @@ async def get_patient_features(
     # Get latest values
     latest_record = records[-1] if records else None
     
+    # If no records, return empty structure
+    if not records:
+        return {
+            "patient_id": patient_id,
+            "patient_name": f"{patient.first_name} {patient.last_name}",
+            "age": (datetime.now().date() - patient.date_of_birth).days // 365,
+            "gender": patient.gender.value,
+            "cognitive_features": [],
+            "biomarker_features": [],
+            "mri_features": [],
+            "genetic_features": [],
+            "latest_values": {},
+            "trends": {},
+            "alerts": [],
+            "latest_prediction": None,
+        }
+    
     # Calculate trends (simple linear regression slope)
     def calculate_trend(values: List[float]) -> Optional[float]:
         if len(values) < 2:
@@ -488,21 +505,19 @@ async def get_recommendations(
 @router.get("/all-patients/summary")
 async def get_all_patients_summary(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role("admin")),
+    current_user = Depends(require_role("doctor")),
 ) -> Dict[str, Any]:
     """
     Get summary of all patients with their risk levels and alerts
+    Returns all patients, even if they don't have predictions yet
     """
-    # Get all patients with recent predictions
-    result = await db.execute(
-        select(Patient, Prediction)
-        .join(Prediction, Patient.id == Prediction.patient_id)
-        .order_by(Prediction.created_at.desc())
-    )
-    patients_data = result.all()
-
+    # Get all patients
+    result = await db.execute(select(Patient))
+    all_patients = result.scalars().all()
+    
+    # Get latest prediction for each patient
     summary = {
-        "total_patients": 0,
+        "total_patients": len(all_patients),
         "high_risk_alzheimer": 0,
         "high_risk_parkinson": 0,
         "medium_risk_alzheimer": 0,
@@ -511,23 +526,30 @@ async def get_all_patients_summary(
         "patients": [],
     }
 
-    patient_ids_seen = set()
-    for patient, prediction in patients_data:
-        if patient.id in patient_ids_seen:
-            continue
-        patient_ids_seen.add(patient.id)
+    for patient in all_patients:
+        # Get latest prediction for this patient
+        result = await db.execute(
+            select(Prediction)
+            .where(Prediction.patient_id == patient.id)
+            .order_by(Prediction.created_at.desc())
+            .limit(1)
+        )
+        latest_prediction = result.scalar_one_or_none()
         
-        summary["total_patients"] += 1
+        alz_risk = latest_prediction.alzheimer_risk_score if latest_prediction else 0.0
+        park_risk = latest_prediction.parkinson_risk_score if latest_prediction else 0.0
         
-        alz_risk = prediction.alzheimer_risk_score or 0
-        park_risk = prediction.parkinson_risk_score or 0
-        
+        # Count risk levels
         if alz_risk > 0.66 or park_risk > 0.66:
-            summary["high_risk_alzheimer"] += 1 if alz_risk > 0.66 else 0
-            summary["high_risk_parkinson"] += 1 if park_risk > 0.66 else 0
+            if alz_risk > 0.66:
+                summary["high_risk_alzheimer"] += 1
+            if park_risk > 0.66:
+                summary["high_risk_parkinson"] += 1
         elif alz_risk > 0.33 or park_risk > 0.33:
-            summary["medium_risk_alzheimer"] += 1 if alz_risk > 0.33 else 0
-            summary["medium_risk_parkinson"] += 1 if park_risk > 0.33 else 0
+            if alz_risk > 0.33:
+                summary["medium_risk_alzheimer"] += 1
+            if park_risk > 0.33:
+                summary["medium_risk_parkinson"] += 1
         else:
             summary["low_risk"] += 1
         
@@ -536,8 +558,180 @@ async def get_all_patients_summary(
             "name": f"{patient.first_name} {patient.last_name}",
             "alzheimer_risk": alz_risk,
             "parkinson_risk": park_risk,
-            "last_prediction_date": prediction.created_at.isoformat(),
+            "last_prediction_date": latest_prediction.created_at.isoformat() if latest_prediction else None,
         })
 
     return summary
+
+
+@router.post("/add-default-data")
+async def add_default_data_for_all_patients(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(require_role("admin")),
+) -> Dict[str, Any]:
+    """
+    Add default medical records and predictions for all patients who don't have any
+    This is useful for populating disease tracking with sample data
+    """
+    import random
+    from datetime import timedelta
+    
+    # Get all patients
+    result = await db.execute(select(Patient))
+    all_patients = result.scalars().all()
+    
+    if not all_patients:
+        return {
+            "message": "No patients found",
+            "added_records": 0,
+            "added_predictions": 0,
+            "skipped": 0,
+        }
+    
+    added_records = 0
+    added_predictions = 0
+    skipped = 0
+    
+    for patient in all_patients:
+        # Check if patient already has medical records
+        result = await db.execute(
+            select(MedicalRecord).where(MedicalRecord.patient_id == patient.id)
+        )
+        existing_records = result.scalars().all()
+        
+        if existing_records:
+            skipped += 1
+            continue
+        
+        # Calculate age
+        age = (datetime.now().date() - patient.date_of_birth).days // 365
+        
+        # Generate default medical data
+        age_factor = max(0, (age - 50) / 30)
+        age_adjustment = age_factor * random.uniform(-3, -1)
+        
+        mmse_score = max(18, min(30, 28.0 + age_adjustment + random.uniform(-2, 2)))
+        moca_score = max(16, min(30, 26.0 + age_adjustment + random.uniform(-2, 2)))
+        memory_score = max(50, min(100, 75.0 + age_adjustment * 5 + random.uniform(-10, 10)))
+        attention_score = max(60, min(100, 80.0 + age_adjustment * 3 + random.uniform(-8, 8)))
+        executive_score = max(55, min(100, 75.0 + age_adjustment * 4 + random.uniform(-10, 10)))
+        
+        amyloid_beta = random.uniform(450, 650)
+        tau_protein = random.uniform(180, 280)
+        dopamine_level = random.uniform(85, 115)
+        
+        if random.random() < 0.2:
+            amyloid_beta = random.uniform(300, 400)
+            tau_protein = random.uniform(300, 450)
+        if random.random() < 0.15:
+            dopamine_level = random.uniform(50, 75)
+        
+        apoe_e4_status = random.random() < 0.25
+        
+        hippocampal_volume = random.uniform(3500, 4800)
+        cortical_thickness = random.uniform(2.3, 2.9)
+        ventricular_volume = random.uniform(18000, 28000)
+        white_matter_hyperintensities = random.uniform(0.5, 2.5)
+        brain_volume_total = random.uniform(1050000, 1150000)
+        
+        if age > 70:
+            hippocampal_volume *= random.uniform(0.85, 0.95)
+            cortical_thickness *= random.uniform(0.90, 0.98)
+            ventricular_volume *= random.uniform(1.05, 1.15)
+        
+        # Create medical record
+        visit_date = datetime.now() - timedelta(days=random.randint(0, 90))
+        medical_record = MedicalRecord(
+            patient_id=patient.id,
+            visit_date=visit_date,
+            visit_type="Initial",
+            mmse_score=round(mmse_score, 1),
+            moca_score=round(moca_score, 1),
+            memory_score=round(memory_score, 1),
+            attention_score=round(attention_score, 1),
+            executive_function_score=round(executive_score, 1),
+            amyloid_beta=round(amyloid_beta, 1),
+            tau_protein=round(tau_protein, 1),
+            dopamine_level=round(dopamine_level, 1),
+            apoe_e4_status=apoe_e4_status,
+            hippocampal_volume=round(hippocampal_volume, 0),
+            cortical_thickness=round(cortical_thickness, 2),
+            ventricular_volume=round(ventricular_volume, 0),
+            white_matter_hyperintensities=round(white_matter_hyperintensities, 2),
+            brain_volume_total=round(brain_volume_total, 0),
+            symptoms="Routine check-up",
+            clinical_notes=f"Initial assessment for disease tracking. Age: {age}, Gender: {patient.gender.value}",
+        )
+        
+        db.add(medical_record)
+        await db.flush()
+        
+        # Calculate risk scores
+        alzheimer_risk = 0.0
+        parkinson_risk = 0.0
+        
+        if mmse_score < 24:
+            alzheimer_risk += 0.3
+        if moca_score < 22:
+            alzheimer_risk += 0.25
+        if amyloid_beta < 400:
+            alzheimer_risk += 0.35
+        if tau_protein > 350:
+            alzheimer_risk += 0.3
+        if hippocampal_volume < 3000:
+            alzheimer_risk += 0.25
+        if apoe_e4_status:
+            alzheimer_risk += 0.2
+        if age > 75:
+            alzheimer_risk += 0.15
+        
+        if dopamine_level < 70:
+            parkinson_risk += 0.5
+        if dopamine_level < 50:
+            parkinson_risk += 0.3
+        if age > 70:
+            parkinson_risk += 0.2
+        if attention_score < 65:
+            parkinson_risk += 0.15
+        
+        alzheimer_risk = min(1.0, alzheimer_risk)
+        parkinson_risk = min(1.0, parkinson_risk)
+        
+        from ..models.prediction import RiskLevel
+        alzheimer_level = (
+            RiskLevel.HIGH if alzheimer_risk >= 0.66
+            else RiskLevel.MEDIUM if alzheimer_risk >= 0.33
+            else RiskLevel.LOW
+        )
+        parkinson_level = (
+            RiskLevel.HIGH if parkinson_risk >= 0.66
+            else RiskLevel.MEDIUM if parkinson_risk >= 0.33
+            else RiskLevel.LOW
+        )
+        
+        # Create prediction
+        from ..models.prediction import DiseaseType
+        prediction = Prediction(
+            patient_id=patient.id,
+            disease_type=DiseaseType.BOTH,
+            alzheimer_risk_score=alzheimer_risk,
+            parkinson_risk_score=parkinson_risk,
+            alzheimer_risk_level=alzheimer_level,
+            parkinson_risk_level=parkinson_level,
+            created_at=datetime.now(),
+        )
+        
+        db.add(prediction)
+        added_records += 1
+        added_predictions += 1
+    
+    await db.commit()
+    
+    return {
+        "message": "Default data added successfully",
+        "added_records": added_records,
+        "added_predictions": added_predictions,
+        "skipped": skipped,
+        "total_patients": len(all_patients),
+    }
 

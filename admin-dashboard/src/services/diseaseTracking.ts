@@ -135,6 +135,59 @@ const diseaseTrackingApi = {
     const response = await axios.get('/api/v1/disease-tracking/all-patients/summary')
     return response.data
   },
+
+  async createPatient(patientData: {
+    patient_id: string
+    first_name: string
+    last_name: string
+    date_of_birth: string
+    gender: 'male' | 'female' | 'other'
+    email?: string
+    phone?: string
+    address?: string
+    education_years?: number
+    medical_history?: string
+    family_history?: string
+    current_medications?: string
+  }): Promise<any> {
+    const response = await axios.post('/api/v1/patients/', patientData)
+    return response.data
+  },
+
+  async createMedicalRecord(patientId: number, recordData: {
+    visit_date: string
+    visit_type?: string
+    mmse_score?: number
+    moca_score?: number
+    memory_score?: number
+    attention_score?: number
+    executive_function_score?: number
+    amyloid_beta?: number
+    tau_protein?: number
+    dopamine_level?: number
+    apoe_e4_status?: boolean
+    hippocampal_volume?: number
+    cortical_thickness?: number
+    ventricular_volume?: number
+    white_matter_hyperintensities?: number
+    brain_volume_total?: number
+    symptoms?: string
+    clinical_notes?: string
+  }): Promise<any> {
+    const response = await axios.post(`/api/v1/patients/${patientId}/medical-records`, recordData)
+    return response.data
+  },
+
+  async addDefaultDataForAllPatients(): Promise<{
+    message: string
+    added_records: number
+    added_predictions: number
+    skipped: number
+    total_patients: number
+  }> {
+    const response = await axios.post('/api/v1/disease-tracking/add-default-data')
+    return response.data
+  },
 }
 
 export default diseaseTrackingApi
