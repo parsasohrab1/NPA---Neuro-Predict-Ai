@@ -1,7 +1,7 @@
 """
 AI Prediction Model
 """
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON, Text, Enum
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON, Text, Enum, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -26,7 +26,7 @@ class Prediction(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     
     # Prediction Information
     disease_type = Column(Enum(DiseaseType), nullable=False)
@@ -61,7 +61,7 @@ class Prediction(Base):
     report_path = Column(String, nullable=True)  # Path to generated PDF report
     
     # Validation & Review
-    is_reviewed = Column(String, default=False)
+    is_reviewed = Column(Boolean, default=False)
     reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     review_notes = Column(Text, nullable=True)
