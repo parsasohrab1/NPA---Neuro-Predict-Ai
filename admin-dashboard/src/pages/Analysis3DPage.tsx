@@ -397,6 +397,7 @@ export default function Analysis3DPage() {
     }
 
     if (analysis3DQuery.isError) {
+      const queryError = analysis3DQuery.error as any
       return (
         <div className="flex h-[600px] items-center justify-center">
           <div className="text-center max-w-2xl mx-auto px-8">
@@ -405,7 +406,7 @@ export default function Analysis3DPage() {
             <p className="text-slate-300 text-sm mb-6">
               The 3D visualization requires patient data with medical records. Import patient data with biomarker measurements to use this feature.
             </p>
-            {error?.response?.status === 401 && (
+            {queryError?.response?.status === 401 && (
               <button
                 onClick={() => window.location.href = '/login'}
                 className="mt-4 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors"
