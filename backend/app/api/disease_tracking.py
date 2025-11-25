@@ -582,6 +582,9 @@ async def load_all_datasets(
     import pandas as pd
     from pathlib import Path
     import numpy as np
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     project_root = Path(__file__).parent.parent.parent.parent
     synthetic_csv = project_root / 'data' / 'data' / 'csv' / 'sample_dataset_complete.csv'
@@ -591,15 +594,21 @@ async def load_all_datasets(
     total_records = 0
     total_predictions = 0
     skipped = 0
+    errors = []
     
     # Load both datasets
     for csv_path, dataset_name in [(synthetic_csv, "Synthetic"), (real_csv, "Real")]:
         if not csv_path.exists():
+            logger.warning(f"{dataset_name} dataset not found at {csv_path}")
+            errors.append(f"{dataset_name} dataset file not found")
             continue
         
         try:
             df = pd.read_csv(csv_path)
+            logger.info(f"Loaded {dataset_name} dataset with {len(df)} rows")
         except Exception as e:
+            logger.error(f"Failed to read {dataset_name} dataset: {e}")
+            errors.append(f"Failed to read {dataset_name} dataset: {str(e)}")
             continue
         
         for idx, row in df.iterrows():
@@ -689,16 +698,28 @@ async def load_all_datasets(
                 total_predictions += 1
                 
             except Exception as e:
+                logger.error(f"Error processing row {idx} in {dataset_name}: {str(e)}", exc_info=True)
+                errors.append(f"Row {idx} ({patient_id if 'patient_id' in locals() else 'unknown'}): {str(e)[:100]}")
                 continue
     
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as e:
+        logger.error(f"Failed to commit changes: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save data to database: {str(e)}"
+        )
     
     return {
-        "message": "All datasets loaded successfully",
+        "message": "All datasets loaded successfully" if not errors else "Loaded with some errors",
         "total_patients": total_patients,
         "total_records": total_records,
         "total_predictions": total_predictions,
         "skipped": skipped,
+        "errors": errors[:10] if errors else [],  # Return first 10 errors
+        "error_count": len(errors),
     }
 
 

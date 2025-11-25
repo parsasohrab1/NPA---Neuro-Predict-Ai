@@ -145,19 +145,33 @@ export default function DiseaseTrackingDashboard() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
       setShowLoadDataConfirm(false)
+      
+      let message = `All datasets loaded! ${data.total_patients} patients, ${data.total_records} records, ${data.total_predictions} predictions created.`
+      
+      if (data.skipped > 0) {
+        message += ` (${data.skipped} skipped - already exist)`
+      }
+      
+      if (data.error_count > 0) {
+        message += ` WARNING: ${data.error_count} errors occurred during import.`
+        console.error('Import errors:', data.errors)
+      }
+      
       setNotification({
-        type: 'success',
-        message: `All datasets loaded! ${data.total_patients} patients, ${data.total_records} records, ${data.total_predictions} predictions created.`,
+        type: data.error_count > 0 ? 'error' : 'success',
+        message,
       })
-      setTimeout(() => setNotification(null), 5000)
+      setTimeout(() => setNotification(null), 8000)
     },
     onError: (error: any) => {
+      console.error('Load datasets error:', error)
+      const detail = error.response?.data?.detail || error.message
       setShowLoadDataConfirm(false)
       setNotification({
         type: 'error',
-        message: error.response?.data?.detail || 'Failed to load datasets',
+        message: `Failed to load datasets: ${detail}. Check console for details.`,
       })
-      setTimeout(() => setNotification(null), 5000)
+      setTimeout(() => setNotification(null), 8000)
     },
   })
 

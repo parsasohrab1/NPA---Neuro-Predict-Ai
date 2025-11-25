@@ -195,8 +195,12 @@ const diseaseTrackingApi = {
     total_records: number
     total_predictions: number
     skipped: number
+    errors?: string[]
+    error_count?: number
   }> {
-    const response = await axios.post('/api/v1/disease-tracking/load-all-datasets')
+    const response = await axios.post('/api/v1/disease-tracking/load-all-datasets', {}, {
+      timeout: 120000, // 2 minutes timeout for large dataset
+    })
     return response.data
   },
 }
