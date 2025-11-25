@@ -8,6 +8,7 @@ import {
   Cog6ToothIcon,
   ArrowTrendingUpIcon,
   HeartIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 import { useEffect } from 'react'
@@ -63,6 +64,7 @@ function useKeyboardNavigation() {
 const navigation = [
   { name: 'System Overview', icon: HomeModernIcon, to: '/' },
   { name: 'Disease Tracking', icon: HeartIcon, to: '/disease-tracking' },
+  { name: 'Data Monitoring', icon: ChartBarIcon, to: '/data-monitoring' },
   { name: 'Reports', icon: ClipboardDocumentListIcon, to: '/reports' },
   { name: 'Longitudinal', icon: ArrowTrendingUpIcon, to: '/longitudinal' },
   { name: 'Users', icon: UsersIcon, to: '/users' },
