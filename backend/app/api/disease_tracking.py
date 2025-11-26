@@ -616,8 +616,23 @@ async def load_all_datasets(
             errors.append(f"{dataset_name}: Failed to read CSV - {str(e)[:100]}")
             return
         
+        # Process in batches for better performance
+        batch_size = 500
+        batch_count = 0
+        
         # Process each row
         for idx, row in df.iterrows():
+            # Commit every batch_size records
+            if idx > 0 and idx % batch_size == 0:
+                try:
+                    await db.commit()
+                    batch_count += 1
+                    logger.info(f"  {dataset_name}: Committed batch {batch_count} ({idx}/{len(df)} records processed)")
+                except Exception as e:
+                    logger.error(f"Error committing batch: {e}")
+                    await db.rollback()
+                    errors.append(f"{dataset_name} batch {batch_count}: Failed to commit - {str(e)[:100]}")
+                    continue
             try:
                 patient_id = str(row['patient_id'])
                 
@@ -638,19 +653,29 @@ async def load_all_datasets(
                         continue
                 else:
                     # Create new patient
-                    age = int(row['age'])
-                    dob = date(datetime.now().year - age, 1, 1)
+                    # Use date_of_birth from CSV if available, otherwise calculate from age
+                    if pd.notna(row.get('date_of_birth')):
+                        try:
+                            dob = pd.to_datetime(row['date_of_birth']).date()
+                        except:
+                            age = int(row['age'])
+                            dob = date(datetime.now().year - age, 1, 1)
+                    else:
+                        age = int(row['age'])
+                        dob = date(datetime.now().year - age, 1, 1)
                     
                     gender_str = str(row['gender']).lower()
                     gender = Gender.MALE if gender_str == 'male' else Gender.FEMALE if gender_str == 'female' else Gender.OTHER
                     
                     patient = Patient(
                         patient_id=patient_id,
-                        first_name="Patient",
-                        last_name=patient_id.replace('PT_', '').replace('RD_', ''),
+                        first_name=str(row.get('first_name', 'Patient')),
+                        last_name=str(row.get('last_name', patient_id.replace('PT_', '').replace('RD_', '').replace('SYN_', '').replace('REAL_', ''))),
                         date_of_birth=dob,
                         gender=gender,
                         education_years=int(row.get('education_years', 12)) if pd.notna(row.get('education_years')) else None,
+                        email=str(row.get('email', '')) if pd.notna(row.get('email')) else None,
+                        phone=str(row.get('phone', '')) if pd.notna(row.get('phone')) else None,
                     )
                     
                     db.add(patient)
@@ -763,12 +788,12 @@ async def load_all_datasets(
     
     logger.info(f"Loaded {total_patients} patients, {total_records} records, {total_predictions} predictions. Skipped: {skipped}, Errors: {len(errors)}")
     
-    # Commit all changes
+    # Commit any remaining changes (final batch)
     try:
         await db.commit()
-        logger.info(f"Successfully committed all changes")
+        logger.info(f"Successfully committed all changes. Total: {total_patients} patients, {total_records} records, {total_predictions} predictions")
     except Exception as e:
-        logger.error(f"Failed to commit changes: {e}")
+        logger.error(f"Failed to commit final changes: {e}")
         await db.rollback()
         raise HTTPException(
             status_code=500,
