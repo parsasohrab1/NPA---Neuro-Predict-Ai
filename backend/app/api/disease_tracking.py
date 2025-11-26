@@ -1001,8 +1001,8 @@ async def load_sample_datasets(
                 disease_type = DiseaseType.ALZHEIMER
             elif diagnosis == 'PARKINSON':
                 disease_type = DiseaseType.PARKINSON
-            else:
-                disease_type = DiseaseType.NORMAL
+            else:  # Normal - assessed for both diseases
+                disease_type = DiseaseType.BOTH
             
             # Create prediction
             prediction = Prediction(
