@@ -199,7 +199,7 @@ const diseaseTrackingApi = {
     error_count?: number
   }> {
     const response = await axios.post('/api/v1/disease-tracking/load-all-datasets', {}, {
-      timeout: 120000, // 2 minutes timeout for large dataset
+      timeout: 600000, // 10 minutes timeout for 100k records
     })
     return response.data
   },

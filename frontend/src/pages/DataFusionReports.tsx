@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tantml:query';
 import {
   SparklesIcon,
   DocumentTextIcon,
@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8001';
 
 interface FusionReport {
   id: number;
