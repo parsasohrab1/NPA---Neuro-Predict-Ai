@@ -576,152 +576,210 @@ async def load_all_datasets(
     # current_user = Depends(require_role("admin")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
-    Load all synthetic and real data from CSV files into disease tracking
-    This creates patients, medical records, and predictions from both datasets
+    Load all existing patients from database into disease tracking
+    This creates medical records and predictions for all patients (500 total)
     """
-    import pandas as pd
-    from pathlib import Path
-    import numpy as np
+    import random
+    from datetime import timedelta
     import logging
     
     logger = logging.getLogger(__name__)
     
-    project_root = Path(__file__).parent.parent.parent  # /app/
-    synthetic_csv = project_root / 'data' / 'data' / 'csv' / 'sample_dataset_complete.csv'
-    real_csv = project_root / 'data' / 'real_data' / 'csv' / 'real_dataset_complete.csv'
+    # Get ALL patients from database (not from CSV)
+    result = await db.execute(select(Patient))
+    all_patients = result.scalars().all()
     
-    total_patients = 0
+    if not all_patients:
+        return {
+            "message": "No patients found in database",
+            "total_patients": 0,
+            "total_records": 0,
+            "total_predictions": 0,
+            "skipped": 0,
+            "errors": [],
+            "error_count": 0,
+        }
+    
+    logger.info(f"Found {len(all_patients)} patients in database")
+    
+    total_patients = len(all_patients)
     total_records = 0
     total_predictions = 0
     skipped = 0
     errors = []
     
-    # Load both datasets
-    for csv_path, dataset_name in [(synthetic_csv, "Synthetic"), (real_csv, "Real")]:
-        if not csv_path.exists():
-            logger.warning(f"{dataset_name} dataset not found at {csv_path}")
-            errors.append(f"{dataset_name} dataset file not found")
-            continue
-        
+    # Process all existing patients from database
+    for patient in all_patients:
         try:
-            df = pd.read_csv(csv_path)
-            logger.info(f"Loaded {dataset_name} dataset with {len(df)} rows")
+            # Check if patient already has medical records
+            result = await db.execute(
+                select(MedicalRecord).where(MedicalRecord.patient_id == patient.id)
+            )
+            existing_records = result.scalars().all()
             
-            # Filter to get diverse patients: 20 Alzheimer's, 20 Parkinson's, 10 Normal
-            alzheimer_patients = df[df['diagnosis'] == 'Alzheimer'].head(20)
-            parkinson_patients = df[df['diagnosis'] == 'Parkinson'].head(20)
-            normal_patients = df[df['diagnosis'] == 'Normal'].head(10)
+            if existing_records:
+                # Patient already has medical records, skip
+                skipped += 1
+                continue
             
-            # Combine filtered patients
-            df_filtered = pd.concat([alzheimer_patients, parkinson_patients, normal_patients])
-            logger.info(f"Filtered to {len(df_filtered)} patients: {len(alzheimer_patients)} Alzheimer's, {len(parkinson_patients)} Parkinson's, {len(normal_patients)} Normal")
+            # Calculate age
+            age = (datetime.now().date() - patient.date_of_birth).days // 365
+            
+            # Generate realistic medical data based on age and existing patient data
+            age_factor = max(0, (age - 50) / 30)
+            age_adjustment = age_factor * random.uniform(-3, -1)
+            
+            mmse_score = max(18, min(30, 28.0 + age_adjustment + random.uniform(-2, 2)))
+            moca_score = max(16, min(30, 26.0 + age_adjustment + random.uniform(-2, 2)))
+            memory_score = max(50, min(100, 75.0 + age_adjustment * 5 + random.uniform(-10, 10)))
+            attention_score = max(60, min(100, 80.0 + age_adjustment * 3 + random.uniform(-8, 8)))
+            executive_score = max(55, min(100, 75.0 + age_adjustment * 4 + random.uniform(-10, 10)))
+            
+            # Biomarkers - vary based on patient type (from patient_id)
+            patient_id = patient.patient_id
+            is_alzheimer = 'AD' in patient_id.upper() or 'ALZHEIMER' in patient_id.upper()
+            is_parkinson = 'PD' in patient_id.upper() or 'PARKINSON' in patient_id.upper()
+            
+            if is_alzheimer:
+                # Alzheimer's patients - low amyloid-beta, high tau
+                amyloid_beta = random.uniform(250, 400)
+                tau_protein = random.uniform(350, 550)
+                dopamine_level = random.uniform(90, 120)
+                hippocampal_volume = random.uniform(2200, 3000)
+                mmse_score = max(15, min(25, mmse_score - random.uniform(3, 7)))
+                moca_score = max(13, min(23, moca_score - random.uniform(3, 7)))
+            elif is_parkinson:
+                # Parkinson's patients - low dopamine
+                amyloid_beta = random.uniform(450, 700)
+                tau_protein = random.uniform(180, 300)
+                dopamine_level = random.uniform(40, 75)
+                hippocampal_volume = random.uniform(3300, 4200)
+                mmse_score = max(20, min(28, mmse_score - random.uniform(1, 3)))
+                moca_score = max(18, min(26, moca_score - random.uniform(1, 3)))
+            else:
+                # Normal patients
+                amyloid_beta = random.uniform(550, 750)
+                tau_protein = random.uniform(150, 250)
+                dopamine_level = random.uniform(95, 125)
+                hippocampal_volume = random.uniform(3700, 4500)
+            
+            apoe_e4_status = random.random() < (0.7 if is_alzheimer else 0.3 if is_parkinson else 0.2)
+            
+            cortical_thickness = random.uniform(2.3, 2.9)
+            ventricular_volume = random.uniform(18000, 28000)
+            white_matter_hyperintensities = random.uniform(0.5, 2.5)
+            brain_volume_total = random.uniform(1050000, 1150000)
+            
+            if age > 70:
+                hippocampal_volume *= random.uniform(0.85, 0.95)
+                cortical_thickness *= random.uniform(0.90, 0.98)
+                ventricular_volume *= random.uniform(1.05, 1.15)
+            
+            # Create medical record
+            visit_date = datetime.now() - timedelta(days=random.randint(0, 90))
+            medical_record = MedicalRecord(
+                patient_id=patient.id,
+                visit_date=visit_date,
+                visit_type="Initial",
+                mmse_score=round(mmse_score, 1),
+                moca_score=round(moca_score, 1),
+                memory_score=round(memory_score, 1),
+                attention_score=round(attention_score, 1),
+                executive_function_score=round(executive_score, 1),
+                amyloid_beta=round(amyloid_beta, 1),
+                tau_protein=round(tau_protein, 1),
+                dopamine_level=round(dopamine_level, 1),
+                apoe_e4_status=apoe_e4_status,
+                hippocampal_volume=round(hippocampal_volume, 0),
+                cortical_thickness=round(cortical_thickness, 2),
+                ventricular_volume=round(ventricular_volume, 0),
+                white_matter_hyperintensities=round(white_matter_hyperintensities, 2),
+                brain_volume_total=round(brain_volume_total, 0),
+                symptoms="Loaded for disease tracking",
+                clinical_notes=f"Medical record created for disease tracking. Age: {age}, Patient Type: {patient_id}",
+            )
+            
+            db.add(medical_record)
+            await db.flush()
+            total_records += 1
+            
+            # Calculate risk scores based on medical data
+            alzheimer_risk = 0.0
+            parkinson_risk = 0.0
+            
+            # Alzheimer's risk factors
+            if mmse_score < 24:
+                alzheimer_risk += 0.3
+            if moca_score < 22:
+                alzheimer_risk += 0.25
+            if amyloid_beta < 400:
+                alzheimer_risk += 0.35
+            if tau_protein > 350:
+                alzheimer_risk += 0.3
+            if hippocampal_volume < 3000:
+                alzheimer_risk += 0.25
+            if apoe_e4_status:
+                alzheimer_risk += 0.2
+            if age > 75:
+                alzheimer_risk += 0.15
+            
+            # Parkinson's risk factors
+            if dopamine_level < 70:
+                parkinson_risk += 0.5
+            if dopamine_level < 50:
+                parkinson_risk += 0.3
+            if age > 70:
+                parkinson_risk += 0.2
+            if attention_score < 65:
+                parkinson_risk += 0.15
+            
+            alzheimer_risk = min(1.0, alzheimer_risk)
+            parkinson_risk = min(1.0, parkinson_risk)
+            
+            from ..models.prediction import RiskLevel, DiseaseType
+            alzheimer_level = (
+                RiskLevel.HIGH if alzheimer_risk >= 0.66
+                else RiskLevel.MEDIUM if alzheimer_risk >= 0.33
+                else RiskLevel.LOW
+            )
+            parkinson_level = (
+                RiskLevel.HIGH if parkinson_risk >= 0.66
+                else RiskLevel.MEDIUM if parkinson_risk >= 0.33
+                else RiskLevel.LOW
+            )
+            
+            # Determine disease type
+            if alzheimer_risk > 0.6 and parkinson_risk > 0.6:
+                disease_type = DiseaseType.BOTH
+            elif alzheimer_risk > parkinson_risk and alzheimer_risk > 0.5:
+                disease_type = DiseaseType.ALZHEIMER
+            elif parkinson_risk > alzheimer_risk and parkinson_risk > 0.5:
+                disease_type = DiseaseType.PARKINSON
+            else:
+                disease_type = DiseaseType.BOTH
+            
+            # Create prediction
+            prediction = Prediction(
+                patient_id=patient.id,
+                disease_type=disease_type,
+                alzheimer_risk_score=alzheimer_risk,
+                parkinson_risk_score=parkinson_risk,
+                alzheimer_risk_level=alzheimer_level,
+                parkinson_risk_level=parkinson_level,
+                created_at=datetime.now(),
+            )
+            
+            db.add(prediction)
+            total_predictions += 1
             
         except Exception as e:
-            logger.error(f"Failed to read {dataset_name} dataset: {e}")
-            errors.append(f"Failed to read {dataset_name} dataset: {str(e)}")
+            logger.error(f"Error processing patient {patient.patient_id}: {str(e)}", exc_info=True)
+            errors.append(f"Patient {patient.patient_id}: {str(e)[:100]}")
             continue
-        
-        for idx, row in df_filtered.iterrows():
-            try:
-                patient_id = str(row['patient_id'])
-                
-                # Check if patient exists
-                result = await db.execute(
-                    select(Patient).where(Patient.patient_id == patient_id)
-                )
-                if result.scalar_one_or_none():
-                    skipped += 1
-                    continue
-                
-                # Create patient
-                age = int(row['age'])
-                dob = datetime.now().date().replace(year=datetime.now().year - age)
-                gender_str = str(row['gender']).lower()
-                gender = (
-                    Gender.MALE if gender_str == 'male'
-                    else Gender.FEMALE if gender_str == 'female'
-                    else Gender.OTHER
-                )
-                
-                patient = Patient(
-                    patient_id=patient_id,
-                    first_name=f"{dataset_name}Patient",
-                    last_name=patient_id.replace('PT_', ''),
-                    date_of_birth=dob,
-                    gender=gender,
-                    education_years=int(row.get('education_years', 12)) if pd.notna(row.get('education_years')) else None,
-                )
-                
-                db.add(patient)
-                await db.flush()
-                total_patients += 1
-                
-                # Create medical record
-                visit_date = datetime.now()
-                medical_record = MedicalRecord(
-                    patient_id=patient.id,
-                    visit_date=visit_date,
-                    visit_type="Initial",
-                    mmse_score=float(row['mmse_score']) if pd.notna(row['mmse_score']) else None,
-                    moca_score=float(row['moca_score']) if pd.notna(row['moca_score']) else None,
-                    memory_score=float(row['memory_score']) if pd.notna(row['memory_score']) else None,
-                    attention_score=float(row['attention_score']) if pd.notna(row['attention_score']) else None,
-                    executive_function_score=float(row['executive_function_score']) if pd.notna(row['executive_function_score']) else None,
-                    amyloid_beta=float(row['amyloid_beta']) if pd.notna(row['amyloid_beta']) else None,
-                    tau_protein=float(row['tau_protein']) if pd.notna(row['tau_protein']) else None,
-                    dopamine_level=float(row['dopamine_level']) if pd.notna(row['dopamine_level']) else None,
-                    apoe_e4_status=bool(int(row['apoe_e4_status'])) if pd.notna(row['apoe_e4_status']) else False,
-                    hippocampal_volume=float(row['hippocampal_volume']) if pd.notna(row['hippocampal_volume']) else None,
-                    cortical_thickness=float(row['cortical_thickness']) if pd.notna(row['cortical_thickness']) else None,
-                    ventricular_volume=float(row['ventricular_volume']) if pd.notna(row['ventricular_volume']) else None,
-                    white_matter_hyperintensities=float(row['white_matter_hyperintensities']) if pd.notna(row['white_matter_hyperintensities']) else None,
-                    brain_volume_total=float(row['brain_volume_total']) if pd.notna(row['brain_volume_total']) else None,
-                    clinical_notes=f"Imported from {dataset_name} dataset: {row.get('diagnosis', 'Unknown')}",
-                )
-                
-                db.add(medical_record)
-                await db.flush()
-                total_records += 1
-                
-                # Calculate risk
-                diagnosis = str(row.get('diagnosis', 'Normal'))
-                alzheimer_risk = 0.85 if diagnosis == 'Alzheimer' else 0.80 if diagnosis == 'Parkinson' else 0.15
-                parkinson_risk = 0.80 if diagnosis == 'Parkinson' else 0.15 if diagnosis == 'Alzheimer' else 0.12
-                
-                from ..models.prediction import RiskLevel
-                alzheimer_level = RiskLevel.HIGH if alzheimer_risk >= 0.66 else RiskLevel.MEDIUM if alzheimer_risk >= 0.33 else RiskLevel.LOW
-                parkinson_level = RiskLevel.HIGH if parkinson_risk >= 0.66 else RiskLevel.MEDIUM if parkinson_risk >= 0.33 else RiskLevel.LOW
-                
-                # Determine disease type based on diagnosis
-                from ..models.prediction import DiseaseType
-                if diagnosis == 'Alzheimer':
-                    disease_type = DiseaseType.ALZHEIMER
-                elif diagnosis == 'Parkinson':
-                    disease_type = DiseaseType.PARKINSON
-                else:
-                    disease_type = DiseaseType.BOTH
-                
-                # Create prediction
-                prediction = Prediction(
-                    patient_id=patient.id,
-                    disease_type=disease_type,
-                    alzheimer_risk_score=alzheimer_risk,
-                    parkinson_risk_score=parkinson_risk,
-                    alzheimer_risk_level=alzheimer_level,
-                    parkinson_risk_level=parkinson_level,
-                    created_at=datetime.now(),
-                )
-                
-                db.add(prediction)
-                total_predictions += 1
-                
-            except Exception as e:
-                logger.error(f"Error processing row {idx} in {dataset_name}: {str(e)}", exc_info=True)
-                errors.append(f"Row {idx} ({patient_id if 'patient_id' in locals() else 'unknown'}): {str(e)[:100]}")
-                continue
     
     try:
         await db.commit()
+        logger.info(f"Successfully committed: {total_records} medical records, {total_predictions} predictions for {total_patients} total patients ({skipped} already had records)")
     except Exception as e:
         logger.error(f"Failed to commit changes: {e}")
         await db.rollback()
@@ -730,8 +788,14 @@ async def load_all_datasets(
             detail=f"Failed to save data to database: {str(e)}"
         )
     
+    message = f"Loaded {total_patients} patients from database"
+    if total_records > 0:
+        message += f", created {total_records} medical records and {total_predictions} predictions"
+    if skipped > 0:
+        message += f" ({skipped} patients already had medical records)"
+    
     return {
-        "message": "All datasets loaded successfully" if not errors else "Loaded with some errors",
+        "message": message,
         "total_patients": total_patients,
         "total_records": total_records,
         "total_predictions": total_predictions,
