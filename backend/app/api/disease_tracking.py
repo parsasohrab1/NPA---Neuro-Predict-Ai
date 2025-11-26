@@ -783,7 +783,7 @@ async def load_sample_datasets(
     Total: 100 synthetic + 100 real = 200 patients
     """
     import random
-    from datetime import timedelta
+    from datetime import timedelta, date
     import logging
     import pandas as pd
     from pathlib import Path
