@@ -12,6 +12,7 @@ import LongitudinalTrackingPage from './pages/LongitudinalTrackingPage'
 import DiseaseTrackingDashboard from './pages/DiseaseTrackingDashboard'
 import DataMonitoringPage from './pages/DataMonitoringPage'
 import Analysis3DPage from './pages/Analysis3DPage'
+import DataFusionReportsPage from './pages/DataFusionReportsPage'
 import LoginPage from './pages/LoginPage'
 import TestPage from './pages/TestPage'
 
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
       { path: 'disease-tracking', element: <DiseaseTrackingDashboard /> },
       { path: 'data-monitoring', element: <DataMonitoringPage /> },
       { path: '3d-analysis', element: <Analysis3DPage /> },
+      { path: 'data-fusion', element: <DataFusionReportsPage /> },
       { path: 'users', element: <UsersManagement /> },
       { path: 'roles', element: <RolesPermissions /> },
       { path: 'models', element: <ModelManagement /> },

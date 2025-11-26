@@ -11,6 +11,7 @@ import {
   ChartBarIcon,
   CubeIcon,
   ArrowRightOnRectangleIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 import { useEffect } from 'react'
@@ -68,6 +69,7 @@ const navigation = [
   { name: 'Disease Tracking', icon: HeartIcon, to: '/disease-tracking' },
   { name: 'Data Monitoring', icon: ChartBarIcon, to: '/data-monitoring' },
   { name: '3D Analysis', icon: CubeIcon, to: '/3d-analysis' },
+  { name: 'Data Fusion Reports', icon: SparklesIcon, to: '/data-fusion', highlight: true },
   { name: 'Reports', icon: ClipboardDocumentListIcon, to: '/reports' },
   { name: 'Longitudinal', icon: ArrowTrendingUpIcon, to: '/longitudinal' },
   { name: 'Users', icon: UsersIcon, to: '/users' },
