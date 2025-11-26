@@ -51,6 +51,13 @@ export default function Layout() {
             🔬 {t('predictions.newPrediction')}
           </Link>
           <Link
+            to="/data-fusion"
+            className="block px-4 py-3 rounded-lg hover:bg-primary-800 dark:hover:bg-gray-700 transition-colors bg-gradient-to-r from-purple-700 to-purple-600"
+            aria-current={window.location.pathname === '/data-fusion' ? 'page' : undefined}
+          >
+            ✨ Data Fusion Reports
+          </Link>
+          <Link
             to="/settings"
             className="block px-4 py-3 rounded-lg hover:bg-primary-800 dark:hover:bg-gray-700 transition-colors"
             aria-current={window.location.pathname === '/settings' ? 'page' : undefined}

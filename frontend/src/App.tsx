@@ -11,6 +11,7 @@ import PatientDetailPage from './pages/PatientDetailPage'
 import PredictionPage from './pages/PredictionPage'
 import PredictionResultPage from './pages/PredictionResultPage'
 import SettingsPage from './pages/SettingsPage'
+import DataFusionReports from './pages/DataFusionReports'
 
 function App() {
   const { isAuthenticated } = useAuthStore()
@@ -33,6 +34,7 @@ function App() {
             <Route path="patients/:id" element={<PatientDetailPage />} />
             <Route path="predictions/new" element={<PredictionPage />} />
             <Route path="predictions/:id" element={<PredictionResultPage />} />
+            <Route path="data-fusion" element={<DataFusionReports />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

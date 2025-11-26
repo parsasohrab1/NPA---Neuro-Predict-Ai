@@ -1,76 +1,29 @@
 """
-Models Package
+Models package initialization
 """
-from .user import User, UserRole
-from .patient import Patient, Gender
+from .user import User, Gender, Role
+from .patient import Patient
 from .medical_record import MedicalRecord
-from .imaging import ImagingStudy, ImagingModality
 from .prediction import Prediction, DiseaseType, RiskLevel
-from .longitudinal import (
-    LongitudinalEpisode,
-    LongitudinalVisit,
-    LongitudinalMetric,
-    LongitudinalEpisodeStatus,
-    LongitudinalVisitType,
-    MetricCategory,
-    LongitudinalAlert,
-    AlertSeverity,
-    AlertType,
-    LongitudinalReport,
-    LongitudinalReportFormat,
-    LongitudinalReportStatus,
-    LongitudinalReportSchedule,
-    LongitudinalReportScheduleStatus,
-    LongitudinalReportRun,
-    LongitudinalReportRunStatus,
-)
-from .audit import AuditLog
-from .security import (
-    UserSession,
-    MFASecret,
-    MFAMethod,
-    IPWhitelist,
-    PasswordPolicy,
-    PasswordHistory,
-    SecurityLog,
-    FailedLoginAttempt,
-)
+from .imaging_study import ImagingStudy, ImagingType
+from .longitudinal_episode import LongitudinalEpisode
+from .longitudinal_visit import LongitudinalVisit
+from .data_fusion_report import DataFusionReport, FusionConfidence, FusionInterpretation
 
 __all__ = [
     "User",
-    "UserRole",
-    "Patient",
     "Gender",
+    "Role",
+    "Patient",
     "MedicalRecord",
-    "ImagingStudy",
-    "ImagingModality",
     "Prediction",
     "DiseaseType",
     "RiskLevel",
-    "AuditLog",
+    "ImagingStudy",
+    "ImagingType",
     "LongitudinalEpisode",
     "LongitudinalVisit",
-    "LongitudinalMetric",
-    "LongitudinalEpisodeStatus",
-    "LongitudinalVisitType",
-    "MetricCategory",
-    "LongitudinalAlert",
-    "AlertSeverity",
-    "AlertType",
-    "LongitudinalReport",
-    "LongitudinalReportFormat",
-    "LongitudinalReportStatus",
-    "LongitudinalReportSchedule",
-    "LongitudinalReportScheduleStatus",
-    "LongitudinalReportRun",
-    "LongitudinalReportRunStatus",
-    "UserSession",
-    "MFASecret",
-    "MFAMethod",
-    "IPWhitelist",
-    "PasswordPolicy",
-    "PasswordHistory",
-    "SecurityLog",
-    "FailedLoginAttempt",
+    "DataFusionReport",
+    "FusionConfidence",
+    "FusionInterpretation",
 ]
-

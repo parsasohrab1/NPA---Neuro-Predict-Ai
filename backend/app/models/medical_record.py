@@ -56,6 +56,7 @@ class MedicalRecord(Base):
     patient = relationship("Patient", back_populates="medical_records")
     imaging_studies = relationship("ImagingStudy", back_populates="medical_record", cascade="all, delete-orphan")
     longitudinal_visits = relationship("LongitudinalVisit", back_populates="medical_record")
+    fusion_reports = relationship("DataFusionReport", back_populates="medical_record", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<MedicalRecord(id={self.id}, patient_id={self.patient_id}, visit_date={self.visit_date})>"
