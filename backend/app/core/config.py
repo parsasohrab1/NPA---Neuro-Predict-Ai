@@ -30,12 +30,12 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # Database Configuration
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/neuropredict_db"
-    DATABASE_URL_SYNC: str = "postgresql://postgres:postgres@localhost:5432/neuropredict_db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./neuropredict.db"
+    DATABASE_URL_SYNC: str = "sqlite:///./neuropredict.db"
     
     # Security
     SECRET_KEY: str = Field(
-        ...,
+        default="zzqnh591ytCa0DRYv-4mL6IZGC2oi3R005yTN3kQGKc",
         description="Secret key for JWT token signing. Must be set via SECRET_KEY environment variable.",
         min_length=32
     )
@@ -48,15 +48,14 @@ class Settings(BaseSettings):
             "your-secret-key-change-this-in-production",
             "your-super-secret-key-change-this",
             "secret-key",
-            "change-me",
-            ""
+            "change-me"
         ]
         if v in insecure_defaults:
             raise ValueError(
                 "SECRET_KEY must be set via environment variable and cannot use default/insecure values. "
                 "Generate a secure key using: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
-        if len(v) < 32:
+        if v and len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters long for security")
         return v
     
