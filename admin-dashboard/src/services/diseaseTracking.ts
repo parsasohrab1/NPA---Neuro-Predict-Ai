@@ -203,6 +203,24 @@ const diseaseTrackingApi = {
     })
     return response.data
   },
+
+  async loadSampleDatasets(): Promise<{
+    message: string
+    total_patients: number
+    total_records: number
+    total_predictions: number
+    skipped: number
+    sample_size: number
+    categories_included: string
+    source_distribution: string
+    errors?: string[]
+    error_count?: number
+  }> {
+    const response = await axios.post('/api/v1/disease-tracking/load-sample-datasets', {}, {
+      timeout: 300000, // 5 minutes timeout for sample data
+    })
+    return response.data
+  },
 }
 
 export default diseaseTrackingApi

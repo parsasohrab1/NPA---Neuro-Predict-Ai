@@ -770,6 +770,294 @@ async def load_all_datasets(
     }
 
 
+@router.post("/load-sample-datasets")
+async def load_sample_datasets(
+    db: AsyncSession = Depends(get_db),
+    # current_user = Depends(require_role("admin")),  # Disabled for development
+) -> Dict[str, Any]:
+    """
+    Load 200 sample patients from CSV files with specific distribution:
+    - 120 Normal patients (60 synthetic + 60 real)
+    - 40 Alzheimer patients (20 synthetic + 20 real)
+    - 40 Parkinson patients (20 synthetic + 20 real)
+    Total: 100 synthetic + 100 real = 200 patients
+    """
+    import random
+    from datetime import timedelta
+    import logging
+    import pandas as pd
+    from pathlib import Path
+    
+    logger = logging.getLogger(__name__)
+    logger.info("=== Starting load_sample_datasets - Loading 200 specific patients ===")
+    
+    total_patients_processed = 0
+    total_records_created = 0
+    total_predictions_created = 0
+    skipped_patients = 0
+    errors = []
+    
+    # Paths to CSV files
+    project_root = Path(__file__).parent.parent.parent.parent
+    synthetic_csv = project_root / 'data' / 'data' / 'csv' / 'sample_dataset_complete.csv'
+    real_csv = project_root / 'data' / 'real_data' / 'csv' / 'real_dataset_complete.csv'
+    
+    # Load CSV files
+    synthetic_df = None
+    real_df = None
+    
+    try:
+        if synthetic_csv.exists():
+            synthetic_df = pd.read_csv(synthetic_csv)
+            logger.info(f"Loaded synthetic data: {len(synthetic_df)} records")
+        else:
+            logger.warning(f"Synthetic CSV not found: {synthetic_csv}")
+    except Exception as e:
+        logger.error(f"Error loading synthetic CSV: {e}")
+    
+    try:
+        if real_csv.exists():
+            real_df = pd.read_csv(real_csv)
+            logger.info(f"Loaded real data: {len(real_df)} records")
+        else:
+            logger.warning(f"Real CSV not found: {real_csv}")
+    except Exception as e:
+        logger.error(f"Error loading real CSV: {e}")
+    
+    if synthetic_df is None and real_df is None:
+        return {
+            "message": "No CSV data files found. Please ensure data files exist.",
+            "total_patients": 0,
+            "total_records": 0,
+            "total_predictions": 0,
+            "skipped": 0,
+            "errors": ["No CSV files found"],
+            "error_count": 1,
+        }
+    
+    # Categorize and sample from each dataset
+    def categorize_df(df):
+        normal = df[df['diagnosis'].str.upper() == 'NORMAL']
+        alzheimer = df[df['diagnosis'].str.upper() == 'ALZHEIMER']
+        parkinson = df[df['diagnosis'].str.upper() == 'PARKINSON']
+        return normal, alzheimer, parkinson
+    
+    selected_rows = []
+    
+    # Sample from synthetic data (100 total: 60 normal, 20 AD, 20 PD)
+    if synthetic_df is not None:
+        syn_normal, syn_alzheimer, syn_parkinson = categorize_df(synthetic_df)
+        
+        if len(syn_normal) >= 60:
+            selected_rows.extend(syn_normal.sample(n=60).to_dict('records'))
+        else:
+            selected_rows.extend(syn_normal.to_dict('records'))
+            
+        if len(syn_alzheimer) >= 20:
+            selected_rows.extend(syn_alzheimer.sample(n=20).to_dict('records'))
+        else:
+            selected_rows.extend(syn_alzheimer.to_dict('records'))
+            
+        if len(syn_parkinson) >= 20:
+            selected_rows.extend(syn_parkinson.sample(n=20).to_dict('records'))
+        else:
+            selected_rows.extend(syn_parkinson.to_dict('records'))
+    
+    # Sample from real data (100 total: 60 normal, 20 AD, 20 PD)
+    if real_df is not None:
+        real_normal, real_alzheimer, real_parkinson = categorize_df(real_df)
+        
+        if len(real_normal) >= 60:
+            selected_rows.extend(real_normal.sample(n=60).to_dict('records'))
+        else:
+            selected_rows.extend(real_normal.to_dict('records'))
+            
+        if len(real_alzheimer) >= 20:
+            selected_rows.extend(real_alzheimer.sample(n=20).to_dict('records'))
+        else:
+            selected_rows.extend(real_alzheimer.to_dict('records'))
+            
+        if len(real_parkinson) >= 20:
+            selected_rows.extend(real_parkinson.sample(n=20).to_dict('records'))
+        else:
+            selected_rows.extend(real_parkinson.to_dict('records'))
+    
+    logger.info(f"Selected {len(selected_rows)} patients for sample (Target: 200)")
+    
+    # Process each selected patient row from CSV
+    for idx, row in enumerate(selected_rows):
+        try:
+            patient_id = str(row['patient_id'])
+            
+            # Check if patient already exists
+            result = await db.execute(
+                select(Patient).where(Patient.patient_id == patient_id)
+            )
+            patient = result.scalar_one_or_none()
+            
+            if patient:
+                # Check if patient already has medical records
+                result_mr = await db.execute(
+                    select(MedicalRecord).where(MedicalRecord.patient_id == patient.id)
+                )
+                if result_mr.scalar_one_or_none():
+                    skipped_patients += 1
+                    continue
+            else:
+                # Create new patient from CSV data
+                age = int(row['age'])
+                dob = date(datetime.now().year - age, 1, 1)
+                
+                gender_str = str(row['gender']).lower()
+                gender = Gender.MALE if gender_str == 'male' else Gender.FEMALE if gender_str == 'female' else Gender.OTHER
+                
+                patient = Patient(
+                    patient_id=patient_id,
+                    first_name=f"Patient",
+                    last_name=patient_id.replace('PT_', ''),
+                    date_of_birth=dob,
+                    gender=gender,
+                    education_years=int(row.get('education_years', 12)) if pd.notna(row.get('education_years')) else None,
+                )
+                
+                db.add(patient)
+                await db.flush()
+            
+            # Parse visit date
+            try:
+                visit_date = pd.to_datetime(row['visit_date'])
+            except:
+                visit_date = datetime.now()
+            
+            # Create medical record from CSV
+            medical_record = MedicalRecord(
+                patient_id=patient.id,
+                visit_date=visit_date,
+                visit_type="Initial",
+                mmse_score=float(row['mmse_score']) if pd.notna(row['mmse_score']) else None,
+                moca_score=float(row['moca_score']) if pd.notna(row['moca_score']) else None,
+                memory_score=float(row['memory_score']) if pd.notna(row['memory_score']) else None,
+                attention_score=float(row['attention_score']) if pd.notna(row['attention_score']) else None,
+                executive_function_score=float(row['executive_function_score']) if pd.notna(row['executive_function_score']) else None,
+                amyloid_beta=float(row['amyloid_beta']) if pd.notna(row['amyloid_beta']) else None,
+                tau_protein=float(row['tau_protein']) if pd.notna(row['tau_protein']) else None,
+                dopamine_level=float(row['dopamine_level']) if pd.notna(row['dopamine_level']) else None,
+                apoe_e4_status=bool(int(row['apoe_e4_status'])) if pd.notna(row['apoe_e4_status']) else False,
+                hippocampal_volume=float(row['hippocampal_volume']) if pd.notna(row['hippocampal_volume']) else None,
+                cortical_thickness=float(row['cortical_thickness']) if pd.notna(row['cortical_thickness']) else None,
+                ventricular_volume=float(row['ventricular_volume']) if pd.notna(row['ventricular_volume']) else None,
+                white_matter_hyperintensities=float(row['white_matter_hyperintensities']) if pd.notna(row['white_matter_hyperintensities']) else None,
+                brain_volume_total=float(row['brain_volume_total']) if pd.notna(row['brain_volume_total']) else None,
+                clinical_notes=f"Sample data (200 patients). Diagnosis: {row.get('diagnosis', 'Unknown')}",
+            )
+            
+            db.add(medical_record)
+            await db.flush()
+            total_records_created += 1
+            
+            # Calculate risk scores based on diagnosis
+            diagnosis = str(row.get('diagnosis', 'Normal')).upper()
+            mmse = medical_record.mmse_score or 25
+            moca = medical_record.moca_score or 24
+            amyloid = medical_record.amyloid_beta or 600
+            tau = medical_record.tau_protein or 200
+            dopamine = medical_record.dopamine_level or 100
+            hippocampal = medical_record.hippocampal_volume or 3500
+            
+            alzheimer_risk = 0.0
+            parkinson_risk = 0.0
+            
+            if diagnosis == 'ALZHEIMER':
+                alzheimer_risk = 0.85
+                if mmse < 20: alzheimer_risk = 0.95
+                elif mmse < 24: alzheimer_risk = 0.80
+                if tau > 500 and amyloid < 500: alzheimer_risk = min(0.98, alzheimer_risk + 0.1)
+                if hippocampal < 2500: alzheimer_risk = min(0.98, alzheimer_risk + 0.08)
+            elif diagnosis == 'PARKINSON':
+                parkinson_risk = 0.80
+                if dopamine < 50: parkinson_risk = 0.90
+                elif dopamine < 70: parkinson_risk = 0.75
+                if mmse >= 26: parkinson_risk = min(0.95, parkinson_risk + 0.1)
+            else:  # Normal
+                alzheimer_risk = 0.15
+                parkinson_risk = 0.12
+                if mmse >= 28 and moca >= 26:
+                    alzheimer_risk = 0.08
+                    parkinson_risk = 0.05
+            
+            alzheimer_level = (
+                RiskLevel.HIGH if alzheimer_risk >= 0.66
+                else RiskLevel.MEDIUM if alzheimer_risk >= 0.33
+                else RiskLevel.LOW
+            )
+            parkinson_level = (
+                RiskLevel.HIGH if parkinson_risk >= 0.66
+                else RiskLevel.MEDIUM if parkinson_risk >= 0.33
+                else RiskLevel.LOW
+            )
+            
+            # Determine disease type
+            if diagnosis == 'ALZHEIMER':
+                disease_type = DiseaseType.ALZHEIMER
+            elif diagnosis == 'PARKINSON':
+                disease_type = DiseaseType.PARKINSON
+            else:
+                disease_type = DiseaseType.NORMAL
+            
+            # Create prediction
+            prediction = Prediction(
+                patient_id=patient.id,
+                disease_type=disease_type,
+                alzheimer_risk_score=round(alzheimer_risk, 2),
+                parkinson_risk_score=round(parkinson_risk, 2),
+                alzheimer_risk_level=alzheimer_level,
+                parkinson_risk_level=parkinson_level,
+                created_at=datetime.now(),
+            )
+            
+            db.add(prediction)
+            total_predictions_created += 1
+            total_patients_processed += 1
+            
+            if (idx + 1) % 50 == 0:
+                logger.info(f"Progress: {idx + 1}/{len(selected_rows)} records processed...")
+            
+        except Exception as e:
+            logger.error(f"Error processing row {idx}: {str(e)}", exc_info=True)
+            errors.append(f"Row {idx}: {str(e)[:100]}")
+            continue
+    
+    # Commit all changes
+    try:
+        await db.commit()
+        logger.info(f"SUCCESS: {total_patients_processed} patients (200 sample), {total_records_created} records, {total_predictions_created} predictions")
+    except Exception as e:
+        logger.error(f"Failed to commit: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save data: {str(e)}"
+        )
+    
+    # Count categories from loaded rows
+    normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'NORMAL'])
+    alzheimer_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'ALZHEIMER'])
+    parkinson_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'PARKINSON'])
+    
+    return {
+        "message": f"Loaded {total_patients_processed} patients successfully!" if not errors else "Loaded with some errors",
+        "total_patients": total_patients_processed,
+        "total_records": total_records_created,
+        "total_predictions": total_predictions_created,
+        "skipped": skipped_patients,
+        "sample_size": 200,
+        "categories_included": f"Normal: {normal_count}, Alzheimer: {alzheimer_count}, Parkinson: {parkinson_count}",
+        "source_distribution": "100 synthetic + 100 real data",
+        "errors": errors[:10] if errors else [],
+        "error_count": len(errors),
+    }
+
+
 @router.post("/add-default-data")
 async def add_default_data_for_all_patients(
     db: AsyncSession = Depends(get_db),

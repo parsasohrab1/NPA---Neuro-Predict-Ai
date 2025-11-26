@@ -30,6 +30,7 @@ import diseaseTrackingApi, {
   FutureRiskPrediction,
   PatientRecommendations,
 } from '../services/diseaseTracking'
+import BrainVisualization3D from '../components/BrainVisualization3D'
 
 const COLORS = {
   alzheimer: '#ef4444',
@@ -63,6 +64,7 @@ export default function DiseaseTrackingDashboard() {
   const [showAddDataModal, setShowAddDataModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showLoadDataConfirm, setShowLoadDataConfirm] = useState(false)
+  const [showLoadSampleDataConfirm, setShowLoadSampleDataConfirm] = useState(false)
   const queryClient = useQueryClient()
 
   // Get all patients summary
@@ -152,13 +154,13 @@ export default function DiseaseTrackingDashboard() {
         message += ` (${data.skipped} skipped - already exist)`
       }
       
-      if (data.error_count > 0) {
+      if (data.error_count && data.error_count > 0) {
         message += ` WARNING: ${data.error_count} errors occurred during import.`
         console.error('Import errors:', data.errors)
       }
       
       setNotification({
-        type: data.error_count > 0 ? 'error' : 'success',
+        type: data.error_count && data.error_count > 0 ? 'error' : 'success',
         message,
       })
       setTimeout(() => setNotification(null), 8000)
@@ -175,9 +177,45 @@ export default function DiseaseTrackingDashboard() {
     },
   })
 
+  // Load sample datasets mutation (200 patients with specific distribution)
+  const loadSampleDatasetsMutation = useMutation({
+    mutationFn: () => diseaseTrackingApi.loadSampleDatasets(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      setShowLoadSampleDataConfirm(false)
+      
+      let message = `Sample data loaded! ${data.total_patients} patients, ${data.total_records} records, ${data.total_predictions} predictions. Categories: ${data.categories_included}. Source: ${data.source_distribution}`
+      
+      if (data.skipped > 0) {
+        message += ` (${data.skipped} skipped - already exist)`
+      }
+      
+      if (data.error_count && data.error_count > 0) {
+        message += ` WARNING: ${data.error_count} errors occurred during import.`
+        console.error('Import errors:', data.errors)
+      }
+      
+      setNotification({
+        type: data.error_count && data.error_count > 0 ? 'error' : 'success',
+        message,
+      })
+      setTimeout(() => setNotification(null), 10000)
+    },
+    onError: (error: any) => {
+      console.error('Load sample datasets error:', error)
+      const detail = error.response?.data?.detail || error.message
+      setShowLoadSampleDataConfirm(false)
+      setNotification({
+        type: 'error',
+        message: `Failed to load sample datasets: ${detail}. Check console for details.`,
+      })
+      setTimeout(() => setNotification(null), 8000)
+    },
+  })
+
   // Select first patient by default
   useEffect(() => {
-    if (!selectedPatientId && patientsSummary?.patients.length > 0) {
+    if (!selectedPatientId && patientsSummary?.patients && patientsSummary.patients.length > 0) {
       setSelectedPatientId(patientsSummary.patients[0].patient_id)
     }
   }, [patientsSummary, selectedPatientId])
@@ -282,6 +320,14 @@ export default function DiseaseTrackingDashboard() {
               Add Data
             </button>
           )}
+          <button
+            onClick={() => setShowLoadSampleDataConfirm(true)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors"
+            title="Load 200 sample patients: 120 Normal, 40 Alzheimer, 40 Parkinson"
+          >
+            <PlusIcon className="h-5 w-5" />
+            Load Sample Data (200)
+          </button>
           <button
             onClick={() => setShowLoadDataConfirm(true)}
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -423,6 +469,21 @@ export default function DiseaseTrackingDashboard() {
       )}
       {patientFeatures && selectedPatientId && (
         <>
+          {/* 3D Brain Visualization */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">
+              3D Brain Visualization - Disease Impact Map
+            </h2>
+            <p className="text-sm text-slate-400 mb-4">
+              Interactive 3D model showing brain regions affected by Alzheimer's and Parkinson's disease
+            </p>
+            <BrainVisualization3D
+              alzheimerRisk={patientFeatures.latest_prediction?.alzheimer_risk || 0}
+              parkinsonRisk={patientFeatures.latest_prediction?.parkinson_risk || 0}
+              className="h-[600px] rounded-xl overflow-hidden border border-slate-800"
+            />
+          </div>
+
           {/* Patient Info and Current Risk */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
@@ -951,6 +1012,59 @@ export default function DiseaseTrackingDashboard() {
               onCancel={() => setShowAddPatientModal(false)}
               isLoading={createPatientMutation.isPending}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Load Sample Data Confirmation Modal */}
+      {showLoadSampleDataConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-lg">
+            <h2 className="text-2xl font-bold text-white mb-4">Load 200 Sample Patients?</h2>
+            <p className="text-slate-300 mb-4">
+              This will load exactly <strong>200 patients</strong> from CSV files with the following distribution:
+            </p>
+            <div className="bg-slate-900/60 rounded-lg p-4 mb-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-emerald-400">✓ Normal/Healthy:</span>
+                  <span className="font-bold text-white">120 patients</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-rose-400">✓ Alzheimer's Disease:</span>
+                  <span className="font-bold text-white">40 patients</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-orange-400">✓ Parkinson's Disease:</span>
+                  <span className="font-bold text-white">40 patients</span>
+                </div>
+                <div className="border-t border-slate-700 pt-2 mt-2">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>Data Source:</span>
+                    <span className="text-slate-300">100 Synthetic + 100 Real</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mb-6">
+              <strong>Note:</strong> This includes all features and detailed information (cognitive scores, biomarkers, MRI data, etc.) for comprehensive analysis and 3D brain visualization.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowLoadSampleDataConfirm(false)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                disabled={loadSampleDatasetsMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => loadSampleDatasetsMutation.mutate()}
+                disabled={loadSampleDatasetsMutation.isPending}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loadSampleDatasetsMutation.isPending ? 'Loading 200 Patients...' : 'Load Sample Data (200)'}
+              </button>
+            </div>
           </div>
         </div>
       )}
