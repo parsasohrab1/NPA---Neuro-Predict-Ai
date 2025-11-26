@@ -221,6 +221,16 @@ const diseaseTrackingApi = {
     })
     return response.data
   },
+
+  async clearAllData(): Promise<{
+    message: string
+    patients_deleted: number
+    records_deleted: number
+    predictions_deleted: number
+  }> {
+    const response = await axios.post('/api/v1/disease-tracking/clear-all-data')
+    return response.data
+  },
 }
 
 export default diseaseTrackingApi

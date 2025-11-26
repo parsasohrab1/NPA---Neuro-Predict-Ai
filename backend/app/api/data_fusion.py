@@ -189,3 +189,4 @@ async def batch_generate_fusion_reports(
         'error_details': errors[:10]  # First 10 errors
     }
 
+

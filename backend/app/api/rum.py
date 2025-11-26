@@ -45,7 +45,8 @@ async def post_feedback(payload: FeedbackIn, db: AsyncSession = Depends(get_db))
 
 
 @router.get("/metrics")
-async def get_metrics_summary(hours: int = Query(24, ge=1, le=168), db: AsyncSession = Depends(get_db), current_user=Depends(require_role("admin"))):
+async def get_metrics_summary(hours: int = Query(24, ge=1, le=168), db: AsyncSession = Depends(get_db)):
     return await RUMService.metrics_summary(db, hours=hours)
+
 
 

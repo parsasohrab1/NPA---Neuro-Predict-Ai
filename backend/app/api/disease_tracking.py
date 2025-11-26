@@ -844,43 +844,52 @@ async def load_sample_datasets(
     
     selected_rows = []
     
-    # Sample from synthetic data (100 total: 60 normal, 20 AD, 20 PD)
+    # Sample from synthetic data - take all available
+    # Target: 60 normal, 20 Alzheimer, 20 Parkinson (but take what's available)
     if synthetic_df is not None:
         syn_normal, syn_alzheimer, syn_parkinson = categorize_df(synthetic_df)
         
-        if len(syn_normal) >= 60:
-            selected_rows.extend(syn_normal.sample(n=60).to_dict('records'))
-        else:
-            selected_rows.extend(syn_normal.to_dict('records'))
-            
-        if len(syn_alzheimer) >= 20:
-            selected_rows.extend(syn_alzheimer.sample(n=20).to_dict('records'))
-        else:
-            selected_rows.extend(syn_alzheimer.to_dict('records'))
-            
-        if len(syn_parkinson) >= 20:
-            selected_rows.extend(syn_parkinson.sample(n=20).to_dict('records'))
-        else:
-            selected_rows.extend(syn_parkinson.to_dict('records'))
+        # Take all available, up to target
+        n_syn_normal = min(len(syn_normal), 60)
+        n_syn_alzheimer = min(len(syn_alzheimer), 20)
+        n_syn_parkinson = min(len(syn_parkinson), 20)
+        
+        if n_syn_normal > 0:
+            selected_rows.extend(syn_normal.sample(n=n_syn_normal).to_dict('records'))
+        if n_syn_alzheimer > 0:
+            selected_rows.extend(syn_alzheimer.sample(n=n_syn_alzheimer).to_dict('records'))
+        if n_syn_parkinson > 0:
+            selected_rows.extend(syn_parkinson.sample(n=n_syn_parkinson).to_dict('records'))
+        
+        logger.info(f"Sampled from synthetic: {n_syn_normal} normal, {n_syn_alzheimer} Alzheimer, {n_syn_parkinson} Parkinson")
     
-    # Sample from real data (100 total: 60 normal, 20 AD, 20 PD)
+    # Sample from real data - take all available to reach 200 total
+    # Calculate how many more we need to reach target of 120 normal, 40 Alzheimer, 40 Parkinson
     if real_df is not None:
         real_normal, real_alzheimer, real_parkinson = categorize_df(real_df)
         
-        if len(real_normal) >= 60:
-            selected_rows.extend(real_normal.sample(n=60).to_dict('records'))
-        else:
-            selected_rows.extend(real_normal.to_dict('records'))
-            
-        if len(real_alzheimer) >= 20:
-            selected_rows.extend(real_alzheimer.sample(n=20).to_dict('records'))
-        else:
-            selected_rows.extend(real_alzheimer.to_dict('records'))
-            
-        if len(real_parkinson) >= 20:
-            selected_rows.extend(real_parkinson.sample(n=20).to_dict('records'))
-        else:
-            selected_rows.extend(real_parkinson.to_dict('records'))
+        # Calculate needed to reach targets (accounting for what we got from synthetic)
+        syn_normal_count = len([r for r in selected_rows if r['diagnosis'].upper() == 'NORMAL'])
+        syn_alzheimer_count = len([r for r in selected_rows if r['diagnosis'].upper() == 'ALZHEIMER'])
+        syn_parkinson_count = len([r for r in selected_rows if r['diagnosis'].upper() == 'PARKINSON'])
+        
+        needed_normal = max(0, 120 - syn_normal_count)
+        needed_alzheimer = max(0, 40 - syn_alzheimer_count)
+        needed_parkinson = max(0, 40 - syn_parkinson_count)
+        
+        # Take what's available from real data
+        n_real_normal = min(len(real_normal), needed_normal)
+        n_real_alzheimer = min(len(real_alzheimer), needed_alzheimer)
+        n_real_parkinson = min(len(real_parkinson), needed_parkinson)
+        
+        if n_real_normal > 0:
+            selected_rows.extend(real_normal.sample(n=n_real_normal).to_dict('records'))
+        if n_real_alzheimer > 0:
+            selected_rows.extend(real_alzheimer.sample(n=n_real_alzheimer).to_dict('records'))
+        if n_real_parkinson > 0:
+            selected_rows.extend(real_parkinson.sample(n=n_real_parkinson).to_dict('records'))
+        
+        logger.info(f"Sampled from real: {n_real_normal} normal, {n_real_alzheimer} Alzheimer, {n_real_parkinson} Parkinson")
     
     logger.info(f"Selected {len(selected_rows)} patients for sample (Target: 200)")
     
@@ -1044,18 +1053,80 @@ async def load_sample_datasets(
     alzheimer_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'ALZHEIMER'])
     parkinson_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'PARKINSON'])
     
+    # Create appropriate message
+    if skipped_patients > 0 and total_patients_processed == 0:
+        message = f"⚠️ All {len(selected_rows)} patients already exist in database! Please use 'Clear All Data' button first, then try loading again."
+    elif skipped_patients > 0:
+        message = f"Loaded {total_patients_processed} patients successfully ({skipped_patients} skipped - already exist)"
+    elif errors:
+        message = f"Loaded {total_patients_processed} patients with {len(errors)} errors"
+    else:
+        message = f"Successfully loaded {total_patients_processed} patients!"
+    
     return {
-        "message": f"Loaded {total_patients_processed} patients successfully!" if not errors else "Loaded with some errors",
+        "message": message,
         "total_patients": total_patients_processed,
         "total_records": total_records_created,
         "total_predictions": total_predictions_created,
         "skipped": skipped_patients,
-        "sample_size": 200,
+        "sample_size": len(selected_rows),
         "categories_included": f"Normal: {normal_count}, Alzheimer: {alzheimer_count}, Parkinson: {parkinson_count}",
-        "source_distribution": "100 synthetic + 100 real data",
+        "source_distribution": f"{len(selected_rows)} total available in CSV files",
         "errors": errors[:10] if errors else [],
         "error_count": len(errors),
     }
+
+
+@router.post("/clear-all-data")
+async def clear_all_disease_tracking_data(
+    db: AsyncSession = Depends(get_db),
+    # current_user = Depends(require_role("admin")),  # Disabled for development
+) -> Dict[str, Any]:
+    """
+    Clear all patients, medical records, and predictions from the disease tracking system.
+    WARNING: This deletes ALL data!
+    """
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    logger.info("=== Clearing all disease tracking data ===")
+    
+    try:
+        # Delete all predictions
+        result = await db.execute(select(Prediction))
+        predictions = result.scalars().all()
+        for pred in predictions:
+            await db.delete(pred)
+        predictions_deleted = len(predictions)
+        
+        # Delete all medical records
+        result = await db.execute(select(MedicalRecord))
+        records = result.scalars().all()
+        for record in records:
+            await db.delete(record)
+        records_deleted = len(records)
+        
+        # Delete all patients
+        result = await db.execute(select(Patient))
+        patients = result.scalars().all()
+        for patient in patients:
+            await db.delete(patient)
+        patients_deleted = len(patients)
+        
+        await db.commit()
+        
+        logger.info(f"Deleted {patients_deleted} patients, {records_deleted} records, {predictions_deleted} predictions")
+        
+        return {
+            "message": "All disease tracking data cleared successfully",
+            "patients_deleted": patients_deleted,
+            "records_deleted": records_deleted,
+            "predictions_deleted": predictions_deleted,
+        }
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error clearing data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}")
 
 
 @router.post("/add-default-data")
@@ -1226,4 +1297,5 @@ async def add_default_data_for_all_patients(
         "skipped": skipped,
         "total_patients": len(all_patients),
     }
+
 

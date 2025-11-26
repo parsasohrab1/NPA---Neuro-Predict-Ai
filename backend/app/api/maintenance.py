@@ -14,7 +14,7 @@ router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
 
 
 @router.post("/weekly")
-async def run_weekly(db: AsyncSession = Depends(get_db), current_user=Depends(require_role("admin"))) -> Dict[str, Any]:
+async def run_weekly(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
     return await MaintenanceService.weekly_review(db)
 
 
@@ -24,7 +24,7 @@ async def run_biweekly(current_user=Depends(require_role("admin"))) -> Dict[str,
 
 
 @router.post("/monthly/db")
-async def run_monthly_db(db: AsyncSession = Depends(get_db), current_user=Depends(require_role("admin"))) -> Dict[str, Any]:
+async def run_monthly_db(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
     return await MaintenanceService.monthly_db_maintenance(db)
 
 
@@ -41,12 +41,12 @@ async def run_quarterly_dr(current_user=Depends(require_role("admin"))) -> Dict[
 @router.post("/retention/archive-reports")
 async def archive_old_reports(
     days: int = 540,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("admin"))
+    db: AsyncSession = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Archive reports older than N days (default ~18 months) to cold storage path.
     """
     return await DataLifecycleService.archive_reports_older_than(db, days=days)
+
 
 

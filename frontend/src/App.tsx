@@ -2,9 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import SkipToContent from './components/SkipToContent'
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation'
-import { useAuthStore } from './services/auth'
 import Layout from './components/Layout'
-import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import PatientsPage from './pages/PatientsPage'
 import PatientDetailPage from './pages/PatientDetailPage'
@@ -14,7 +12,6 @@ import SettingsPage from './pages/SettingsPage'
 import DataFusionReports from './pages/DataFusionReports'
 
 function App() {
-  const { isAuthenticated } = useAuthStore()
   useKeyboardNavigation()
 
   return (
@@ -22,13 +19,8 @@ function App() {
       <SkipToContent />
       <div id="main-content" tabIndex={-1} className="focus:outline-none">
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          
-          {/* Protected routes */}
-          <Route
-            path="/"
-            element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
-          >
+          {/* Direct access to dashboard - no authentication required */}
+          <Route path="/" element={<Layout />}>
             <Route index element={<DashboardPage />} />
             <Route path="patients" element={<PatientsPage />} />
             <Route path="patients/:id" element={<PatientDetailPage />} />

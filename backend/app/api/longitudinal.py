@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.security import require_role
 from ..db.session import get_db
 from ..models.longitudinal import MetricCategory, LongitudinalReportScheduleStatus
 from ..schemas.longitudinal import (
@@ -43,7 +42,6 @@ router = APIRouter(prefix="/longitudinal", tags=["Longitudinal Tracking"])
 async def list_episodes(
     patient_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     episodes = await longitudinal_service.list_episodes(db, patient_id)
     summaries: List[LongitudinalEpisodeSummary] = []
@@ -72,7 +70,6 @@ async def create_episode(
     patient_id: int,
     payload: LongitudinalEpisodeCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     episode = await longitudinal_service.create_episode(db, patient_id, payload)
     detailed = await longitudinal_service.get_episode(db, episode.id, patient_id)
@@ -89,7 +86,6 @@ async def get_episode(
     episode_id: int,
     patient_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     episode = await longitudinal_service.get_episode(db, episode_id, patient_id)
     if episode is None:
@@ -106,7 +102,6 @@ async def add_visit(
     episode_id: int,
     payload: LongitudinalVisitCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     visit = await longitudinal_service.add_visit(db, episode_id, payload)
     visit_with_metrics = await longitudinal_service.get_timeline(db, episode_id)
@@ -126,7 +121,6 @@ async def add_metrics(
     metrics: List[LongitudinalMetricCreate],
     episode_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     saved_metrics = await longitudinal_service.add_metrics(db, visit_id, metrics)
     if episode_id is None:
@@ -155,7 +149,6 @@ async def add_metrics(
 async def get_timeline(
     episode_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     visits = await longitudinal_service.get_timeline(db, episode_id)
     events: List[TimelineEvent] = []
@@ -184,7 +177,6 @@ async def get_trend(
     metric_key: str = Query(..., min_length=1),
     metric_type: Optional[MetricCategory] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     metrics = await longitudinal_service.get_metric_trend(db, episode_id, metric_key, metric_type)
     points: List[TrendPoint] = []
@@ -209,7 +201,6 @@ async def compare_imaging(
     visit_a: int = Query(..., description="Visit id for baseline"),
     visit_b: int = Query(..., description="Visit id for comparison"),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     if visit_a == visit_b:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Visits must be different")
@@ -234,7 +225,6 @@ async def compare_imaging(
 async def get_alerts(
     episode_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> List[LongitudinalAlertResponse]:
     alerts = await longitudinal_service.get_alerts(db, episode_id)
     return alerts
@@ -247,7 +237,6 @@ async def get_alerts(
 async def acknowledge_alert(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> LongitudinalAlertResponse:
     alert = await longitudinal_service.acknowledge_alert(db, alert_id)
     if alert is None:
@@ -262,7 +251,6 @@ async def acknowledge_alert(
 async def get_progression(
     episode_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ) -> LongitudinalProgressionSummary:
     summary = await longitudinal_service.get_progression_summary(db, episode_id)
     metrics_payload = {
@@ -285,7 +273,6 @@ async def create_report(
     episode_id: int,
     payload: LongitudinalReportCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> LongitudinalReportResponse:
     try:
         report = await longitudinal_service.create_report(
@@ -313,7 +300,6 @@ async def create_report(
 async def list_reports(
     episode_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ) -> List[LongitudinalReportResponse]:
     reports = await longitudinal_service.list_reports(db, episode_id)
     return reports
@@ -327,7 +313,6 @@ async def download_report(
     report_id: int,
     variant: Optional[str] = Query(None, regex="^(pdf|excel)$"),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     report = await longitudinal_service.get_report(db, report_id)
     if report is None:
@@ -358,7 +343,6 @@ async def download_report(
 async def get_report_heatmap(
     report_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     report = await longitudinal_service.get_report(db, report_id)
     if report is None or not report.heatmap_path:
@@ -375,7 +359,6 @@ async def get_report_heatmap(
 async def get_report_heatmap_summary(
     report_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """
     Return metadata for the report heatmap (metrics, time buckets, file path).
@@ -411,7 +394,6 @@ async def get_report_heatmap_summary(
 async def create_report_schedule(
     payload: ReportScheduleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> ReportScheduleResponse:
     schedule = await longitudinal_service.create_schedule(db, payload, getattr(current_user, "id", None))
     return schedule
@@ -423,7 +405,6 @@ async def create_report_schedule(
 )
 async def list_report_schedules(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> List[ReportScheduleResponse]:
     schedules = await longitudinal_service.list_schedules(db)
     return schedules
@@ -437,7 +418,6 @@ async def update_report_schedule(
     schedule_id: int,
     payload: ReportScheduleUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> ReportScheduleResponse:
     schedule = await longitudinal_service.update_schedule_status(
         db,
@@ -456,7 +436,6 @@ async def update_report_schedule(
 async def delete_report_schedule(
     schedule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> None:
     deleted = await longitudinal_service.delete_schedule(db, schedule_id)
     if not deleted:
@@ -471,7 +450,6 @@ async def delete_report_schedule(
 async def enqueue_schedule_run(
     schedule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> ReportRunResponse:
     run = await longitudinal_service.enqueue_schedule_run(db, schedule_id)
     if run is None:
@@ -486,7 +464,6 @@ async def enqueue_schedule_run(
 async def list_schedule_runs(
     schedule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> List[ReportRunResponse]:
     runs = await longitudinal_service.list_schedule_runs(db, schedule_id)
     return runs
@@ -499,7 +476,6 @@ async def list_schedule_runs(
 async def execute_schedule_run(
     run_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ) -> ReportRunResponse:
     run = await longitudinal_service.execute_schedule_run(db, run_id)
     if run is None:
@@ -515,7 +491,6 @@ async def get_personal_baseline(
     metric_key: str = Query(..., min_length=1),
     baseline_window_days: int = Query(90, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     """Get personal baseline for a metric"""
     baseline = await longitudinal_service.calculate_personal_baseline(
@@ -532,7 +507,6 @@ async def get_future_prediction(
     metric_key: str = Query(..., min_length=1),
     days_ahead: int = Query(30, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     """Predict future metric value"""
     prediction = await longitudinal_service.predict_future_progression(
@@ -548,7 +522,6 @@ async def get_combined_alerts(
     episode_id: int,
     metric_keys: Optional[str] = Query(None, description="Comma-separated metric keys"),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """Get combined alerts based on multiple metrics"""
     keys_list = None
@@ -564,7 +537,6 @@ async def get_combined_alerts(
 async def get_schedule_monitoring(
     schedule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """Get monitoring statistics for a report schedule"""
     stats = await longitudinal_service.get_schedule_monitoring_stats(db, schedule_id)
@@ -578,7 +550,6 @@ async def get_schedule_monitoring(
 )
 async def load_sample_data(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("admin")),
 ):
     """
     Load sample episodes, visits, and metrics for longitudinal tracking testing.
@@ -731,5 +702,6 @@ async def load_sample_data(
         "total_visits": total_visits,
         "total_metrics": total_metrics,
     }
+
 
 

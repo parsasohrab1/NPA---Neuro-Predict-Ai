@@ -97,7 +97,6 @@ async def upload_dicom_study(
     ),
     file: UploadFile = File(..., description="DICOM file (.dcm)"),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """Accept a DICOM file upload, store it on disk, and register an imaging study."""
 
@@ -232,7 +231,6 @@ async def get_study_preview(
     study_id: int,
     slice_index: Optional[int] = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """Generate and return preview image for an imaging study"""
     from fastapi.responses import Response
@@ -277,7 +275,6 @@ async def get_study_preview(
 async def get_study_slices(
     study_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """Get metadata about available slices in a DICOM study"""
     result = await db.execute(select(ImagingStudy).where(ImagingStudy.id == study_id))
@@ -302,7 +299,6 @@ async def get_study_slice(
     study_id: int,
     slice_index: int = 0,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """Get a specific slice from a DICOM study"""
     from fastapi.responses import Response
@@ -336,5 +332,6 @@ async def get_study_slice(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to load slice: {str(exc)}"
         ) from exc
+
 
 

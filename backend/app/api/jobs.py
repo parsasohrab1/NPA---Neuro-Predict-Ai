@@ -20,7 +20,6 @@ class EnqueueRequest(BaseModel):
 @router.post("/enqueue")
 async def enqueue_job(
     req: EnqueueRequest,
-    current_user=Depends(require_role("admin")),
 ):
     try:
         result = await JobQueueService.enqueue(req.job_type, req.payload, req.idempotency_key)
@@ -32,5 +31,6 @@ async def enqueue_job(
 @router.get("/stats")
 async def queue_stats(current_user=Depends(require_role("admin"))):
     return await JobQueueService.stats()
+
 
 

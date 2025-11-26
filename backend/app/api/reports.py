@@ -44,7 +44,6 @@ async def get_clinical_report(
     start: Optional[str] = Query(None, description="ISO datetime start filter"),
     end: Optional[str] = Query(None, description="ISO datetime end filter"),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     try:
         return await reporting_service.clinical_report(
@@ -70,7 +69,6 @@ async def get_research_report(
     risk_level: Optional[str] = Query(None),
     disease_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("researcher")),
 ):
     risk_enum = None
     if risk_level:
@@ -105,7 +103,6 @@ async def get_management_report(
     start: Optional[str] = Query(None),
     end: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("admin")),
 ):
     return await reporting_service.management_report(
         db=db,
@@ -123,7 +120,6 @@ async def get_management_report(
 async def export_report(
     request: ReportExportRequest,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     logger.info(
         "Report export triggered by user %s: type=%s format=%s filters=%s",
@@ -149,7 +145,6 @@ async def export_report(
 )
 async def get_reports_stats(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """
     Get basic statistics about available data for reports
@@ -200,7 +195,6 @@ async def get_reports_stats(
 )
 async def load_sample_data(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("admin")),
 ):
     """
     Load sample patients, medical records, and predictions for reports testing.

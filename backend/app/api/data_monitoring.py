@@ -34,7 +34,6 @@ def get_time_range(range_str: str) -> datetime:
 async def get_overview(
     disease: Optional[str] = Query(None, description="Filter by disease: alzheimer, parkinson, or all"),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """
     Get overview of all data categories
@@ -127,7 +126,6 @@ async def get_category_data(
     time_range: str = Query('7d', description="Time range: 24h, 7d, 30d, 90d"),
     disease: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """
     Get detailed data for a specific category
@@ -268,7 +266,6 @@ async def get_recent_data(
     disease: Optional[str] = Query(None),
     limit: int = Query(20, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """
     Get recent data entries across all categories
@@ -314,7 +311,6 @@ async def get_trends(
     time_range: str = Query('7d'),
     disease: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("doctor")),
 ):
     """
     Get trend data for radar chart visualization
@@ -365,7 +361,6 @@ async def get_trends(
 @router.post("/load-sample-data", status_code=201)
 async def load_sample_data(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("admin")),
 ):
     """
     Load sample data for all data monitoring categories

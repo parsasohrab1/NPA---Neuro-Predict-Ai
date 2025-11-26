@@ -1,4 +1,4 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../services/auth'
 import ThemeSwitcher from './ThemeSwitcher'
@@ -6,13 +6,7 @@ import LanguageSwitcher from './LanguageSwitcher'
 
 export default function Layout() {
   const { t } = useTranslation()
-  const { user, logout } = useAuthStore()
-  const navigate = useNavigate()
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
+  const { user } = useAuthStore()
 
   return (
     <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
@@ -76,22 +70,15 @@ export default function Layout() {
               className="w-10 h-10 bg-primary-700 dark:bg-gray-700 rounded-full flex items-center justify-center"
               aria-hidden="true"
             >
-              {user?.full_name.charAt(0).toUpperCase()}
+              {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'G'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate" aria-label={`User: ${user?.full_name}`}>
-                {user?.full_name}
+              <p className="text-sm font-medium truncate" aria-label={`User: ${user?.full_name || 'Guest'}`}>
+                {user?.full_name || 'Guest User'}
               </p>
-              <p className="text-xs text-primary-300 dark:text-gray-400 truncate">{user?.role}</p>
+              <p className="text-xs text-primary-300 dark:text-gray-400 truncate">{user?.role || 'Viewer'}</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full px-4 py-2 bg-primary-800 dark:bg-gray-700 hover:bg-primary-700 dark:hover:bg-gray-600 rounded-lg text-sm transition-colors"
-            aria-label="Logout"
-          >
-            Logout
-          </button>
         </div>
       </aside>
 

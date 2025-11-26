@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import {
   HomeModernIcon,
   UsersIcon,
@@ -10,7 +10,6 @@ import {
   HeartIcon,
   ChartBarIcon,
   CubeIcon,
-  ArrowRightOnRectangleIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
@@ -81,13 +80,6 @@ const navigation = [
 
 export default function AdminLayout() {
   useKeyboardNavigation()
-  const navigate = useNavigate()
-
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token')
-    sessionStorage.removeItem('auth_token')
-    navigate('/login')
-  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">

@@ -24,6 +24,7 @@ import {
   XMarkIcon,
   UserPlusIcon,
   DocumentPlusIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline'
 import diseaseTrackingApi, {
   PatientFeatures,
@@ -65,6 +66,7 @@ export default function DiseaseTrackingDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showLoadDataConfirm, setShowLoadDataConfirm] = useState(false)
   const [showLoadSampleDataConfirm, setShowLoadSampleDataConfirm] = useState(false)
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false)
   const queryClient = useQueryClient()
 
   // Get all patients summary
@@ -177,21 +179,68 @@ export default function DiseaseTrackingDashboard() {
     },
   })
 
+  // Clear all data mutation
+  const clearAllDataMutation = useMutation({
+    mutationFn: () => diseaseTrackingApi.clearAllData(),
+    onSuccess: (data) => {
+      // Invalidate all related queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-features'] })
+      queryClient.invalidateQueries({ queryKey: ['future-risk'] })
+      
+      // Clear selected patient
+      setSelectedPatientId(null)
+      
+      setShowClearDataConfirm(false)
+      setNotification({
+        type: 'success',
+        message: `✅ All data cleared successfully! ${data.patients_deleted} patients, ${data.records_deleted} records, ${data.predictions_deleted} predictions deleted. You can now load fresh sample data.`,
+      })
+      setTimeout(() => setNotification(null), 8000)
+    },
+    onError: (error: any) => {
+      console.error('Clear data error:', error)
+      const detail = error.response?.data?.detail || error.message
+      setShowClearDataConfirm(false)
+      setNotification({
+        type: 'error',
+        message: `❌ Failed to clear data: ${detail}`,
+      })
+      setTimeout(() => setNotification(null), 6000)
+    },
+  })
+
   // Load sample datasets mutation (200 patients with specific distribution)
   const loadSampleDatasetsMutation = useMutation({
     mutationFn: () => diseaseTrackingApi.loadSampleDatasets(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-features'] })
+      queryClient.invalidateQueries({ queryKey: ['future-risk'] })
       setShowLoadSampleDataConfirm(false)
       
-      let message = `Sample data loaded! ${data.total_patients} patients, ${data.total_records} records, ${data.total_predictions} predictions. Categories: ${data.categories_included}. Source: ${data.source_distribution}`
+      // Check if no new patients were added (all skipped)
+      if (data.total_patients === 0 && data.skipped > 0) {
+        setNotification({
+          type: 'error',
+          message: `⚠️ All ${data.skipped} patients already exist in the database! Please click "Clear All Data" button first, then try "Load Sample Data" again.`,
+        })
+        setTimeout(() => setNotification(null), 15000) // Longer timeout for important message
+        return
+      }
+      
+      let message = `✅ Sample data loaded successfully! ${data.total_patients} patients, ${data.total_records} records, ${data.total_predictions} predictions.`
+      
+      if (data.categories_included) {
+        message += ` Categories: ${data.categories_included}.`
+      }
       
       if (data.skipped > 0) {
-        message += ` (${data.skipped} skipped - already exist)`
+        message += ` (${data.skipped} skipped - already existed)`
       }
       
       if (data.error_count && data.error_count > 0) {
-        message += ` WARNING: ${data.error_count} errors occurred during import.`
+        message += ` ⚠️ WARNING: ${data.error_count} errors occurred during import.`
         console.error('Import errors:', data.errors)
       }
       
@@ -199,7 +248,7 @@ export default function DiseaseTrackingDashboard() {
         type: data.error_count && data.error_count > 0 ? 'error' : 'success',
         message,
       })
-      setTimeout(() => setNotification(null), 10000)
+      setTimeout(() => setNotification(null), 12000)
     },
     onError: (error: any) => {
       console.error('Load sample datasets error:', error)
@@ -207,9 +256,9 @@ export default function DiseaseTrackingDashboard() {
       setShowLoadSampleDataConfirm(false)
       setNotification({
         type: 'error',
-        message: `Failed to load sample datasets: ${detail}. Check console for details.`,
+        message: `❌ Failed to load sample datasets: ${detail}. Check console for details.`,
       })
-      setTimeout(() => setNotification(null), 8000)
+      setTimeout(() => setNotification(null), 10000)
     },
   })
 
@@ -321,6 +370,14 @@ export default function DiseaseTrackingDashboard() {
             </button>
           )}
           <button
+            onClick={() => setShowClearDataConfirm(true)}
+            className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg transition-colors"
+            title="Clear all disease tracking data (patients, records, predictions)"
+          >
+            <TrashIcon className="h-5 w-5" />
+            Clear All Data
+          </button>
+          <button
             onClick={() => setShowLoadSampleDataConfirm(true)}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors"
             title="Load 200 sample patients: 120 Normal, 40 Alzheimer, 40 Parkinson"
@@ -371,7 +428,37 @@ export default function DiseaseTrackingDashboard() {
               )}
             </div>
             <div className="text-xs text-slate-500 mt-2">
-              Tip: Make sure the backend is running on port 8000 and you have the required permissions.
+              Tip: Make sure the backend is running on port 8001 and you have the required permissions.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Banner - Show when no patients exist */}
+      {!patientsError && patientsSummary && patientsSummary.patients.length === 0 && (
+        <div className="bg-blue-900/30 border-2 border-blue-700 rounded-xl p-5">
+          <div className="flex items-start gap-4">
+            <div className="text-4xl">📊</div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-blue-200 mb-2">No patients in database</h3>
+              <p className="text-slate-300 text-sm mb-3">
+                To get started, load sample data into the system:
+              </p>
+              <div className="space-y-2 text-sm text-slate-300">
+                <div className="flex items-start gap-2">
+                  <span className="text-indigo-400 font-bold mt-0.5">1.</span>
+                  <span>Click <strong className="text-indigo-300">"Load Sample Data (200)"</strong> to load sample patients (183 available in CSV files)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-purple-400 font-bold mt-0.5">2.</span>
+                  <span>Or click <strong className="text-purple-300">"Load All Data"</strong> to load all available datasets</span>
+                </div>
+              </div>
+              <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
+                <p className="text-amber-200 text-xs">
+                  <strong>💡 Tip:</strong> If you've already loaded data and want to refresh, use <strong>"Clear All Data"</strong> first (red button), then load again.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -1016,6 +1103,49 @@ export default function DiseaseTrackingDashboard() {
         </div>
       )}
 
+      {/* Clear All Data Confirmation Modal */}
+      {showClearDataConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-2xl border border-rose-700 p-6 w-full max-w-lg">
+            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              <ExclamationTriangleIcon className="h-7 w-7 text-rose-500" />
+              Clear All Data?
+            </h2>
+            <div className="bg-rose-900/30 border border-rose-700/50 rounded-lg p-4 mb-4">
+              <p className="text-rose-200 font-semibold mb-2">⚠️ WARNING: This action cannot be undone!</p>
+              <p className="text-slate-300 text-sm">
+                This will permanently delete:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-slate-300">
+                <li>All patients</li>
+                <li>All medical records</li>
+                <li>All predictions</li>
+                <li>All disease tracking data</li>
+              </ul>
+            </div>
+            <p className="text-slate-400 text-sm mb-6">
+              After clearing, you can load fresh sample data without any conflicts.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowClearDataConfirm(false)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                disabled={clearAllDataMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => clearAllDataMutation.mutate()}
+                disabled={clearAllDataMutation.isPending}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {clearAllDataMutation.isPending ? 'Clearing...' : 'Yes, Clear All Data'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Load Sample Data Confirmation Modal */}
       {showLoadSampleDataConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1045,6 +1175,11 @@ export default function DiseaseTrackingDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+            <div className="bg-amber-900/30 border border-amber-700/50 rounded-lg p-3 mb-4">
+              <p className="text-amber-200 text-xs">
+                <strong>⚠️ Important:</strong> If you already have patients in the database, they will be skipped. To load fresh data, please use "Clear All Data" first.
+              </p>
             </div>
             <p className="text-xs text-slate-400 mb-6">
               <strong>Note:</strong> This includes all features and detailed information (cognitive scores, biomarkers, MRI data, etc.) for comprehensive analysis and 3D brain visualization.
