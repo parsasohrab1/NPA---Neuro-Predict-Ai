@@ -1,19 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '../components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
-import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
-import { 
-  FileText, 
-  TrendingUp, 
-  AlertCircle, 
-  CheckCircle, 
-  Brain, 
-  Activity,
-  Download,
-  Sparkles
-} from 'lucide-react';
+import {
+  SparklesIcon,
+  DocumentTextIcon,
+  ArrowDownTrayIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  ArrowPathIcon,
+} from '@heroicons/react/24/outline';
 import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -98,17 +93,17 @@ export default function DataFusionReports() {
   const getInterpretationColor = (interpretation: string) => {
     switch (interpretation) {
       case 'normal':
-        return 'bg-green-500';
+        return 'bg-green-100 text-green-800 border-green-300';
       case 'mild_concern':
-        return 'bg-yellow-500';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'moderate_concern':
-        return 'bg-orange-500';
+        return 'bg-orange-100 text-orange-800 border-orange-300';
       case 'high_concern':
-        return 'bg-red-500';
+        return 'bg-red-100 text-red-800 border-red-300';
       case 'critical':
-        return 'bg-red-700';
+        return 'bg-red-200 text-red-900 border-red-400';
       default:
-        return 'bg-gray-500';
+        return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 
@@ -171,239 +166,248 @@ Patent-pending technology. © 2024 NeuroPredict-AI
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Sparkles className="h-8 w-8 text-purple-500" />
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+            <SparklesIcon className="h-8 w-8 text-purple-500" />
             Data Fusion Reports
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             PATENT-PENDING: Multi-Modal Medical Data Integration & Interpretation
           </p>
         </div>
       </div>
 
       {/* Patent Notice */}
-      <Card className="border-purple-200 bg-purple-50">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            <Sparkles className="h-6 w-6 text-purple-600 mt-1" />
-            <div>
-              <h3 className="font-semibold text-purple-900">Patent-Pending Innovation</h3>
-              <p className="text-sm text-purple-700 mt-1">
-                This system implements our proprietary <strong>Multi-Modal Data Fusion Algorithm</strong> that
-                integrates cognitive assessments, biomarker profiles, and neuroimaging findings through
-                confidence-weighted correlation analysis with automated conflict resolution and natural
-                language report generation. This represents our key differentiator for intellectual property protection.
-              </p>
-            </div>
+      <div className="border-2 border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 rounded-lg p-6">
+        <div className="flex items-start gap-3">
+          <SparklesIcon className="h-6 w-6 text-purple-600 dark:text-purple-400 mt-1 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-purple-900 dark:text-purple-100">Patent-Pending Innovation</h3>
+            <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+              This system implements our proprietary <strong>Multi-Modal Data Fusion Algorithm</strong> that
+              integrates cognitive assessments, biomarker profiles, and neuroimaging findings through
+              confidence-weighted correlation analysis with automated conflict resolution and natural
+              language report generation. This represents our key differentiator for intellectual property protection.
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Search & Generate */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Generate or View Fusion Reports</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Generate or View Fusion Reports</h2>
+        <div className="space-y-4">
           <div className="flex gap-2">
-            <Input
+            <input
               type="number"
               placeholder="Enter Patient ID"
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
-              className="flex-1"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
             />
-            <Button
+            <button
               onClick={() => {
                 if (patientId) {
                   generateReport.mutate(parseInt(patientId));
                 }
               }}
               disabled={!patientId || generateReport.isPending}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="px-6 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
             >
-              <Sparkles className="h-4 w-4 mr-2" />
+              <SparklesIcon className="h-5 w-5" />
               Generate Fusion Report
-            </Button>
+            </button>
           </div>
 
           {generateReport.isPending && (
-            <div className="text-sm text-gray-600 flex items-center gap-2">
-              <Activity className="h-4 w-4 animate-spin" />
+            <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+              <ArrowPathIcon className="h-4 w-4 animate-spin" />
               Generating multi-modal fusion report...
             </div>
           )}
 
           {generateReport.isSuccess && (
-            <div className="text-sm text-green-600 flex items-center gap-2">
-              <CheckCircle className="h-4 w-4" />
+            <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4" />
               Fusion report generated successfully!
             </div>
           )}
-        </CardContent>
-      </Card>
+
+          {generateReport.isError && (
+            <div className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+              <ExclamationTriangleIcon className="h-4 w-4" />
+              Error generating report. Please try again.
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Reports List */}
       {isLoading && (
         <div className="text-center py-8">
-          <Activity className="h-8 w-8 animate-spin mx-auto text-purple-600" />
-          <p className="text-gray-600 mt-2">Loading reports...</p>
+          <ArrowPathIcon className="h-8 w-8 animate-spin mx-auto text-purple-600" />
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Loading reports...</p>
         </div>
       )}
 
       {reports && reports.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {reports.map((report) => (
-            <Card
+            <div
               key={report.id}
-              className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-purple-500"
+              className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-purple-500 p-6"
               onClick={() => setSelectedReport(report)}
             >
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">Report #{report.id}</CardTitle>
-                    <p className="text-sm text-gray-600">
-                      {new Date(report.generated_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Badge className={getInterpretationColor(report.interpretation.overall)}>
-                    {report.interpretation.overall.replace('_', ' ').toUpperCase()}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Fusion Score */}
+              <div className="flex justify-between items-start mb-4">
                 <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-semibold">Integrated Fusion Score</span>
-                    <span className={getConfidenceColor(report.fusion_scores.confidence)}>
-                      {report.fusion_scores.integrated.toFixed(1)}/100
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full"
-                      style={{ width: `${report.fusion_scores.integrated}%` }}
-                    />
-                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Report #{report.id}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {new Date(report.generated_at).toLocaleDateString()}
+                  </p>
                 </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getInterpretationColor(report.interpretation.overall)}`}>
+                  {report.interpretation.overall.replace('_', ' ').toUpperCase()}
+                </span>
+              </div>
 
-                {/* Primary Concern */}
-                <div>
-                  <p className="text-sm font-semibold">Primary Concern:</p>
-                  <p className="text-sm text-gray-700">{report.interpretation.primary_concern}</p>
+              {/* Fusion Score */}
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">Integrated Fusion Score</span>
+                  <span className={`font-bold ${getConfidenceColor(report.fusion_scores.confidence)}`}>
+                    {report.fusion_scores.integrated.toFixed(1)}/100
+                  </span>
                 </div>
-
-                {/* Modality Scores */}
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <p className="text-gray-600">Cognitive</p>
-                    <p className="font-semibold">{report.fusion_scores.cognitive.toFixed(0)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Biomarker</p>
-                    <p className="font-semibold">{report.fusion_scores.biomarker.toFixed(0)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Imaging</p>
-                    <p className="font-semibold">{report.fusion_scores.imaging.toFixed(0)}</p>
-                  </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full"
+                    style={{ width: `${report.fusion_scores.integrated}%` }}
+                  />
                 </div>
+              </div>
 
-                {/* Conflicts Warning */}
-                {report.cross_modal.has_conflicts && (
-                  <div className="flex items-center gap-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    <AlertCircle className="h-4 w-4" />
-                    Cross-modal conflicts detected
-                  </div>
-                )}
+              {/* Primary Concern */}
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Primary Concern:</p>
+                <p className="text-sm text-gray-900 dark:text-white">{report.interpretation.primary_concern}</p>
+              </div>
 
-                {/* Disease Analysis */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-blue-50 p-2 rounded">
-                    <p className="text-gray-600">AD Risk</p>
-                    <p className="font-semibold text-blue-700">
-                      {report.disease_analysis.alzheimer.score.toFixed(0)}%
-                    </p>
-                  </div>
-                  <div className="bg-green-50 p-2 rounded">
-                    <p className="text-gray-600">PD Risk</p>
-                    <p className="font-semibold text-green-700">
-                      {report.disease_analysis.parkinson.score.toFixed(0)}%
-                    </p>
-                  </div>
+              {/* Modality Scores */}
+              <div className="grid grid-cols-3 gap-2 text-xs mb-4">
+                <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
+                  <p className="text-gray-600 dark:text-gray-400">Cognitive</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{report.fusion_scores.cognitive.toFixed(0)}</p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="bg-green-50 dark:bg-green-900/30 p-2 rounded">
+                  <p className="text-gray-600 dark:text-gray-400">Biomarker</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{report.fusion_scores.biomarker.toFixed(0)}</p>
+                </div>
+                <div className="bg-purple-50 dark:bg-purple-900/30 p-2 rounded">
+                  <p className="text-gray-600 dark:text-gray-400">Imaging</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{report.fusion_scores.imaging.toFixed(0)}</p>
+                </div>
+              </div>
+
+              {/* Conflicts Warning */}
+              {report.cross_modal.has_conflicts && (
+                <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-2 rounded mb-4">
+                  <ExclamationTriangleIcon className="h-4 w-4" />
+                  Cross-modal conflicts detected
+                </div>
+              )}
+
+              {/* Disease Analysis */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
+                  <p className="text-gray-600 dark:text-gray-400">AD Risk</p>
+                  <p className="font-semibold text-blue-700 dark:text-blue-400">
+                    {report.disease_analysis.alzheimer.score.toFixed(0)}%
+                  </p>
+                </div>
+                <div className="bg-green-50 dark:bg-green-900/30 p-2 rounded">
+                  <p className="text-gray-600 dark:text-gray-400">PD Risk</p>
+                  <p className="font-semibold text-green-700 dark:text-green-400">
+                    {report.disease_analysis.parkinson.score.toFixed(0)}%
+                  </p>
+                </div>
+              </div>
+            </div>
           ))}
+        </div>
+      )}
+
+      {reports && reports.length === 0 && patientId && !isLoading && (
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
+          <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">No fusion reports found for this patient.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Generate one using the button above.</p>
         </div>
       )}
 
       {/* Detailed Report Modal */}
       {selectedReport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <CardHeader className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 sticky top-0 z-10">
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-2xl flex items-center gap-2">
-                    <Brain className="h-6 w-6" />
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <DocumentTextIcon className="h-6 w-6" />
                     Data Fusion Report #{selectedReport.id}
-                  </CardTitle>
+                  </h2>
                   <p className="text-purple-100 mt-1">
                     Patient ID: {selectedReport.patient_id} | 
                     Generated: {new Date(selectedReport.generated_at).toLocaleString()}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => setSelectedReport(null)}
-                  className="text-white hover:bg-purple-700"
+                  className="text-white hover:bg-purple-700 rounded p-2 transition-colors"
                 >
-                  ✕
-                </Button>
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-6">
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
               {/* Executive Summary */}
               <div>
-                <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-purple-600" />
+                <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
+                  <DocumentTextIcon className="h-5 w-5 text-purple-600" />
                   Executive Summary
                 </h3>
-                <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
+                <pre className="whitespace-pre-wrap text-sm bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
                   {selectedReport.report.executive_summary}
                 </pre>
               </div>
 
               {/* Detailed Findings */}
               <div>
-                <h3 className="font-bold text-lg mb-2">Detailed Findings</h3>
-                <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded">
+                <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">Detailed Findings</h3>
+                <pre className="whitespace-pre-wrap text-sm bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
                   {selectedReport.report.detailed_findings}
                 </pre>
               </div>
 
               {/* Risk Assessment */}
               <div>
-                <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-orange-600" />
+                <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-orange-600" />
                   Risk Assessment
                 </h3>
-                <pre className="whitespace-pre-wrap text-sm bg-orange-50 p-4 rounded">
+                <pre className="whitespace-pre-wrap text-sm bg-orange-50 dark:bg-orange-900/20 p-4 rounded border border-orange-200 dark:border-orange-700 text-gray-900 dark:text-gray-100">
                   {selectedReport.report.risk_assessment}
                 </pre>
               </div>
 
               {/* Recommendations */}
               <div>
-                <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+                <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
+                  <CheckCircleIcon className="h-5 w-5 text-green-600" />
                   Recommendations
                 </h3>
-                <pre className="whitespace-pre-wrap text-sm bg-green-50 p-4 rounded">
+                <pre className="whitespace-pre-wrap text-sm bg-green-50 dark:bg-green-900/20 p-4 rounded border border-green-200 dark:border-green-700 text-gray-900 dark:text-gray-100">
                   {selectedReport.report.recommendations}
                 </pre>
               </div>
@@ -411,8 +415,8 @@ Patent-pending technology. © 2024 NeuroPredict-AI
               {/* Follow-up Plan */}
               {selectedReport.report.follow_up_plan && (
                 <div>
-                  <h3 className="font-bold text-lg mb-2">Follow-up Plan</h3>
-                  <pre className="whitespace-pre-wrap text-sm bg-blue-50 p-4 rounded">
+                  <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">Follow-up Plan</h3>
+                  <pre className="whitespace-pre-wrap text-sm bg-blue-50 dark:bg-blue-900/20 p-4 rounded border border-blue-200 dark:border-blue-700 text-gray-900 dark:text-gray-100">
                     {selectedReport.report.follow_up_plan}
                   </pre>
                 </div>
@@ -421,47 +425,45 @@ Patent-pending technology. © 2024 NeuroPredict-AI
               {/* Quality Metrics */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="font-semibold mb-2">Data Completeness</h4>
+                  <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Data Completeness</h4>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-green-500 h-2 rounded-full"
                         style={{ width: `${selectedReport.quality.data_completeness}%` }}
                       />
                     </div>
-                    <span className="text-sm">{selectedReport.quality.data_completeness.toFixed(0)}%</span>
+                    <span className="text-sm text-gray-900 dark:text-white">{selectedReport.quality.data_completeness.toFixed(0)}%</span>
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-2">Confidence</h4>
-                  <Badge className={getConfidenceColor(selectedReport.fusion_scores.confidence)}>
+                  <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Confidence</h4>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getConfidenceColor(selectedReport.fusion_scores.confidence)}`}>
                     {selectedReport.fusion_scores.confidence.replace('_', ' ').toUpperCase()}
-                  </Badge>
+                  </span>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-4 border-t">
-                <Button
+              <div className="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
                   onClick={() => downloadReport(selectedReport)}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700"
+                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
                 >
-                  <Download className="h-4 w-4 mr-2" />
+                  <ArrowDownTrayIcon className="h-5 w-5" />
                   Download Report
-                </Button>
-                <Button
-                  variant="outline"
+                </button>
+                <button
                   onClick={() => setSelectedReport(null)}
-                  className="flex-1"
+                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-medium transition-colors"
                 >
                   Close
-                </Button>
+                </button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
-
