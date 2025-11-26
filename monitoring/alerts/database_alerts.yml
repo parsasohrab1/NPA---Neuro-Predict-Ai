@@ -1,0 +1,122 @@
+# Alert Rules for Database (PostgreSQL)
+groups:
+  - name: database_alerts
+    interval: 30s
+    rules:
+      # PostgreSQL Down
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance {{ $labels.instance }} has been down for more than 1 minute"
+
+      # High Connection Count
+      - alert: HighDatabaseConnections
+        expr: |
+          (
+            pg_stat_database_numbackends
+            /
+            pg_settings_max_connections
+          ) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connection count"
+          description: "Database connections at {{ $value | humanize }}% of maximum (threshold: 80%)"
+
+      # Database Replication Lag
+      - alert: DatabaseReplicationLag
+        expr: pg_replication_lag_seconds > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Database replication lag"
+          description: "Replication lag is {{ $value }}s (threshold: 30s)"
+
+      # High Transaction Rate
+      - alert: HighTransactionRate
+        expr: rate(pg_stat_database_xact_commit[5m]) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Unusually high transaction rate"
+          description: "Transaction rate is {{ $value }} TPS"
+
+      # Database Deadlocks
+      - alert: DatabaseDeadlocks
+        expr: increase(pg_stat_database_deadlocks[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Database deadlocks detected"
+          description: "{{ $value }} deadlocks in the last 5 minutes"
+
+      # Long Running Queries
+      - alert: LongRunningQueries
+        expr: pg_stat_activity_max_tx_duration > 300
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Long running query detected"
+          description: "Query running for {{ $value }}s (threshold: 300s)"
+
+      # Database Table Bloat
+      - alert: HighTableBloat
+        expr: |
+          (
+            pg_stat_user_tables_n_dead_tup
+            /
+            (pg_stat_user_tables_n_live_tup + pg_stat_user_tables_n_dead_tup)
+          ) * 100 > 20
+        for: 1h
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High table bloat detected"
+          description: "Table {{ $labels.table }} has {{ $value | humanize }}% dead tuples"
+
+      # Low Cache Hit Ratio
+      - alert: LowCacheHitRatio
+        expr: |
+          (
+            pg_stat_database_blks_hit
+            /
+            (pg_stat_database_blks_hit + pg_stat_database_blks_read)
+          ) < 0.90
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Low database cache hit ratio"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }} (threshold: 90%)"
+
+      # Database Disk Full Soon
+      - alert: DatabaseDiskFullSoon
+        expr: |
+          predict_linear(pg_database_size_bytes[1h], 86400 * 7)
+          >
+          node_filesystem_size_bytes{mountpoint="/var/lib/postgresql/data"}
+        for: 1h
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Database disk will be full soon"
+          description: "Database disk predicted to be full in 7 days based on current growth rate"
+

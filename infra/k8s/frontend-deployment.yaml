@@ -1,12 +1,19 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: neuropredict-frontend
+  namespace: neuropredict
   labels:
     app: neuropredict
     tier: frontend
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: neuropredict
@@ -20,47 +27,108 @@ spec:
       containers:
         - name: frontend
           image: neuropredict/frontend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
-          env:
-            - name: VITE_API_URL
-              value: "http://backend:8000"
+              name: http
+          envFrom:
+            - configMapRef:
+                name: neuropredict-frontend-config
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
               port: 3000
             initialDelaySeconds: 5
             periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 15
-            periodSeconds: 20
           resources:
             requests:
               cpu: "100m"
-              memory: "128Mi"
+              memory: "256Mi"
             limits:
               cpu: "500m"
               memory: "512Mi"
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
+  namespace: neuropredict
   labels:
     app: neuropredict
     tier: frontend
 spec:
+  type: ClusterIP
   selector:
     app: neuropredict
     tier: frontend
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 3000
       targetPort: 3000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neuropredict-admin
+  namespace: neuropredict
+  labels:
+    app: neuropredict
+    tier: admin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: neuropredict
+      tier: admin
+  template:
+    metadata:
+      labels:
+        app: neuropredict
+        tier: admin
+    spec:
+      containers:
+        - name: admin
+          image: neuropredict/admin-dashboard:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: neuropredict-frontend-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-dashboard
+  namespace: neuropredict
+  labels:
+    app: neuropredict
+    tier: admin
+spec:
   type: ClusterIP
-
-
+  selector:
+    app: neuropredict
+    tier: admin
+  ports:
+    - name: http
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

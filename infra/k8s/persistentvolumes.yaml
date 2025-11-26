@@ -1,0 +1,63 @@
+---
+# Persistent Volume Claim for uploads
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neuropredict-uploads-pvc
+  namespace: neuropredict
+  labels:
+    app: neuropredict
+    tier: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# Persistent Volume Claim for ML models
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neuropredict-models-pvc
+  namespace: neuropredict
+  labels:
+    app: neuropredict
+    tier: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Storage Class for NFS (if not already configured)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-storage
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: nfs-server.example.com
+  share: /data/neuropredict
+  # Mount options
+mountOptions:
+  - hard
+  - nfsvers=4.1
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+
+---
+# Example: Local Storage Class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+

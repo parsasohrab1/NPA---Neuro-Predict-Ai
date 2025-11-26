@@ -1,0 +1,131 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@neuropredict.ai'
+  smtp_auth_username: 'alerts@neuropredict.ai'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alerts
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+    
+    # Backend alerts
+    - match:
+        service: backend
+      receiver: 'backend-team'
+      group_wait: 30s
+      repeat_interval: 1h
+    
+    # Database alerts
+    - match:
+        service: database
+      receiver: 'database-team'
+      group_wait: 30s
+      repeat_interval: 1h
+    
+    # Infrastructure alerts
+    - match:
+        service: infrastructure
+      receiver: 'ops-team'
+      group_wait: 1m
+      repeat_interval: 2h
+
+# Alert receivers
+receivers:
+  # Default receiver
+  - name: 'default'
+    email_configs:
+      - to: 'team@neuropredict.ai'
+        headers:
+          Subject: '[NeuroPredict] Alert: {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://backend:8000/api/v1/monitoring/alerts'
+        send_resolved: true
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@neuropredict.ai'
+        headers:
+          Subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+    # SMS notifications (example with Twilio)
+    webhook_configs:
+      - url: 'https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json'
+        send_resolved: true
+      # Slack notifications
+      - url: 'https://hooks.slack.com/services/${SLACK_WEBHOOK}'
+        send_resolved: true
+
+  # Backend team
+  - name: 'backend-team'
+    email_configs:
+      - to: 'backend-team@neuropredict.ai'
+        headers:
+          Subject: '[Backend] {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/${SLACK_WEBHOOK}'
+        channel: '#backend-alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+  # Database team
+  - name: 'database-team'
+    email_configs:
+      - to: 'database-team@neuropredict.ai'
+        headers:
+          Subject: '[Database] {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/${SLACK_WEBHOOK}'
+        channel: '#database-alerts'
+
+  # Operations team
+  - name: 'ops-team'
+    email_configs:
+      - to: 'ops@neuropredict.ai'
+        headers:
+          Subject: '[Infrastructure] {{ .GroupLabels.alertname }}'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # Inhibit backend alerts if backend is down
+  - source_match:
+      alertname: 'APIEndpointDown'
+    target_match:
+      service: 'backend'
+    equal: ['instance']
+  
+  # Inhibit disk alerts if node is down
+  - source_match:
+      alertname: 'InstanceDown'
+    target_match:
+      service: 'infrastructure'
+    equal: ['instance']
+  
+  # Don't alert about high memory if container is being terminated
+  - source_match:
+      alertname: 'ContainerTerminating'
+    target_match:
+      alertname: 'HighMemoryUsage'
+    equal: ['container']
+

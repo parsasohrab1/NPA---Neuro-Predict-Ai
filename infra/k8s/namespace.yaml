@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: neuropredict
+  labels:
+    name: neuropredict
+    environment: production
+    app: neuropredict-ai
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: neuropredict-monitoring
+  labels:
+    name: neuropredict-monitoring
+    environment: production
+    purpose: monitoring
+

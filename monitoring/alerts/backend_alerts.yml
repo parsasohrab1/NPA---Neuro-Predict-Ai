@@ -1,0 +1,174 @@
+# Alert Rules for NeuroPredict Backend
+groups:
+  - name: backend_alerts
+    interval: 30s
+    rules:
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="neuropredict-backend",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="neuropredict-backend"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Backend error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # High Response Time
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="neuropredict-backend"}[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s (threshold: 2s)"
+
+      # API Endpoint Down
+      - alert: APIEndpointDown
+        expr: up{job="neuropredict-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "Backend API is down"
+          description: "Backend API at {{ $labels.instance }} has been down for more than 1 minute"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          (
+            sum(rate(container_cpu_usage_seconds_total{container="neuropredict-backend"}[5m]))
+            /
+            sum(container_spec_cpu_quota{container="neuropredict-backend"} / container_spec_cpu_period{container="neuropredict-backend"})
+          ) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High CPU usage"
+          description: "Backend CPU usage is {{ $value | humanize }}% (threshold: 80%)"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            sum(container_memory_usage_bytes{container="neuropredict-backend"})
+            /
+            sum(container_spec_memory_limit_bytes{container="neuropredict-backend"})
+          ) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High memory usage"
+          description: "Backend memory usage is {{ $value | humanize }}% (threshold: 85%)"
+
+      # Database Connection Pool Exhaustion
+      - alert: DatabaseConnectionPoolExhausted
+        expr: db_connection_pool_available{job="neuropredict-backend"} < 5
+        for: 5m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Only {{ $value }} database connections available"
+
+      # Slow Queries
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket{job="neuropredict-backend"}[5m])) by (le)
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s (threshold: 5s)"
+
+      # ML Model Prediction Failures
+      - alert: HighModelPredictionFailureRate
+        expr: |
+          (
+            sum(rate(ml_predictions_total{job="neuropredict-backend",status="failed"}[5m]))
+            /
+            sum(rate(ml_predictions_total{job="neuropredict-backend"}[5m]))
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "High ML prediction failure rate"
+          description: "ML prediction failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Authentication Failures
+      - alert: HighAuthenticationFailureRate
+        expr: |
+          sum(rate(auth_attempts_total{job="neuropredict-backend",status="failed"}[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value }} failed authentication attempts per second"
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"}
+            /
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value | humanize }}% available (threshold: 15%)"
+
+      # SSL Certificate Expiring Soon
+      - alert: SSLCertificateExpiringSoon
+        expr: (ssl_certificate_expiry_seconds < 86400 * 30)
+        for: 1h
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate expires in {{ $value | humanizeDuration }}"
+
+      # Request Rate Spike
+      - alert: RequestRateSpike
+        expr: |
+          (
+            sum(rate(http_requests_total{job="neuropredict-backend"}[5m]))
+            /
+            avg_over_time(sum(rate(http_requests_total{job="neuropredict-backend"}[5m]))[1h:5m])
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "Unusual request rate spike"
+          description: "Request rate is {{ $value }}x normal (possible DDoS or traffic spike)"
+

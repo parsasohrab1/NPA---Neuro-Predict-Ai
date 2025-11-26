@@ -1,0 +1,43 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neuropredict-backend-config
+  namespace: neuropredict
+data:
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  LOG_LEVEL: "INFO"
+  CORS_ORIGINS: "https://neuropredict.ai,https://admin.neuropredict.ai"
+  MAX_UPLOAD_SIZE: "10485760"  # 10MB
+  SESSION_TIMEOUT: "3600"  # 1 hour
+  JWT_ALGORITHM: "RS256"
+  JWT_EXPIRATION: "3600"  # 1 hour
+  RATE_LIMIT_PER_MINUTE: "100"
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neuropredict-frontend-config
+  namespace: neuropredict
+data:
+  VITE_API_URL: "https://api.neuropredict.ai"
+  VITE_ENVIRONMENT: "production"
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: neuropredict
+data:
+  POSTGRES_DB: "neuropredict_db"
+  POSTGRES_MAX_CONNECTIONS: "200"
+  POSTGRES_SHARED_BUFFERS: "256MB"
+  POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
+  POSTGRES_MAINTENANCE_WORK_MEM: "64MB"
+  POSTGRES_WAL_BUFFERS: "16MB"
+

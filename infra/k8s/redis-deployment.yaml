@@ -1,20 +1,22 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
+  namespace: neuropredict
   labels:
-    app: neuropredict
+    app: redis
     tier: cache
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: neuropredict
+      app: redis
       tier: cache
   template:
     metadata:
       labels:
-        app: neuropredict
+        app: redis
         tier: cache
     spec:
       containers:
@@ -22,32 +24,78 @@ spec:
           image: redis:7-alpine
           ports:
             - containerPort: 6379
+              name: redis
+          command:
+            - redis-server
+            - "--appendonly"
+            - "yes"
+            - "--requirepass"
+            - "$(REDIS_PASSWORD)"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: neuropredict-secrets
+                  key: REDIS_PASSWORD
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
           livenessProbe:
-            tcpSocket:
-              port: 6379
-            initialDelaySeconds: 10
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
-            tcpSocket:
-              port: 6379
+            exec:
+              command:
+                - redis-cli
+                - ping
             initialDelaySeconds: 5
             periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data-pvc
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
+  namespace: neuropredict
   labels:
-    app: neuropredict
+    app: redis
     tier: cache
 spec:
+  type: ClusterIP
   selector:
-    app: neuropredict
+    app: redis
     tier: cache
   ports:
-    - protocol: TCP
+    - name: redis
+      protocol: TCP
       port: 6379
       targetPort: 6379
-  type: ClusterIP
 
-
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data-pvc
+  namespace: neuropredict
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
