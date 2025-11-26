@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Html, Environment } from '@react-three/drei'
+import { OrbitControls, Html } from '@react-three/drei'
 import * as THREE from 'three'
 
 // Brain region definitions with their positions and sizes
@@ -445,8 +445,9 @@ export default function BrainVisualization3D({
           color="#ffffff"
         />
 
-        {/* Environment for reflections and ambient lighting */}
-        <Environment preset="city" />
+        {/* Ambient and hemisphere lighting instead of Environment */}
+        <hemisphereLight intensity={0.35} groundColor="#444444" />
+        <ambientLight intensity={0.25} />
         
         {/* Fog for depth perception */}
         <fog attach="fog" args={['#0f172a', 8, 15]} />
