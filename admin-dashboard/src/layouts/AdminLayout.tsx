@@ -121,11 +121,6 @@ export default function AdminLayout() {
               >
                 <item.icon className="h-5 w-5" aria-hidden="true" />
                 <span>{item.name}</span>
-                {item.highlight && (
-                  <span className="ml-auto text-xs bg-yellow-400/20 text-yellow-300 px-2 py-0.5 rounded-full font-semibold">
-                    PATENT
-                  </span>
-                )}
               </NavLink>
             ))}
           </nav>

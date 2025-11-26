@@ -126,7 +126,7 @@ export default function DataFusionReportsPage() {
 
   const downloadReport = (report: FusionReport) => {
     const content = `
-PATENT-PENDING: MULTI-MODAL DATA FUSION REPORT
+MULTI-MODAL DATA FUSION REPORT
 NeuroPredict-AI System
 
 Report ID: ${report.id}
@@ -149,7 +149,7 @@ ${report.report.follow_up_plan}
 
 ---
 This report was generated using our proprietary multi-modal data fusion algorithm.
-Patent-pending technology. © 2024 NeuroPredict-AI
+© 2024 NeuroPredict-AI
     `.trim()
 
     const blob = new Blob([content], { type: 'text/plain' })
@@ -171,22 +171,22 @@ Patent-pending technology. © 2024 NeuroPredict-AI
             Data Fusion Reports
           </h1>
           <p className="text-slate-400 mt-1">
-            PATENT-PENDING: Multi-Modal Medical Data Integration & Interpretation
+            Multi-Modal Medical Data Integration & Interpretation
           </p>
         </div>
       </div>
 
-      {/* Patent Notice */}
+      {/* System Information */}
       <div className="border-2 border-purple-500/30 bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-6">
         <div className="flex items-start gap-3">
           <SparklesIcon className="h-6 w-6 text-purple-400 mt-1 flex-shrink-0" />
           <div>
-            <h3 className="font-semibold text-purple-200">Patent-Pending Innovation</h3>
+            <h3 className="font-semibold text-purple-200">Advanced Data Fusion</h3>
             <p className="text-sm text-purple-300 mt-1">
-              This system implements our proprietary <strong>Multi-Modal Data Fusion Algorithm</strong> that
+              This system implements a <strong>Multi-Modal Data Fusion Algorithm</strong> that
               integrates cognitive assessments, biomarker profiles, and neuroimaging findings through
               confidence-weighted correlation analysis with automated conflict resolution and natural
-              language report generation. This represents our key differentiator for intellectual property protection.
+              language report generation.
             </p>
           </div>
         </div>
