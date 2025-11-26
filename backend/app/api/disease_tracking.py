@@ -11,7 +11,7 @@ from ..db.session import get_db
 from ..core.security import require_role, get_current_user
 from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
-from ..models.prediction import Prediction
+from ..models.prediction import Prediction, RiskLevel, DiseaseType
 from ..services.ai_model_service import AIModelService
 
 router = APIRouter(prefix="/disease-tracking", tags=["Disease Tracking"])
@@ -708,7 +708,6 @@ async def load_all_datasets(
             alzheimer_risk = min(1.0, alzheimer_risk)
             parkinson_risk = min(1.0, parkinson_risk)
             
-            from ..models.prediction import RiskLevel, DiseaseType
             alzheimer_level = (
                 RiskLevel.HIGH if alzheimer_risk >= 0.66
                 else RiskLevel.MEDIUM if alzheimer_risk >= 0.33
@@ -904,7 +903,6 @@ async def add_default_data_for_all_patients(
         alzheimer_risk = min(1.0, alzheimer_risk)
         parkinson_risk = min(1.0, parkinson_risk)
         
-        from ..models.prediction import RiskLevel
         alzheimer_level = (
             RiskLevel.HIGH if alzheimer_risk >= 0.66
             else RiskLevel.MEDIUM if alzheimer_risk >= 0.33
@@ -917,7 +915,6 @@ async def add_default_data_for_all_patients(
         )
         
         # Create prediction
-        from ..models.prediction import DiseaseType
         prediction = Prediction(
             patient_id=patient.id,
             disease_type=DiseaseType.BOTH,
