@@ -111,7 +111,9 @@ export default function AdminLayout() {
                 className={({ isActive }) =>
                   clsx(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 focus-visible:ring-offset-slate-900',
-                    isActive
+                    item.highlight && !isActive
+                      ? 'bg-gradient-to-r from-purple-600/90 to-purple-700/90 text-white hover:from-purple-600 hover:to-purple-700'
+                      : isActive
                       ? 'bg-slate-800 text-slate-50'
                       : 'text-slate-300 hover:bg-slate-800 hover:text-slate-50'
                   )
@@ -119,6 +121,11 @@ export default function AdminLayout() {
               >
                 <item.icon className="h-5 w-5" aria-hidden="true" />
                 <span>{item.name}</span>
+                {item.highlight && (
+                  <span className="ml-auto text-xs bg-yellow-400/20 text-yellow-300 px-2 py-0.5 rounded-full font-semibold">
+                    PATENT
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
