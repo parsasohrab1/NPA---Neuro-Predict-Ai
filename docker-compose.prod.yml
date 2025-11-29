@@ -42,28 +42,6 @@ services:
       retries: 3
       start_period: 60s
 
-  # Frontend - Production
-  frontend:
-    # Build for production
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
-    # Production resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 1.5G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-
   # PostgreSQL - Production
   postgres:
     environment:
