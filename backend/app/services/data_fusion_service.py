@@ -1,12 +1,15 @@
 """
 PATENT-PENDING: Data Fusion Service
 Multi-Modal Medical Data Fusion and Interpretation Algorithm
+Now uses Deep Learning model for score predictions
 """
 from typing import Dict, Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
 import time
+import numpy as np
+import logging
 
 from ..models.patient import Patient
 from ..models.medical_record import MedicalRecord
@@ -15,6 +18,12 @@ from ..models.data_fusion_report import (
     FusionConfidence, 
     FusionInterpretation
 )
+
+logger = logging.getLogger(__name__)
+from .data_fusion_model_service import get_data_fusion_model_service
+from .data_fusion_xai_service import get_data_fusion_xai_service
+from .clinical_norms_service import get_clinical_norms_service
+from .natural_language_service import get_natural_language_service
 
 
 class DataFusionService:
@@ -63,43 +72,105 @@ class DataFusionService:
             raise ValueError("Patient or medical record not found")
         
         # ====================================================================
-        # STEP 1: ASSESS INDIVIDUAL MODALITIES
+        # STEP 1: USE DEEP LEARNING MODEL FOR SCORE PREDICTIONS
         # ====================================================================
         
-        cognitive_score, cognitive_conf = DataFusionService._assess_cognitive_modality(medical_record)
-        biomarker_score, biomarker_conf = DataFusionService._assess_biomarker_modality(medical_record)
-        imaging_score, imaging_conf = DataFusionService._assess_imaging_modality(medical_record)
+        # Try to use trained Deep Learning model
+        model_service = get_data_fusion_model_service()
+        using_dl_model = False
         
-        # ====================================================================
-        # STEP 2: CALCULATE CROSS-MODAL CORRELATIONS (PATENT-PENDING)
-        # ====================================================================
-        
-        correlations = DataFusionService._calculate_cross_modal_correlations(
-            medical_record, cognitive_score, biomarker_score, imaging_score
-        )
-        
-        consistency_score = DataFusionService._assess_cross_modal_consistency(correlations)
-        has_conflicts = consistency_score < 60
-        
-        # ====================================================================
-        # STEP 3: WEIGHTED FUSION (PATENT-PENDING)
-        # ====================================================================
-        
-        integrated_score = DataFusionService._calculate_integrated_fusion_score(
-            cognitive_score, biomarker_score, imaging_score,
-            cognitive_conf, biomarker_conf, imaging_conf
-        )
-        
-        fusion_confidence = DataFusionService._determine_fusion_confidence(
-            cognitive_conf, biomarker_conf, imaging_conf, consistency_score
-        )
-        
-        # ====================================================================
-        # STEP 4: DISEASE-SPECIFIC FUSION ANALYSIS (PATENT-PENDING)
-        # ====================================================================
-        
-        ad_analysis = DataFusionService._analyze_alzheimer_fusion(medical_record, patient)
-        pd_analysis = DataFusionService._analyze_parkinson_fusion(medical_record, patient)
+        if model_service.is_loaded():
+            using_dl_model = True
+            # Extract features
+            features = DataFusionService._extract_features_for_model(medical_record, patient)
+            
+            # Get predictions from model
+            predictions = model_service.predict_scores(features)
+            
+            # Extract scores from model predictions
+            cognitive_score = predictions.get('cognitive_score', 50.0)
+            biomarker_score = predictions.get('biomarker_score', 50.0)
+            imaging_score = predictions.get('imaging_score', 50.0)
+            cognitive_conf = predictions.get('cognitive_confidence', 0.5)
+            biomarker_conf = predictions.get('biomarker_confidence', 0.5)
+            imaging_conf = predictions.get('imaging_confidence', 0.5)
+            
+            # Correlations
+            correlations = {
+                'cognitive_biomarker': predictions.get('cognitive_biomarker_correlation', 0.5),
+                'cognitive_imaging': predictions.get('cognitive_imaging_correlation', 0.5),
+                'biomarker_imaging': predictions.get('biomarker_imaging_correlation', 0.5),
+            }
+            
+            # Integrated fusion score
+            integrated_score = predictions.get('integrated_fusion_score', 50.0)
+            
+            # Consistency score
+            consistency_score = DataFusionService._assess_cross_modal_consistency(correlations)
+            has_conflicts = consistency_score < 60
+            
+            # Fusion confidence
+            fusion_confidence = DataFusionService._determine_fusion_confidence(
+                cognitive_conf, biomarker_conf, imaging_conf, consistency_score
+            )
+            
+            # Disease-specific analysis
+            ad_analysis = {
+                'score': predictions.get('alzheimer_fusion_score', 0.0),
+                'confidence': (cognitive_conf + biomarker_conf) / 2.0,
+                'amyloid_tau_concordance': predictions.get('alzheimer_concordance', 50.0),
+                'cognitive_biomarker_alignment': predictions.get('alzheimer_alignment', 50.0),
+                'hippocampal_correlation': predictions.get('alzheimer_hippo_corr', 50.0),
+            }
+            
+            pd_analysis = {
+                'score': predictions.get('parkinson_fusion_score', 0.0),
+                'confidence': (cognitive_conf + biomarker_conf) / 2.0,
+                'dopamine_cognitive_concordance': predictions.get('parkinson_concordance', 50.0),
+                'motor_cognitive_alignment': predictions.get('parkinson_alignment', 50.0),
+                'imaging_biomarker_correlation': predictions.get('parkinson_corr', 50.0),
+            }
+        else:
+            # Fallback to manual calculations with clinical norms
+            # ====================================================================
+            # STEP 1: ASSESS INDIVIDUAL MODALITIES (Using Clinical Norms)
+            # ====================================================================
+            
+            # Use age and gender-adjusted clinical norms instead of fixed thresholds
+            cognitive_score, cognitive_conf = DataFusionService._assess_cognitive_modality(medical_record, patient)
+            biomarker_score, biomarker_conf = DataFusionService._assess_biomarker_modality(medical_record, patient)
+            imaging_score, imaging_conf = DataFusionService._assess_imaging_modality(medical_record, patient)
+            
+            # ====================================================================
+            # STEP 2: CALCULATE CROSS-MODAL CORRELATIONS (PATENT-PENDING)
+            # ====================================================================
+            
+            correlations = DataFusionService._calculate_cross_modal_correlations(
+                medical_record, cognitive_score, biomarker_score, imaging_score
+            )
+            
+            consistency_score = DataFusionService._assess_cross_modal_consistency(correlations)
+            has_conflicts = consistency_score < 60
+            
+            # ====================================================================
+            # STEP 3: WEIGHTED FUSION (PATENT-PENDING)
+            # ====================================================================
+            
+            integrated_score = DataFusionService._calculate_integrated_fusion_score(
+                cognitive_score, biomarker_score, imaging_score,
+                cognitive_conf, biomarker_conf, imaging_conf
+            )
+            
+            fusion_confidence = DataFusionService._determine_fusion_confidence(
+                cognitive_conf, biomarker_conf, imaging_conf, consistency_score
+            )
+            
+            # ====================================================================
+            # STEP 4: DISEASE-SPECIFIC FUSION ANALYSIS (PATENT-PENDING)
+            # ====================================================================
+            
+            ad_analysis = DataFusionService._analyze_alzheimer_fusion(medical_record, patient)
+            pd_analysis = DataFusionService._analyze_parkinson_fusion(medical_record, patient)
         
         # ====================================================================
         # STEP 5: GENERATE INTERPRETATION (PATENT-PENDING)
@@ -113,12 +184,21 @@ class DataFusionService:
         # STEP 6: GENERATE NATURAL LANGUAGE REPORT (PATENT-PENDING)
         # ====================================================================
         
-        report_sections = DataFusionService._generate_report_text(
-            patient, medical_record, 
-            cognitive_score, biomarker_score, imaging_score,
-            integrated_score, ad_analysis, pd_analysis,
-            interpretation, correlations
-        )
+            # Generate report using Natural Language Service
+            nlg_service = get_natural_language_service()
+            report_sections = nlg_service.generate_fusion_report(
+                patient=patient,
+                record=medical_record,
+                cog_score=cognitive_score,
+                bio_score=biomarker_score,
+                img_score=imaging_score,
+                fusion_score=integrated_score,
+                ad_analysis=ad_analysis,
+                pd_analysis=pd_analysis,
+                interpretation=interpretation,
+                correlations=correlations,
+                xai_explanation=xai_explanation
+            )
         
         # ====================================================================
         # STEP 7: DATA QUALITY ASSESSMENT
@@ -126,6 +206,44 @@ class DataFusionService:
         
         completeness = DataFusionService._assess_data_completeness(medical_record)
         outliers = DataFusionService._detect_outliers(medical_record)
+        
+        # ====================================================================
+        # STEP 8: PATENT CLAIM 3 - GENERATE DYNAMIC EVIDENCE (XAI)
+        # ====================================================================
+        
+        xai_evidence = None
+        xai_method = None
+        has_xai = False
+        
+        if using_dl_model:
+            try:
+                # Get XAI service
+                xai_service = get_data_fusion_xai_service(model_service.model)
+                
+                # Prepare fusion scores for XAI
+                fusion_scores_dict = {
+                    'cognitive_score': cognitive_score,
+                    'biomarker_score': biomarker_score,
+                    'imaging_score': imaging_score,
+                    'integrated_fusion_score': integrated_score,
+                    'alzheimer_fusion_score': ad_analysis['score'],
+                    'parkinson_fusion_score': pd_analysis['score'],
+                    'fusion_confidence': float(fusion_confidence.value) if hasattr(fusion_confidence, 'value') else 0.5
+                }
+                
+                # Generate dynamic evidence (PATENT CLAIM 3)
+                xai_evidence = xai_service.generate_dynamic_evidence(
+                    medical_record=medical_record,
+                    patient=patient,
+                    fusion_scores=fusion_scores_dict,
+                    method='integrated_gradients'
+                )
+                xai_method = 'integrated_gradients'
+                has_xai = True
+                
+            except Exception as e:
+                logger.warning(f"Could not generate XAI evidence: {e}")
+                xai_evidence = None
         
         # ====================================================================
         # CREATE FUSION REPORT
@@ -181,11 +299,11 @@ class DataFusionService:
             imaging_evidence=interpretation['evidence']['imaging'],
             
             # Report Sections
-            executive_summary=report_sections['executive_summary'],
-            detailed_findings=report_sections['detailed_findings'],
-            risk_assessment=report_sections['risk_assessment'],
-            recommendations=report_sections['recommendations'],
-            follow_up_plan=report_sections['follow_up_plan'],
+            executive_summary=report_sections.get('executive_summary', ''),
+            detailed_findings=report_sections.get('detailed_findings', ''),
+            risk_assessment=report_sections.get('risk_assessment') or report_sections.get('disease_analysis', ''),
+            recommendations=report_sections.get('recommendations', ''),
+            follow_up_plan=report_sections.get('follow_up_plan') or report_sections.get('technical_notes', ''),
             
             # Quality Metrics
             data_completeness_score=completeness,
@@ -194,33 +312,173 @@ class DataFusionService:
             
             # Metadata
             processing_time_ms=processing_time,
-            algorithm_version="1.0.0",
+            algorithm_version="2.0.0-DL" if using_dl_model else "1.0.0",
             report_version="1.0.0",
+            
+            # PATENT CLAIM 3: XAI Dynamic Evidence
+            xai_evidence=xai_evidence,
+            xai_method=xai_method,
+            has_xai_explanation=1 if has_xai else 0,
         )
         
         return fusion_report
     
     # ========================================================================
-    # PATENT-PENDING: Individual Modality Assessment Methods
+    # Feature Extraction for Deep Learning Model
     # ========================================================================
     
     @staticmethod
-    def _assess_cognitive_modality(record: MedicalRecord) -> tuple[float, float]:
+    def _extract_features_for_model(medical_record: MedicalRecord, patient: Patient) -> np.ndarray:
         """
-        Assess cognitive modality and calculate confidence
+        Extract features from medical record for model input
+        
+        Returns normalized feature vector matching training data format
+        """
+        features = []
+        
+        # Cognitive features (normalized)
+        features.append(medical_record.mmse_score / 30.0 if medical_record.mmse_score is not None else 0.0)
+        features.append(medical_record.moca_score / 30.0 if medical_record.moca_score is not None else 0.0)
+        features.append(medical_record.memory_score / 100.0 if medical_record.memory_score is not None else 0.0)
+        features.append(medical_record.attention_score / 100.0 if medical_record.attention_score is not None else 0.0)
+        features.append(medical_record.executive_function_score / 100.0 if medical_record.executive_function_score is not None else 0.0)
+        
+        # Biomarker features (normalized)
+        features.append((medical_record.amyloid_beta - 200) / 800.0 if medical_record.amyloid_beta is not None else 0.0)
+        features.append((medical_record.tau_protein - 100) / 700.0 if medical_record.tau_protein is not None else 0.0)
+        features.append((medical_record.dopamine_level - 50) / 150.0 if medical_record.dopamine_level is not None else 0.0)
+        features.append(1.0 if medical_record.apoe_e4_status else 0.0 if medical_record.apoe_e4_status is not None else 0.0)
+        
+        # Imaging features (normalized)
+        features.append((medical_record.hippocampal_volume - 2000) / 2000.0 if medical_record.hippocampal_volume is not None else 0.0)
+        features.append((medical_record.cortical_thickness - 1.5) / 1.5 if medical_record.cortical_thickness is not None else 0.0)
+        features.append((medical_record.ventricular_volume - 20000) / 30000.0 if medical_record.ventricular_volume is not None else 0.0)
+        features.append((medical_record.white_matter_hyperintensities - 0) / 20.0 if medical_record.white_matter_hyperintensities is not None else 0.0)
+        features.append((medical_record.brain_volume_total - 1000000) / 200000.0 if medical_record.brain_volume_total is not None else 0.0)
+        
+        # Patient demographics
+        age = (datetime.now().date() - patient.date_of_birth).days / 365.25
+        features.append(age / 100.0)  # Normalize age
+        features.append(1.0 if patient.gender.value == 'male' else 0.0)
+        features.append((patient.education_years or 12) / 20.0)  # Normalize education
+        
+        return np.array(features, dtype=np.float32)
+    
+    # ========================================================================
+    # PATENT-PENDING: Individual Modality Assessment Methods
+    # (Kept as fallback when model is not available)
+    # ========================================================================
+    
+    @staticmethod
+    def _assess_cognitive_modality(record: MedicalRecord, patient: Optional[Patient] = None) -> tuple[float, float]:
+        """
+        Assess cognitive modality using clinical norms based on age and education
         Returns: (score 0-100, confidence 0-1)
+        """
+        if not patient:
+            # Fallback to simple assessment if patient not provided
+            return DataFusionService._assess_cognitive_modality_simple(record)
+        
+        norms_service = get_clinical_norms_service()
+        
+        # Calculate age
+        age = (datetime.now().date() - patient.date_of_birth).days / 365.25
+        education_years = patient.education_years or 12
+        
+        # Get cognitive norms
+        cognitive_norms = norms_service.get_cognitive_score_norms(age, education_years)
+        
+        scores = []
+        weights = []
+        confidences = []
+        
+        # MMSE assessment against norms
+        if record.mmse_score is not None:
+            mmse_score, mmse_conf = norms_service.assess_against_norms(
+                record.mmse_score,
+                cognitive_norms['mmse'],
+                higher_is_better=True
+            )
+            scores.append(mmse_score)
+            weights.append(0.25)
+            confidences.append(mmse_conf)
+        
+        # MoCA assessment against norms
+        if record.moca_score is not None:
+            moca_score, moca_conf = norms_service.assess_against_norms(
+                record.moca_score,
+                cognitive_norms['moca'],
+                higher_is_better=True
+            )
+            scores.append(moca_score)
+            weights.append(0.25)
+            confidences.append(moca_conf)
+        
+        # Memory score assessment
+        if record.memory_score is not None:
+            memory_score, memory_conf = norms_service.assess_against_norms(
+                record.memory_score,
+                cognitive_norms['memory'],
+                higher_is_better=True
+            )
+            scores.append(memory_score)
+            weights.append(0.20)
+            confidences.append(memory_conf)
+        
+        # Attention score assessment
+        if record.attention_score is not None:
+            attention_score, attention_conf = norms_service.assess_against_norms(
+                record.attention_score,
+                cognitive_norms['attention'],
+                higher_is_better=True
+            )
+            scores.append(attention_score)
+            weights.append(0.15)
+            confidences.append(attention_conf)
+        
+        # Executive function score assessment
+        if record.executive_function_score is not None:
+            executive_score, executive_conf = norms_service.assess_against_norms(
+                record.executive_function_score,
+                cognitive_norms['executive'],
+                higher_is_better=True
+            )
+            scores.append(executive_score)
+            weights.append(0.15)
+            confidences.append(executive_conf)
+        
+        if not scores:
+            return 50.0, 0.0  # No data, neutral score, zero confidence
+        
+        # Weighted average
+        total_weight = sum(weights)
+        cognitive_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        
+        # Confidence: average of individual confidences weighted by completeness
+        if confidences:
+            avg_confidence = sum(confidences) / len(confidences)
+            completeness_factor = len(scores) / 5.0  # Max 5 cognitive measures
+            confidence = avg_confidence * completeness_factor
+        else:
+            confidence = len(scores) / 5.0
+        
+        return cognitive_score, confidence
+    
+    @staticmethod
+    def _assess_cognitive_modality_simple(record: MedicalRecord) -> tuple[float, float]:
+        """
+        Simple cognitive assessment fallback (when patient info not available)
+        Uses fixed thresholds instead of age/education-adjusted norms
         """
         scores = []
         weights = []
         
         if record.mmse_score is not None:
-            # MMSE: 30 is perfect, 0 is severe impairment
             mmse_norm = (record.mmse_score / 30) * 100
             scores.append(mmse_norm)
             weights.append(0.25)
         
         if record.moca_score is not None:
-            # MoCA: 30 is perfect, 0 is severe impairment
             moca_norm = (record.moca_score / 30) * 100
             scores.append(moca_norm)
             weights.append(0.25)
@@ -238,120 +496,225 @@ class DataFusionService:
             weights.append(0.15)
         
         if not scores:
-            return 50.0, 0.0  # No data, neutral score, zero confidence
+            return 50.0, 0.0
         
-        # Weighted average
         total_weight = sum(weights)
         cognitive_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
-        
-        # Confidence based on data completeness
-        confidence = len(scores) / 5.0  # Max 5 cognitive measures
+        confidence = len(scores) / 5.0
         
         return cognitive_score, confidence
     
     @staticmethod
-    def _assess_biomarker_modality(record: MedicalRecord) -> tuple[float, float]:
+    def _assess_biomarker_modality(record: MedicalRecord, patient: Optional[Patient] = None) -> tuple[float, float]:
         """
-        Assess biomarker modality and calculate confidence
+        Assess biomarker modality using age-adjusted clinical norms
         Returns: (score 0-100, confidence 0-1)
-        PATENT-PENDING: Disease-specific biomarker weighting
+        PATENT-PENDING: Disease-specific biomarker weighting with clinical norms
         """
-        risk_score = 0.0
-        confidence_factors = []
+        norms_service = get_clinical_norms_service()
+        
+        # Calculate age for age-adjusted norms
+        if patient:
+            age = (datetime.now().date() - patient.date_of_birth).days / 365.25
+        else:
+            age = 70.0  # Default age if patient not available
+        
+        # Get biomarker norms
+        biomarker_norms = norms_service.get_biomarker_norms(age)
+        
+        scores = []
+        weights = []
+        confidences = []
         
         # Amyloid-beta assessment (Alzheimer indicator)
+        # Lower is worse (pathological threshold: <450)
         if record.amyloid_beta is not None:
-            if record.amyloid_beta < 400:  # Low = Alzheimer risk
-                risk_score += 30
-            elif record.amyloid_beta < 500:
-                risk_score += 15
-            confidence_factors.append(1.0)
+            abeta_score, abeta_conf = norms_service.assess_against_norms(
+                record.amyloid_beta,
+                biomarker_norms['amyloid_beta'],
+                higher_is_better=True  # Higher amyloid-beta is better (normal)
+            )
+            # Additional penalty if below pathological threshold
+            if record.amyloid_beta < biomarker_norms['amyloid_beta']['pathological_threshold']:
+                abeta_score *= 0.7  # 30% penalty for pathological level
+            scores.append(abeta_score)
+            weights.append(0.30)
+            confidences.append(abeta_conf)
         
         # Tau protein assessment (Alzheimer indicator)
+        # Higher is worse (pathological threshold: >350)
         if record.tau_protein is not None:
-            if record.tau_protein > 400:  # High = Alzheimer risk
-                risk_score += 30
-            elif record.tau_protein > 300:
-                risk_score += 15
-            confidence_factors.append(1.0)
+            tau_score, tau_conf = norms_service.assess_against_norms(
+                record.tau_protein,
+                biomarker_norms['tau_protein'],
+                higher_is_better=False  # Lower tau is better
+            )
+            # Additional penalty if above pathological threshold
+            if record.tau_protein > biomarker_norms['tau_protein']['pathological_threshold']:
+                tau_score *= 0.7  # 30% penalty for pathological level
+            scores.append(tau_score)
+            weights.append(0.30)
+            confidences.append(tau_conf)
         
         # Dopamine assessment (Parkinson indicator)
+        # Lower is worse (pathological threshold: <60)
         if record.dopamine_level is not None:
-            if record.dopamine_level < 60:  # Low = Parkinson risk
-                risk_score += 25
-            elif record.dopamine_level < 80:
-                risk_score += 12
-            confidence_factors.append(1.0)
+            dopamine_score, dopamine_conf = norms_service.assess_against_norms(
+                record.dopamine_level,
+                biomarker_norms['dopamine'],
+                higher_is_better=True  # Higher dopamine is better
+            )
+            # Additional penalty if below pathological threshold
+            if record.dopamine_level < biomarker_norms['dopamine']['pathological_threshold']:
+                dopamine_score *= 0.6  # 40% penalty for pathological level
+            scores.append(dopamine_score)
+            weights.append(0.25)
+            confidences.append(dopamine_conf)
         
         # APOE ε4 status (Alzheimer risk factor)
+        # Genetic marker - fixed risk factor
         if record.apoe_e4_status is not None:
             if record.apoe_e4_status:
-                risk_score += 15
-            confidence_factors.append(0.8)  # Genetic marker, moderate weight
+                apoe_score = 70.0  # Reduced score for APOE ε4 positive
+            else:
+                apoe_score = 100.0  # Normal score for negative
+            scores.append(apoe_score)
+            weights.append(0.15)
+            confidences.append(0.8)  # Genetic marker, moderate confidence
         
-        # Convert risk to health score (inverse)
-        biomarker_score = 100 - min(100, risk_score)
+        if not scores:
+            return 50.0, 0.0
         
-        # Confidence based on available biomarkers
-        confidence = sum(confidence_factors) / 4.0 if confidence_factors else 0.0
+        # Weighted average
+        total_weight = sum(weights)
+        biomarker_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        
+        # Confidence: average of individual confidences
+        if confidences:
+            confidence = sum(confidences) / len(confidences)
+        else:
+            confidence = len(scores) / 4.0  # Max 4 biomarker measures
         
         return biomarker_score, confidence
     
     @staticmethod
-    def _assess_imaging_modality(record: MedicalRecord) -> tuple[float, float]:
+    def _assess_imaging_modality(record: MedicalRecord, patient: Optional[Patient] = None) -> tuple[float, float]:
         """
-        Assess imaging modality and calculate confidence
+        Assess imaging modality using age and gender-adjusted clinical norms
         Returns: (score 0-100, confidence 0-1)
-        PATENT-PENDING: Multi-metric MRI fusion
+        PATENT-PENDING: Multi-metric MRI fusion with clinical norms
         """
-        risk_score = 0.0
-        confidence_factors = []
+        norms_service = get_clinical_norms_service()
         
-        # Hippocampal volume (Alzheimer indicator)
+        # Calculate age and get gender for norms
+        if patient:
+            age = (datetime.now().date() - patient.date_of_birth).days / 365.25
+            gender = patient.gender.value
+        else:
+            age = 70.0  # Default age
+            gender = 'male'  # Default gender
+        
+        scores = []
+        weights = []
+        confidences = []
+        
+        # Hippocampal volume assessment (age and gender adjusted)
         if record.hippocampal_volume is not None:
-            if record.hippocampal_volume < 2800:  # Severe atrophy
-                risk_score += 35
-            elif record.hippocampal_volume < 3200:  # Moderate atrophy
-                risk_score += 20
-            elif record.hippocampal_volume < 3500:  # Mild atrophy
-                risk_score += 10
-            confidence_factors.append(1.0)
+            hippo_norms = norms_service.get_hippocampal_volume_norms(age, gender)
+            hippo_score, hippo_conf = norms_service.assess_against_norms(
+                record.hippocampal_volume,
+                hippo_norms,
+                higher_is_better=True
+            )
+            # Additional assessment based on atrophy thresholds
+            if record.hippocampal_volume < hippo_norms['severe_atrophy_threshold']:
+                hippo_score *= 0.5  # Severe penalty for severe atrophy
+            elif record.hippocampal_volume < hippo_norms['moderate_atrophy_threshold']:
+                hippo_score *= 0.75  # Moderate penalty
+            elif record.hippocampal_volume < hippo_norms['mild_atrophy_threshold']:
+                hippo_score *= 0.9  # Mild penalty
+            scores.append(hippo_score)
+            weights.append(0.35)
+            confidences.append(hippo_conf)
         
-        # Cortical thickness (general atrophy indicator)
+        # Cortical thickness assessment (age and gender adjusted)
         if record.cortical_thickness is not None:
-            if record.cortical_thickness < 2.2:  # Severe thinning
-                risk_score += 20
-            elif record.cortical_thickness < 2.5:  # Moderate thinning
-                risk_score += 10
-            confidence_factors.append(0.9)
+            cortical_norms = norms_service.get_cortical_thickness_norms(age, gender)
+            cortical_score, cortical_conf = norms_service.assess_against_norms(
+                record.cortical_thickness,
+                cortical_norms,
+                higher_is_better=True
+            )
+            # Additional assessment based on thinning thresholds
+            if record.cortical_thickness < cortical_norms['severe_thinning_threshold']:
+                cortical_score *= 0.6  # Severe penalty
+            elif record.cortical_thickness < cortical_norms['moderate_thinning_threshold']:
+                cortical_score *= 0.8  # Moderate penalty
+            elif record.cortical_thickness < cortical_norms['mild_thinning_threshold']:
+                cortical_score *= 0.9  # Mild penalty
+            scores.append(cortical_score)
+            weights.append(0.25)
+            confidences.append(cortical_conf)
         
-        # Ventricular volume (atrophy/neurodegeneration indicator)
+        # Ventricular volume assessment (age adjusted)
         if record.ventricular_volume is not None:
-            if record.ventricular_volume > 50000:  # Severe enlargement
-                risk_score += 25
-            elif record.ventricular_volume > 40000:  # Moderate enlargement
-                risk_score += 12
-            confidence_factors.append(0.9)
+            ventricular_norms = norms_service.get_ventricular_volume_norms(age)
+            ventricular_score, ventricular_conf = norms_service.assess_against_norms(
+                record.ventricular_volume,
+                ventricular_norms,
+                higher_is_better=False  # Lower is better
+            )
+            # Additional assessment based on enlargement thresholds
+            if record.ventricular_volume > ventricular_norms['severe_enlargement_threshold']:
+                ventricular_score *= 0.5  # Severe penalty
+            elif record.ventricular_volume > ventricular_norms['moderate_enlargement_threshold']:
+                ventricular_score *= 0.75  # Moderate penalty
+            elif record.ventricular_volume > ventricular_norms['mild_enlargement_threshold']:
+                ventricular_score *= 0.9  # Mild penalty
+            scores.append(ventricular_score)
+            weights.append(0.20)
+            confidences.append(ventricular_conf)
         
-        # White matter hyperintensities (vascular/degenerative)
+        # White matter hyperintensities (WMH)
+        # Fixed thresholds (less age-dependent, more pathology-dependent)
         if record.white_matter_hyperintensities is not None:
-            if record.white_matter_hyperintensities > 10:
-                risk_score += 15
-            elif record.white_matter_hyperintensities > 5:
-                risk_score += 7
-            confidence_factors.append(0.8)
+            wmh = record.white_matter_hyperintensities
+            if wmh <= 2:
+                wmh_score = 100.0
+            elif wmh <= 5:
+                wmh_score = 85.0
+            elif wmh <= 10:
+                wmh_score = 65.0
+            else:
+                wmh_score = 40.0
+            scores.append(wmh_score)
+            weights.append(0.10)
+            confidences.append(0.8)
         
-        # Total brain volume
+        # Total brain volume assessment (age and gender adjusted)
         if record.brain_volume_total is not None:
-            if record.brain_volume_total < 1100000:  # Reduced volume
-                risk_score += 10
-            confidence_factors.append(0.7)
+            brain_volume_norms = norms_service.get_brain_volume_norms(age, gender)
+            brain_volume_score, brain_volume_conf = norms_service.assess_against_norms(
+                record.brain_volume_total,
+                brain_volume_norms,
+                higher_is_better=True
+            )
+            scores.append(brain_volume_score)
+            weights.append(0.10)
+            confidences.append(brain_volume_conf)
         
-        # Convert risk to health score (inverse)
-        imaging_score = 100 - min(100, risk_score)
+        if not scores:
+            return 50.0, 0.0
         
-        # Confidence based on available imaging metrics
-        confidence = sum(confidence_factors) / 5.0 if confidence_factors else 0.0
+        # Weighted average
+        total_weight = sum(weights)
+        imaging_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        
+        # Confidence: average of individual confidences
+        if confidences:
+            confidence = sum(confidences) / len(confidences)
+        else:
+            confidence = len(scores) / 5.0  # Max 5 imaging measures
         
         return imaging_score, confidence
     
@@ -376,29 +739,32 @@ class DataFusionService:
         
         # Cognitive-Biomarker Correlation
         # Expected: Low cognitive should correlate with abnormal biomarkers
-        if record.mmse_score is not None and record.amyloid_beta is not None:
-            # For Alzheimer: Low MMSE should correlate with low amyloid
-            mmse_impairment = (30 - record.mmse_score) / 30  # 0-1
-            amyloid_abnormality = max(0, (500 - record.amyloid_beta) / 500)  # 0-1
-            correlations['cognitive_biomarker'] = 1.0 - abs(mmse_impairment - amyloid_abnormality)
+        # Use normalized scores (0-1) for better correlation calculation
+        if cognitive_score is not None and biomarker_score is not None:
+            # Normalize cognitive impairment (0 = normal, 1 = severe)
+            cognitive_impairment = 1.0 - (cognitive_score / 100.0)
+            # Normalize biomarker abnormality (0 = normal, 1 = severe)
+            biomarker_abnormality = 1.0 - (biomarker_score / 100.0)
+            # Correlation: how well they align (1.0 = perfect alignment, 0.0 = complete discordance)
+            correlations['cognitive_biomarker'] = 1.0 - abs(cognitive_impairment - biomarker_abnormality)
         else:
             correlations['cognitive_biomarker'] = 0.5  # Neutral if data missing
         
         # Cognitive-Imaging Correlation
-        # Expected: Low cognitive should correlate with hippocampal atrophy
-        if record.mmse_score is not None and record.hippocampal_volume is not None:
-            mmse_impairment = (30 - record.mmse_score) / 30
-            hippo_atrophy = max(0, (4000 - record.hippocampal_volume) / 2000)  # 0-1
-            correlations['cognitive_imaging'] = 1.0 - abs(mmse_impairment - hippo_atrophy)
+        # Expected: Low cognitive should correlate with imaging abnormalities
+        if cognitive_score is not None and imaging_score is not None:
+            cognitive_impairment = 1.0 - (cognitive_score / 100.0)
+            imaging_abnormality = 1.0 - (imaging_score / 100.0)
+            correlations['cognitive_imaging'] = 1.0 - abs(cognitive_impairment - imaging_abnormality)
         else:
             correlations['cognitive_imaging'] = 0.5
         
         # Biomarker-Imaging Correlation
         # Expected: Abnormal biomarkers should correlate with brain changes
-        if record.amyloid_beta is not None and record.hippocampal_volume is not None:
-            amyloid_abnormality = max(0, (500 - record.amyloid_beta) / 500)
-            hippo_atrophy = max(0, (4000 - record.hippocampal_volume) / 2000)
-            correlations['biomarker_imaging'] = 1.0 - abs(amyloid_abnormality - hippo_atrophy)
+        if biomarker_score is not None and imaging_score is not None:
+            biomarker_abnormality = 1.0 - (biomarker_score / 100.0)
+            imaging_abnormality = 1.0 - (imaging_score / 100.0)
+            correlations['biomarker_imaging'] = 1.0 - abs(biomarker_abnormality - imaging_abnormality)
         else:
             correlations['biomarker_imaging'] = 0.5
         
@@ -486,19 +852,30 @@ class DataFusionService:
     def _analyze_alzheimer_fusion(record: MedicalRecord, patient: Patient) -> Dict[str, Any]:
         """
         PATENT-PENDING: Alzheimer's disease-specific multi-modal fusion
+        Uses clinical norms instead of fixed thresholds
         """
+        norms_service = get_clinical_norms_service()
+        age = (datetime.now().date() - patient.date_of_birth).days / 365.25
+        gender = patient.gender.value
+        
         score = 0.0
         confidence_factors = []
         
+        # Get clinical norms
+        biomarker_norms = norms_service.get_biomarker_norms(age)
+        cognitive_norms = norms_service.get_cognitive_score_norms(age, patient.education_years or 12)
+        hippo_norms = norms_service.get_hippocampal_volume_norms(age, gender)
+        
         # Amyloid-Tau Concordance (hallmark of AD)
+        # Use pathological thresholds from norms
         if record.amyloid_beta is not None and record.tau_protein is not None:
-            amyloid_low = record.amyloid_beta < 450
-            tau_high = record.tau_protein > 350
+            amyloid_pathological = record.amyloid_beta < biomarker_norms['amyloid_beta']['pathological_threshold']
+            tau_pathological = record.tau_protein > biomarker_norms['tau_protein']['pathological_threshold']
             
-            if amyloid_low and tau_high:
+            if amyloid_pathological and tau_pathological:
                 concordance = 100.0
                 score += 40
-            elif amyloid_low or tau_high:
+            elif amyloid_pathological or tau_pathological:
                 concordance = 60.0
                 score += 20
             else:
@@ -509,10 +886,11 @@ class DataFusionService:
             concordance = 50.0
         
         # Cognitive-Biomarker Alignment
+        # Use age and education-adjusted cognitive norms
         alignment = 50.0
         if record.mmse_score is not None and record.amyloid_beta is not None:
-            mmse_impaired = record.mmse_score < 24
-            amyloid_abnormal = record.amyloid_beta < 450
+            mmse_impaired = record.mmse_score < cognitive_norms['mmse']['mild_impairment']
+            amyloid_abnormal = record.amyloid_beta < biomarker_norms['amyloid_beta']['pathological_threshold']
             
             if mmse_impaired and amyloid_abnormal:
                 alignment = 100.0
@@ -526,10 +904,11 @@ class DataFusionService:
             confidence_factors.append(0.9)
         
         # Hippocampal-Clinical Correlation
+        # Use age and gender-adjusted hippocampal norms
         correlation = 50.0
         if record.hippocampal_volume is not None and record.mmse_score is not None:
-            hippo_atrophy = record.hippocampal_volume < 3000
-            mmse_impaired = record.mmse_score < 24
+            hippo_atrophy = record.hippocampal_volume < hippo_norms['moderate_atrophy_threshold']
+            mmse_impaired = record.mmse_score < cognitive_norms['mmse']['mild_impairment']
             
             if hippo_atrophy and mmse_impaired:
                 correlation = 100.0
@@ -542,8 +921,7 @@ class DataFusionService:
             
             confidence_factors.append(1.0)
         
-        # Age factor
-        age = (datetime.now().date() - patient.date_of_birth).days // 365
+        # Age factor (age > 65 increases risk)
         if age > 65:
             score += min(15, (age - 65) * 0.5)
         
@@ -566,20 +944,29 @@ class DataFusionService:
     def _analyze_parkinson_fusion(record: MedicalRecord, patient: Patient) -> Dict[str, Any]:
         """
         PATENT-PENDING: Parkinson's disease-specific multi-modal fusion
+        Uses clinical norms instead of fixed thresholds
         """
+        norms_service = get_clinical_norms_service()
+        age = (datetime.now().date() - patient.date_of_birth).days / 365.25
+        
         score = 0.0
         confidence_factors = []
         
+        # Get clinical norms
+        biomarker_norms = norms_service.get_biomarker_norms(age)
+        cognitive_norms = norms_service.get_cognitive_score_norms(age, patient.education_years or 12)
+        
         # Dopamine-Cognitive Concordance
+        # Use age-adjusted dopamine norms and education-adjusted cognitive norms
         concordance = 50.0
         if record.dopamine_level is not None and record.attention_score is not None:
-            dopamine_low = record.dopamine_level < 70
-            attention_impaired = record.attention_score < 65
+            dopamine_pathological = record.dopamine_level < biomarker_norms['dopamine']['pathological_threshold']
+            attention_impaired = record.attention_score < cognitive_norms['attention']['normal_min']
             
-            if dopamine_low and attention_impaired:
+            if dopamine_pathological and attention_impaired:
                 concordance = 100.0
                 score += 45
-            elif dopamine_low or attention_impaired:
+            elif dopamine_pathological or attention_impaired:
                 concordance = 60.0
                 score += 22
             else:
@@ -590,13 +977,13 @@ class DataFusionService:
         # Motor-Cognitive Alignment (implied by dopamine + executive function)
         alignment = 50.0
         if record.dopamine_level is not None and record.executive_function_score is not None:
-            dopamine_low = record.dopamine_level < 70
-            executive_impaired = record.executive_function_score < 65
+            dopamine_pathological = record.dopamine_level < biomarker_norms['dopamine']['pathological_threshold']
+            executive_impaired = record.executive_function_score < cognitive_norms['executive']['normal_min']
             
-            if dopamine_low and executive_impaired:
+            if dopamine_pathological and executive_impaired:
                 alignment = 100.0
                 score += 30
-            elif dopamine_low or executive_impaired:
+            elif dopamine_pathological or executive_impaired:
                 alignment = 60.0
                 score += 15
             else:
@@ -605,15 +992,17 @@ class DataFusionService:
             confidence_factors.append(0.9)
         
         # Imaging-Biomarker Correlation
+        # Use age and gender-adjusted cortical thickness norms
         correlation = 50.0
         if record.dopamine_level is not None and record.cortical_thickness is not None:
-            dopamine_low = record.dopamine_level < 70
-            cortical_thin = record.cortical_thickness < 2.5
+            dopamine_pathological = record.dopamine_level < biomarker_norms['dopamine']['pathological_threshold']
+            cortical_norms = norms_service.get_cortical_thickness_norms(age, patient.gender.value)
+            cortical_thin = record.cortical_thickness < cortical_norms['moderate_thinning_threshold']
             
-            if dopamine_low and cortical_thin:
+            if dopamine_pathological and cortical_thin:
                 correlation = 90.0
                 score += 25
-            elif dopamine_low or cortical_thin:
+            elif dopamine_pathological or cortical_thin:
                 correlation = 55.0
                 score += 12
             else:
@@ -757,147 +1146,9 @@ class DataFusionService:
     # ========================================================================
     # PATENT-PENDING: Natural Language Report Generation
     # ========================================================================
-    
-    @staticmethod
-    def _generate_report_text(
-        patient: Patient,
-        record: MedicalRecord,
-        cog_score: float,
-        bio_score: float,
-        img_score: float,
-        fusion_score: float,
-        ad_analysis: Dict,
-        pd_analysis: Dict,
-        interpretation: Dict,
-        correlations: Dict
-    ) -> Dict[str, str]:
-        """
-        PATENT-PENDING: Automated clinical report generation
-        """
-        age = (datetime.now().date() - patient.date_of_birth).days // 365
-        
-        # Executive Summary
-        exec_summary = f"""
-MULTI-MODAL DATA FUSION REPORT
-
-Patient: {patient.first_name} {patient.last_name} (ID: {patient.patient_id})
-Age: {age} years | Gender: {patient.gender.value}
-Report Date: {datetime.now().strftime('%Y-%m-%d')}
-
-INTEGRATED FUSION SCORE: {fusion_score:.1f}/100
-INTERPRETATION: {interpretation['primary_concern']}
-CONFIDENCE: {interpretation['confidence']:.1f}%
-
-This report integrates cognitive assessments, biomarker analyses, and neuroimaging 
-findings through our proprietary multi-modal fusion algorithm.
-        """.strip()
-        
-        # Detailed Findings
-        detailed = f"""
-MODALITY ANALYSIS:
-
-1. COGNITIVE ASSESSMENT (Score: {cog_score:.1f}/100)
-   - MMSE: {record.mmse_score if record.mmse_score else 'N/A'}
-   - MoCA: {record.moca_score if record.moca_score else 'N/A'}
-   - Memory: {record.memory_score if record.memory_score else 'N/A'}
-   - Attention: {record.attention_score if record.attention_score else 'N/A'}
-   - Executive Function: {record.executive_function_score if record.executive_function_score else 'N/A'}
-   
-   {interpretation['evidence']['cognitive']}
-
-2. BIOMARKER PROFILE (Score: {bio_score:.1f}/100)
-   - Amyloid-beta: {record.amyloid_beta if record.amyloid_beta else 'N/A'} pg/mL
-   - Tau Protein: {record.tau_protein if record.tau_protein else 'N/A'} pg/mL
-   - Dopamine: {record.dopamine_level if record.dopamine_level else 'N/A'} ng/mL
-   - APOE ε4: {'Positive' if record.apoe_e4_status else 'Negative' if record.apoe_e4_status is not None else 'N/A'}
-   
-   {interpretation['evidence']['biomarker']}
-
-3. NEUROIMAGING (Score: {img_score:.1f}/100)
-   - Hippocampal Volume: {record.hippocampal_volume if record.hippocampal_volume else 'N/A'} mm³
-   - Cortical Thickness: {record.cortical_thickness if record.cortical_thickness else 'N/A'} mm
-   - Ventricular Volume: {record.ventricular_volume if record.ventricular_volume else 'N/A'} mm³
-   - WMH: {record.white_matter_hyperintensities if record.white_matter_hyperintensities else 'N/A'}
-   
-   {interpretation['evidence']['imaging']}
-
-CROSS-MODAL CORRELATION ANALYSIS:
-- Cognitive-Biomarker: {correlations['cognitive_biomarker']*100:.1f}% concordance
-- Cognitive-Imaging: {correlations['cognitive_imaging']*100:.1f}% concordance
-- Biomarker-Imaging: {correlations['biomarker_imaging']*100:.1f}% concordance
-        """.strip()
-        
-        # Risk Assessment
-        risk_assess = f"""
-DISEASE-SPECIFIC FUSION ANALYSIS:
-
-ALZHEIMER'S DISEASE:
-- Multi-Modal Fusion Score: {ad_analysis['score']:.1f}/100
-- Confidence: {ad_analysis['confidence']*100:.1f}%
-- Amyloid-Tau Concordance: {ad_analysis['amyloid_tau_concordance']:.1f}%
-- Risk Level: {'HIGH' if ad_analysis['score'] > 60 else 'MODERATE' if ad_analysis['score'] > 30 else 'LOW'}
-
-PARKINSON'S DISEASE:
-- Multi-Modal Fusion Score: {pd_analysis['score']:.1f}/100
-- Confidence: {pd_analysis['confidence']*100:.1f}%
-- Dopamine-Cognitive Concordance: {pd_analysis['dopamine_cognitive_concordance']:.1f}%
-- Risk Level: {'HIGH' if pd_analysis['score'] > 60 else 'MODERATE' if pd_analysis['score'] > 30 else 'LOW'}
-
-OVERALL ASSESSMENT:
-- Primary Concern: {interpretation['primary_concern']}
-- Confidence in Assessment: {interpretation['confidence']:.1f}%
-- Data Quality: {'Excellent' if fusion_score > 70 else 'Good' if fusion_score > 50 else 'Fair'}
-        """.strip()
-        
-        # Recommendations
-        if fusion_score >= 85:
-            recommendations = """
-- Continue routine monitoring
-- Maintain healthy lifestyle (exercise, cognitive engagement, social activity)
-- Annual cognitive screening recommended
-- No immediate clinical intervention required
-            """.strip()
-        elif fusion_score >= 70:
-            recommendations = """
-- Follow-up cognitive assessment in 6 months
-- Lifestyle modifications (physical exercise, cognitive training, Mediterranean diet)
-- Consider baseline MRI if not recently done
-- Monitor for progression
-            """.strip()
-        elif fusion_score >= 50:
-            recommendations = """
-- Comprehensive neurological evaluation recommended
-- Repeat biomarker testing in 3-6 months
-- Detailed neuropsychological assessment
-- Consider therapeutic interventions
-- MRI surveillance for progression
-- Specialist referral advised
-            """.strip()
-        else:
-            recommendations = """
-- URGENT: Comprehensive neurological evaluation
-- Initiate appropriate disease-modifying therapy
-- Frequent monitoring (monthly to quarterly)
-- Multidisciplinary care team involvement
-- Consider clinical trial enrollment
-- Family counseling and support services
-            """.strip()
-        
-        # Follow-up Plan
-        if fusion_score >= 70:
-            follow_up = "Routine follow-up in 12 months. Earlier if symptoms develop."
-        elif fusion_score >= 50:
-            follow_up = "Follow-up in 3-6 months with repeat cognitive testing and biomarkers."
-        else:
-            follow_up = "Frequent follow-up (monthly to quarterly) with comprehensive assessments."
-        
-        return {
-            'executive_summary': exec_summary,
-            'detailed_findings': detailed,
-            'risk_assessment': risk_assess,
-            'recommendations': recommendations,
-            'follow_up_plan': follow_up,
-        }
+    # NOTE: Report generation has been moved to NaturalLanguageService
+    # for better separation of concerns and maintainability.
+    # See: backend/app/services/natural_language_service.py
     
     # ========================================================================
     # Data Quality Assessment

@@ -2,10 +2,11 @@
 PATENT-PENDING: Data Fusion Report API Endpoints
 Multi-Modal Medical Data Fusion and Interpretation
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from typing import List
+import torch
 
 from ..db.session import get_db
 from ..models.user import User
@@ -17,6 +18,8 @@ from ..schemas.data_fusion import (
     DataFusionReportCreate
 )
 from ..services.data_fusion_service import DataFusionService
+from ..services.data_fusion_xai_service import get_data_fusion_xai_service
+from ..services.data_fusion_model_service import get_data_fusion_model_service
 from ..core.security import get_current_user
 
 router = APIRouter(prefix="/data-fusion", tags=["Data Fusion Reports"])
@@ -187,6 +190,183 @@ async def batch_generate_fusion_reports(
         'errors': len(errors),
         'generated_reports': generated,
         'error_details': errors[:10]  # First 10 errors
+    }
+
+
+@router.post("/{report_id}/explain", status_code=status.HTTP_200_OK)
+async def explain_fusion_report(
+    report_id: int,
+    method: str = "integrated_gradients",
+    db: AsyncSession = Depends(get_db),
+    # current_user: User = Depends(get_current_user)  # Disabled for development
+):
+    """
+    PATENT CLAIM 3: Generate dynamic evidence and explanations for a fusion report
+    
+    This endpoint implements Patent Claim 3 by providing:
+    (a) Computing model gradients with respect to input
+    (b) Using Integrated Gradients for accurate attribution
+    (c) Mapping attributions to anatomical brain regions
+    (d) Visual display data for saliency maps
+    
+    Args:
+        report_id: ID of the fusion report to explain
+        method: XAI method to use ('integrated_gradients' or 'gradient_saliency')
+    
+    Returns:
+        Comprehensive dynamic evidence supporting Patent Claim 3
+    """
+    # Get fusion report
+    result = await db.execute(
+        select(DataFusionReport).where(DataFusionReport.id == report_id)
+    )
+    report = result.scalar_one_or_none()
+    
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fusion report {report_id} not found"
+        )
+    
+    # Get patient and medical record
+    patient_result = await db.execute(
+        select(Patient).where(Patient.id == report.patient_id)
+    )
+    patient = patient_result.scalar_one_or_none()
+    
+    record_result = await db.execute(
+        select(MedicalRecord).where(MedicalRecord.id == report.medical_record_id)
+    )
+    medical_record = record_result.scalar_one_or_none()
+    
+    if not patient or not medical_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient or medical record not found"
+        )
+    
+    # Get model service and XAI service
+    model_service = get_data_fusion_model_service()
+    
+    if not model_service.is_loaded():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Deep Learning model not available. XAI requires trained model."
+        )
+    
+    xai_service = get_data_fusion_xai_service(model_service.model)
+    
+    # Prepare fusion scores
+    fusion_scores = {
+        'cognitive_score': report.cognitive_modality_score,
+        'biomarker_score': report.biomarker_modality_score,
+        'imaging_score': report.imaging_modality_score,
+        'integrated_fusion_score': report.integrated_fusion_score,
+        'alzheimer_fusion_score': report.alzheimer_fusion_score,
+        'parkinson_fusion_score': report.parkinson_fusion_score,
+        'fusion_confidence': float(report.fusion_confidence.value) if hasattr(report.fusion_confidence, 'value') else 0.5
+    }
+    
+    # Generate dynamic evidence (PATENT CLAIM 3)
+    evidence = xai_service.generate_dynamic_evidence(
+        medical_record=medical_record,
+        patient=patient,
+        fusion_scores=fusion_scores,
+        method=method
+    )
+    
+    return evidence
+
+
+@router.get("/{report_id}/saliency-map", status_code=status.HTTP_200_OK)
+async def get_saliency_map(
+    report_id: int,
+    target_output: str = "integrated_fusion_score",
+    method: str = "integrated_gradients",
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    PATENT CLAIM 3(d): Get visual saliency map data
+    
+    Returns saliency map data for visualization, supporting Patent Claim 3(d)
+    which requires visual display of saliency maps for medical interpretation.
+    
+    Args:
+        report_id: ID of the fusion report
+        target_output: Which output to explain
+        method: XAI method to use
+    
+    Returns:
+        Saliency map data for visualization
+    """
+    # Get fusion report
+    result = await db.execute(
+        select(DataFusionReport).where(DataFusionReport.id == report_id)
+    )
+    report = result.scalar_one_or_none()
+    
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fusion report {report_id} not found"
+        )
+    
+    # Get patient and medical record
+    patient_result = await db.execute(
+        select(Patient).where(Patient.id == report.patient_id)
+    )
+    patient = patient_result.scalar_one_or_none()
+    
+    record_result = await db.execute(
+        select(MedicalRecord).where(MedicalRecord.id == report.medical_record_id)
+    )
+    medical_record = record_result.scalar_one_or_none()
+    
+    if not patient or not medical_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient or medical record not found"
+        )
+    
+    # Get model service
+    model_service = get_data_fusion_model_service()
+    
+    if not model_service.is_loaded():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Deep Learning model not available"
+        )
+    
+    xai_service = get_data_fusion_xai_service(model_service.model)
+    
+    # Extract features
+    from ..services.data_fusion_service import DataFusionService
+    features = DataFusionService._extract_features_for_model(medical_record, patient)
+    features_tensor = torch.FloatTensor(features).unsqueeze(0)
+    
+    # Compute saliency map
+    if method == "integrated_gradients":
+        result = xai_service.compute_integrated_gradients(
+            features_tensor,
+            target_output=target_output
+        )
+    else:
+        result = xai_service.compute_gradient_saliency(
+            features_tensor,
+            target_output=target_output
+        )
+    
+    # Get visual saliency data
+    attributions = result.get('attribution') or result.get('saliency')
+    visual_data = xai_service._prepare_visual_saliency_data(attributions)
+    
+    return {
+        'report_id': report_id,
+        'target_output': target_output,
+        'method': method,
+        'saliency_data': visual_data,
+        'anatomical_regions': xai_service.map_to_anatomical_regions(attributions),
+        'patent_claim_3_support': True
     }
 
 

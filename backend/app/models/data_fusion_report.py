@@ -165,6 +165,15 @@ class DataFusionReport(Base):
     data_quality_notes = Column(Text, nullable=True)
     
     # ============================================================================
+    # PATENT CLAIM 3: XAI Dynamic Evidence
+    # ============================================================================
+    
+    # XAI explanations and dynamic evidence (JSON)
+    xai_evidence = Column(JSON, nullable=True)  # Stores dynamic evidence from XAI service
+    xai_method = Column(String(50), nullable=True)  # Method used: 'integrated_gradients' or 'gradient_saliency'
+    has_xai_explanation = Column(Integer, default=0)  # Boolean: whether XAI explanation is available
+    
+    # ============================================================================
     # Additional Metadata
     # ============================================================================
     
