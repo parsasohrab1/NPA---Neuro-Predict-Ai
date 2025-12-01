@@ -15,29 +15,59 @@ from ..core.config import settings
 
 
 class CacheService:
-    """Redis-based caching service"""
+    """Redis-based caching service with in-memory fallback"""
     
     def __init__(self):
         self.redis_client: Optional[redis.Redis] = None
+        self.memory_cache: Dict[str, tuple] = {}  # In-memory fallback: {key: (value, expiry_time)}
+        self.use_memory_fallback = False
     
     async def connect(self):
         """Connect to Redis"""
         if not self.redis_client:
-            self.redis_client = redis.from_url(
-                f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
-                decode_responses=False
-            )
+            try:
+                self.redis_client = redis.from_url(
+                    f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
+                    decode_responses=False,
+                    socket_connect_timeout=2,
+                    socket_timeout=2
+                )
+                # Test connection
+                await self.redis_client.ping()
+                self.use_memory_fallback = False
+            except Exception:
+                # Redis not available, use memory fallback
+                self.redis_client = None
+                self.use_memory_fallback = True
     
     async def close(self):
         """Close Redis connection"""
         if self.redis_client:
-            await self.redis_client.close()
+            try:
+                await self.redis_client.close()
+            except Exception:
+                pass
             self.redis_client = None
     
     async def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
+        # If using memory fallback
+        if self.use_memory_fallback:
+            if key in self.memory_cache:
+                value, expiry = self.memory_cache[key]
+                from datetime import datetime
+                if datetime.now().timestamp() < expiry:
+                    return value
+                else:
+                    del self.memory_cache[key]
+            return None
+        
+        # Try Redis
         if not self.redis_client:
             await self.connect()
+        
+        if self.use_memory_fallback:
+            return None
         
         try:
             data = await self.redis_client.get(key)
@@ -46,7 +76,13 @@ class CacheService:
                 decompressed = gzip.decompress(data)
                 return pickle.loads(decompressed)
         except Exception:
-            return None
+            # Fallback to memory on Redis error
+            self.use_memory_fallback = True
+            if key in self.memory_cache:
+                value, expiry = self.memory_cache[key]
+                from datetime import datetime
+                if datetime.now().timestamp() < expiry:
+                    return value
         
         return None
     
@@ -57,38 +93,75 @@ class CacheService:
         expire_seconds: Optional[int] = 3600
     ):
         """Set value in cache"""
+        # If using memory fallback
+        if self.use_memory_fallback:
+            from datetime import datetime, timedelta
+            expiry = (datetime.now() + timedelta(seconds=expire_seconds or 3600)).timestamp()
+            self.memory_cache[key] = (value, expiry)
+            # Clean up old entries (keep cache size manageable)
+            if len(self.memory_cache) > 1000:
+                now = datetime.now().timestamp()
+                self.memory_cache = {k: v for k, v in self.memory_cache.items() if v[1] > now}
+            return
+        
+        # Try Redis
         if not self.redis_client:
             await self.connect()
+        
+        if self.use_memory_fallback:
+            # Fallback to memory
+            from datetime import datetime, timedelta
+            expiry = (datetime.now() + timedelta(seconds=expire_seconds or 3600)).timestamp()
+            self.memory_cache[key] = (value, expiry)
+            return
         
         try:
             # Serialize and compress
             serialized = pickle.dumps(value)
             compressed = gzip.compress(serialized)
-            await self.redis_client.setex(key, expire_seconds, compressed)
+            await self.redis_client.setex(key, expire_seconds or 3600, compressed)
         except Exception:
-            pass
+            # Fallback to memory on Redis error
+            self.use_memory_fallback = True
+            from datetime import datetime, timedelta
+            expiry = (datetime.now() + timedelta(seconds=expire_seconds or 3600)).timestamp()
+            self.memory_cache[key] = (value, expiry)
     
     async def delete(self, key: str):
         """Delete key from cache"""
+        # Delete from memory cache
+        if key in self.memory_cache:
+            del self.memory_cache[key]
+        
+        # Try Redis if available
         if not self.redis_client:
             await self.connect()
         
-        try:
-            await self.redis_client.delete(key)
-        except Exception:
-            pass
+        if not self.use_memory_fallback and self.redis_client:
+            try:
+                await self.redis_client.delete(key)
+            except Exception:
+                pass
     
     async def delete_pattern(self, pattern: str):
         """Delete keys matching pattern"""
+        import fnmatch
+        # Delete from memory cache
+        matching_keys = [k for k in self.memory_cache.keys() if fnmatch.fnmatch(k, pattern)]
+        for key in matching_keys:
+            del self.memory_cache[key]
+        
+        # Try Redis if available
         if not self.redis_client:
             await self.connect()
         
-        try:
-            keys = await self.redis_client.keys(pattern)
-            if keys:
-                await self.redis_client.delete(*keys)
-        except Exception:
-            pass
+        if not self.use_memory_fallback and self.redis_client:
+            try:
+                keys = await self.redis_client.keys(pattern)
+                if keys:
+                    await self.redis_client.delete(*keys)
+            except Exception:
+                pass
     
     def generate_cache_key(self, prefix: str, **kwargs) -> str:
         """Generate cache key from prefix and parameters"""

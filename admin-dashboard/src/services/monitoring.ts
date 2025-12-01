@@ -50,6 +50,30 @@ export interface ActivityItem {
   details?: any
 }
 
+export interface ModelMetrics {
+  status: string
+  has_metrics?: boolean
+  overall_accuracy?: number
+  alzheimer_accuracy?: number
+  parkinson_accuracy?: number
+  alzheimer_f1?: number
+  parkinson_f1?: number
+  validation_date?: string
+  test_samples?: number
+  alzheimer?: {
+    accuracy: number
+    precision: number
+    recall: number
+    f1: number
+  }
+  parkinson?: {
+    accuracy: number
+    precision: number
+    recall: number
+    f1: number
+  }
+}
+
 const monitoringApi = {
   // Health checks
   async getHealth(): Promise<HealthStatus> {
@@ -123,6 +147,17 @@ const monitoringApi = {
     const response = await axios.get('/api/v1/admin/system/activity-feed', {
       params: { limit },
     })
+    return response.data
+  },
+
+  // Model Metrics
+  async getModelMetrics(): Promise<ModelMetrics> {
+    const response = await axios.get('/api/v1/model-metrics/current')
+    return response.data
+  },
+
+  async getModelSummary(): Promise<ModelMetrics> {
+    const response = await axios.get('/api/v1/model-metrics/summary')
     return response.data
   },
 }

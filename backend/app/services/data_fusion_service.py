@@ -184,8 +184,12 @@ class DataFusionService:
         # STEP 6: GENERATE NATURAL LANGUAGE REPORT (PATENT-PENDING)
         # ====================================================================
         
-            # Generate report using Natural Language Service
-            nlg_service = get_natural_language_service()
+        # Initialize xai_explanation as None (will be populated later if available)
+        xai_explanation = None
+        
+        # Generate report using Natural Language Service
+        nlg_service = get_natural_language_service()
+        try:
             report_sections = nlg_service.generate_fusion_report(
                 patient=patient,
                 record=medical_record,
@@ -199,6 +203,16 @@ class DataFusionService:
                 correlations=correlations,
                 xai_explanation=xai_explanation
             )
+        except Exception as e:
+            logger.warning(f"Natural language service failed: {e}. Using fallback report generation.")
+            # Fallback: generate basic report sections
+            report_sections = {
+                'executive_summary': f"Data fusion analysis completed for patient {patient_id}.",
+                'detailed_findings': f"Cognitive score: {cognitive_score:.2f}, Biomarker score: {biomarker_score:.2f}, Imaging score: {imaging_score:.2f}.",
+                'risk_assessment': interpretation.get('overall', 'Risk assessment completed.'),
+                'recommendations': 'Please review the detailed findings and consult clinical guidelines.',
+                'follow_up_plan': 'Regular monitoring recommended.'
+            }
         
         # ====================================================================
         # STEP 7: DATA QUALITY ASSESSMENT
@@ -240,10 +254,13 @@ class DataFusionService:
                 )
                 xai_method = 'integrated_gradients'
                 has_xai = True
+                # Update xai_explanation for potential use in report
+                xai_explanation = xai_evidence
                 
             except Exception as e:
                 logger.warning(f"Could not generate XAI evidence: {e}")
                 xai_evidence = None
+                xai_explanation = None
         
         # ====================================================================
         # CREATE FUSION REPORT

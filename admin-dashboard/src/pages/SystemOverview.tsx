@@ -12,7 +12,7 @@ import {
   Area,
 } from 'recharts'
 import { BoltIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
-import monitoringApi, { HealthStatus, SystemMetrics, BusinessKPIs } from '../services/monitoring'
+import monitoringApi, { HealthStatus, SystemMetrics, BusinessKPIs, ModelMetrics } from '../services/monitoring'
 
 interface Alert {
   id: string | number
@@ -82,6 +82,14 @@ export default function SystemOverview() {
     queryKey: ['activity-feed'],
     queryFn: () => monitoringApi.getActivityFeed(20),
     refetchInterval: refreshInterval,
+  })
+
+  // Fetch Model Metrics
+  const { data: modelMetrics } = useQuery({
+    queryKey: ['model-metrics'],
+    queryFn: () => monitoringApi.getModelSummary(),
+    refetchInterval: refreshInterval * 2, // Refresh less frequently
+    retry: 2,
   })
 
   // Update trend data with real metrics
@@ -193,7 +201,7 @@ export default function SystemOverview() {
       </div>
 
       {/* Key Metrics Cards */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           {
             label: 'Active Users',
@@ -214,6 +222,17 @@ export default function SystemOverview() {
             trend: 'up' as const,
           },
           {
+            label: modelMetrics?.has_metrics ? 'Model Accuracy' : 'Model Accuracy',
+            value: modelMetrics?.has_metrics 
+              ? `${(modelMetrics.overall_accuracy! * 100).toFixed(1)}%`
+              : 'N/A',
+            change: modelMetrics?.has_metrics 
+              ? modelMetrics.overall_accuracy! >= 0.85 ? '✓ Excellent' : modelMetrics.overall_accuracy! >= 0.75 ? '✓ Good' : '⚠ Needs Training'
+              : 'No Data',
+            trend: modelMetrics?.has_metrics && modelMetrics.overall_accuracy! >= 0.75 ? ('up' as const) : ('down' as const),
+            highlight: modelMetrics?.has_metrics,
+          },
+          {
             label: 'Critical Alerts',
             value: criticalAlerts.toString(),
             change: criticalAlerts > 0 ? `+${criticalAlerts}` : '-2',
@@ -222,13 +241,27 @@ export default function SystemOverview() {
         ].map((item) => (
           <div
             key={item.label}
-            className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm"
+            className={`rounded-2xl border p-4 shadow-sm ${
+              item.highlight 
+                ? 'border-cyan-500/50 bg-gradient-to-br from-cyan-900/20 to-slate-900/60' 
+                : 'border-slate-800 bg-slate-900/60'
+            }`}
           >
             <div className="text-xs uppercase tracking-wide text-slate-400">{item.label}</div>
             <div className="mt-2 flex items-end justify-between">
-              <div className="text-3xl font-semibold text-white">{item.value}</div>
+              <div className={`text-3xl font-semibold ${
+                item.highlight && modelMetrics?.overall_accuracy! >= 0.85
+                  ? 'text-cyan-400'
+                  : 'text-white'
+              }`}>{item.value}</div>
               <div
-                className={item.trend === 'up' ? 'text-emerald-400 text-sm' : 'text-rose-400 text-sm'}
+                className={`text-sm ${
+                  item.trend === 'up' 
+                    ? item.highlight && modelMetrics?.overall_accuracy! >= 0.85
+                      ? 'text-cyan-400'
+                      : 'text-emerald-400'
+                    : 'text-rose-400'
+                }`}
               >
                 {item.change}
               </div>
@@ -236,6 +269,49 @@ export default function SystemOverview() {
           </div>
         ))}
       </section>
+
+      {/* Model Accuracy Details */}
+      {modelMetrics?.has_metrics && (
+        <section className="rounded-2xl border border-cyan-500/50 bg-gradient-to-br from-cyan-900/20 to-slate-900/60 p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Model Performance Metrics</h2>
+            {modelMetrics.validation_date && (
+              <span className="text-xs text-slate-400">
+                Validated: {new Date(modelMetrics.validation_date).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+              <div className="text-sm text-slate-400 mb-2">Overall Accuracy</div>
+              <div className="text-3xl font-bold text-cyan-400">
+                {(modelMetrics.overall_accuracy! * 100).toFixed(2)}%
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                {modelMetrics.test_samples || 0} test samples
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+              <div className="text-sm text-slate-400 mb-2">Alzheimer's Detection</div>
+              <div className="text-2xl font-bold text-white">
+                {(modelMetrics.alzheimer_accuracy! * 100).toFixed(2)}%
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                F1: {(modelMetrics.alzheimer_f1! * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+              <div className="text-sm text-slate-400 mb-2">Parkinson's Detection</div>
+              <div className="text-2xl font-bold text-white">
+                {(modelMetrics.parkinson_accuracy! * 100).toFixed(2)}%
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                F1: {(modelMetrics.parkinson_f1! * 100).toFixed(2)}%
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Charts and Sidebar */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">

@@ -789,13 +789,15 @@ async def load_sample_datasets(
     from pathlib import Path
     
     logger = logging.getLogger(__name__)
-    logger.info("=== Starting load_sample_datasets - Loading 200 specific patients ===")
     
-    total_patients_processed = 0
-    total_records_created = 0
-    total_predictions_created = 0
-    skipped_patients = 0
-    errors = []
+    try:
+        logger.info("=== Starting load_sample_datasets - Loading 200 specific patients ===")
+        
+        total_patients_processed = 0
+        total_records_created = 0
+        total_predictions_created = 0
+        skipped_patients = 0
+        errors = []
     
     # Paths to CSV files
     project_root = Path(__file__).parent.parent.parent.parent
@@ -810,19 +812,23 @@ async def load_sample_datasets(
         if synthetic_csv.exists():
             synthetic_df = pd.read_csv(synthetic_csv)
             logger.info(f"Loaded synthetic data: {len(synthetic_df)} records")
+            logger.info(f"Synthetic CSV columns: {list(synthetic_df.columns)}")
         else:
             logger.warning(f"Synthetic CSV not found: {synthetic_csv}")
     except Exception as e:
-        logger.error(f"Error loading synthetic CSV: {e}")
+        logger.error(f"Error loading synthetic CSV: {e}", exc_info=True)
+        synthetic_df = None
     
     try:
         if real_csv.exists():
             real_df = pd.read_csv(real_csv)
             logger.info(f"Loaded real data: {len(real_df)} records")
+            logger.info(f"Real CSV columns: {list(real_df.columns)}")
         else:
             logger.warning(f"Real CSV not found: {real_csv}")
     except Exception as e:
-        logger.error(f"Error loading real CSV: {e}")
+        logger.error(f"Error loading real CSV: {e}", exc_info=True)
+        real_df = None
     
     if synthetic_df is None and real_df is None:
         return {
@@ -837,10 +843,24 @@ async def load_sample_datasets(
     
     # Categorize and sample from each dataset
     def categorize_df(df):
-        normal = df[df['diagnosis'].str.upper() == 'NORMAL']
-        alzheimer = df[df['diagnosis'].str.upper() == 'ALZHEIMER']
-        parkinson = df[df['diagnosis'].str.upper() == 'PARKINSON']
-        return normal, alzheimer, parkinson
+        try:
+            # Check if diagnosis column exists
+            if 'diagnosis' not in df.columns:
+                logger.warning(f"CSV file missing 'diagnosis' column. Available columns: {list(df.columns)}")
+                # Return empty dataframes
+                return df.iloc[0:0].copy(), df.iloc[0:0].copy(), df.iloc[0:0].copy()
+            
+            # Convert diagnosis to string and handle NaN values
+            df['diagnosis'] = df['diagnosis'].astype(str).str.upper().str.strip()
+            
+            normal = df[df['diagnosis'] == 'NORMAL']
+            alzheimer = df[df['diagnosis'] == 'ALZHEIMER']
+            parkinson = df[df['diagnosis'] == 'PARKINSON']
+            return normal, alzheimer, parkinson
+        except Exception as e:
+            logger.error(f"Error categorizing dataframe: {e}", exc_info=True)
+            # Return empty dataframes on error
+            return df.iloc[0:0].copy(), df.iloc[0:0].copy(), df.iloc[0:0].copy()
     
     selected_rows = []
     
@@ -869,9 +889,9 @@ async def load_sample_datasets(
         real_normal, real_alzheimer, real_parkinson = categorize_df(real_df)
         
         # Calculate needed to reach targets (accounting for what we got from synthetic)
-        syn_normal_count = len([r for r in selected_rows if r['diagnosis'].upper() == 'NORMAL'])
-        syn_alzheimer_count = len([r for r in selected_rows if r['diagnosis'].upper() == 'ALZHEIMER'])
-        syn_parkinson_count = len([r for r in selected_rows if r['diagnosis'].upper() == 'PARKINSON'])
+        syn_normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'NORMAL'])
+        syn_alzheimer_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'ALZHEIMER'])
+        syn_parkinson_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'PARKINSON'])
         
         needed_normal = max(0, 120 - syn_normal_count)
         needed_alzheimer = max(0, 40 - syn_alzheimer_count)
@@ -896,7 +916,12 @@ async def load_sample_datasets(
     # Process each selected patient row from CSV
     for idx, row in enumerate(selected_rows):
         try:
-            patient_id = str(row['patient_id'])
+            # Validate required fields
+            if 'patient_id' not in row or pd.isna(row.get('patient_id')):
+                errors.append(f"Row {idx}: Missing patient_id")
+                continue
+                
+            patient_id = str(row['patient_id']).strip()
             
             # Check if patient already exists
             result = await db.execute(
@@ -1041,11 +1066,17 @@ async def load_sample_datasets(
         await db.commit()
         logger.info(f"SUCCESS: {total_patients_processed} patients (200 sample), {total_records_created} records, {total_predictions_created} predictions")
     except Exception as e:
-        logger.error(f"Failed to commit: {e}")
+        logger.error(f"Failed to commit: {e}", exc_info=True)
         await db.rollback()
+        
+        # Provide detailed error message
+        error_detail = f"Failed to save data: {str(e)}"
+        if errors:
+            error_detail += f". Processing errors: {len(errors)} errors occurred. First error: {errors[0] if errors else 'Unknown'}"
+        
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to save data: {str(e)}"
+            detail=error_detail
         )
     
     # Count categories from loaded rows
@@ -1074,7 +1105,14 @@ async def load_sample_datasets(
         "source_distribution": f"{len(selected_rows)} total available in CSV files",
         "errors": errors[:10] if errors else [],
         "error_count": len(errors),
-    }
+        }
+    except Exception as e:
+        logger.error(f"Unexpected error in load_sample_datasets: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load sample datasets: {str(e)}. Check backend logs for details."
+        )
 
 
 @router.post("/clear-all-data")
@@ -1083,15 +1121,27 @@ async def clear_all_disease_tracking_data(
     # current_user = Depends(require_role("admin")),  # Disabled for development
 ) -> Dict[str, Any]:
     """
-    Clear all patients, medical records, and predictions from the disease tracking system.
+    Clear all patients, medical records, predictions, and fusion reports from the disease tracking system.
     WARNING: This deletes ALL data!
     """
     import logging
+    from ..models.data_fusion_report import DataFusionReport
     
     logger = logging.getLogger(__name__)
     logger.info("=== Clearing all disease tracking data ===")
     
     try:
+        # Delete all fusion reports first (to avoid foreign key issues)
+        try:
+            result = await db.execute(select(DataFusionReport))
+            fusion_reports = result.scalars().all()
+            for report in fusion_reports:
+                await db.delete(report)
+            fusion_reports_deleted = len(fusion_reports)
+        except Exception as e:
+            logger.warning(f"Could not delete fusion reports (may not exist or have schema issues): {e}")
+            fusion_reports_deleted = 0
+        
         # Delete all predictions
         result = await db.execute(select(Prediction))
         predictions = result.scalars().all()
@@ -1115,17 +1165,18 @@ async def clear_all_disease_tracking_data(
         
         await db.commit()
         
-        logger.info(f"Deleted {patients_deleted} patients, {records_deleted} records, {predictions_deleted} predictions")
+        logger.info(f"Deleted {patients_deleted} patients, {records_deleted} records, {predictions_deleted} predictions, {fusion_reports_deleted} fusion reports")
         
         return {
             "message": "All disease tracking data cleared successfully",
             "patients_deleted": patients_deleted,
             "records_deleted": records_deleted,
             "predictions_deleted": predictions_deleted,
+            "fusion_reports_deleted": fusion_reports_deleted,
         }
     except Exception as e:
         await db.rollback()
-        logger.error(f"Error clearing data: {e}")
+        logger.error(f"Error clearing data: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}")
 
 

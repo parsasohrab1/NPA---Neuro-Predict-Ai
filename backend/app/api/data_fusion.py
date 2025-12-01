@@ -63,17 +63,27 @@ async def generate_fusion_report(
         medical_record_id = latest_record.id
     
     # Generate fusion report using our patent-pending algorithm
-    fusion_report = await DataFusionService.generate_fusion_report(
-        patient_id=patient_id,
-        medical_record_id=medical_record_id,
-        db=db
-    )
-    
-    db.add(fusion_report)
-    await db.commit()
-    await db.refresh(fusion_report)
-    
-    return fusion_report.to_dict()
+    try:
+        fusion_report = await DataFusionService.generate_fusion_report(
+            patient_id=patient_id,
+            medical_record_id=medical_record_id,
+            db=db
+        )
+        
+        db.add(fusion_report)
+        await db.commit()
+        await db.refresh(fusion_report)
+        
+        return fusion_report.to_dict()
+    except Exception as e:
+        import traceback
+        error_detail = str(e)
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error generating fusion report: {error_detail}\n{error_traceback}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating fusion report: {error_detail}"
+        )
 
 
 @router.get("/patient/{patient_id}", response_model=List[DataFusionReportResponse])
