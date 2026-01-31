@@ -13,7 +13,6 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"
     DOCTOR = "doctor"
     RADIOLOGIST = "radiologist"
-    RESEARCHER = "researcher"
     NURSE = "nurse"
     VIEWER = "viewer"
 
@@ -40,22 +39,10 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
     
-    # Security fields
-    password_changed_at = Column(DateTime(timezone=True), nullable=True)
-    is_locked = Column(Boolean, default=False)
-    locked_until = Column(DateTime(timezone=True), nullable=True)
-    failed_login_count = Column(Integer, default=0)
-    
     # Relationships
     patients = relationship("Patient", back_populates="assigned_doctor")
-    predictions = relationship("Prediction", foreign_keys="Prediction.created_by", back_populates="created_by_user")
+    predictions = relationship("Prediction", back_populates="created_by_user")
     audit_logs = relationship("AuditLog", back_populates="user")
-    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
-    mfa_secret = relationship("MFASecret", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    ip_whitelist = relationship("IPWhitelist", back_populates="user", cascade="all, delete-orphan")
-    password_history = relationship("PasswordHistory", back_populates="user", cascade="all, delete-orphan")
-    security_logs = relationship("SecurityLog", back_populates="user", cascade="all, delete-orphan")
-    failed_login_attempts = relationship("FailedLoginAttempt", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

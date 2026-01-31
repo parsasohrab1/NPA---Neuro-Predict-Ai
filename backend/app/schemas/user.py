@@ -44,10 +44,8 @@ class UserResponse(UserBase):
 
 class Token(BaseModel):
     access_token: str
-    refresh_token: Optional[str] = None
+    refresh_token: str
     token_type: str = "bearer"
-    mfa_required: Optional[bool] = False
-    message: Optional[str] = None
 
 
 class TokenData(BaseModel):

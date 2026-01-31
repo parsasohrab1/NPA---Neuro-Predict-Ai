@@ -12,11 +12,11 @@ class MedicalRecord(Base):
     __tablename__ = "medical_records"
     
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
     
     # Visit Information
-    visit_date = Column(DateTime(timezone=True), nullable=False, index=True)
-    visit_type = Column(String, nullable=True, index=True)  # Initial, Follow-up, etc.
+    visit_date = Column(DateTime(timezone=True), nullable=False)
+    visit_type = Column(String, nullable=True)  # Initial, Follow-up, etc.
     
     # Cognitive Scores
     mmse_score = Column(Float, nullable=True)  # Mini-Mental State Examination (0-30)
@@ -55,8 +55,6 @@ class MedicalRecord(Base):
     # Relationships
     patient = relationship("Patient", back_populates="medical_records")
     imaging_studies = relationship("ImagingStudy", back_populates="medical_record", cascade="all, delete-orphan")
-    longitudinal_visits = relationship("LongitudinalVisit", back_populates="medical_record")
-    fusion_reports = relationship("DataFusionReport", back_populates="medical_record", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<MedicalRecord(id={self.id}, patient_id={self.patient_id}, visit_date={self.visit_date})>"

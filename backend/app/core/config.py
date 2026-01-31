@@ -14,28 +14,28 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
     
-    # Environment Configuration
+    # Environment Configuration (set via ENVIRONMENT and DEBUG env vars in production)
     ENVIRONMENT: str = Field(
         default="development",
-        description="Application environment: 'development' or 'production'"
+        description="Application environment. Set ENVIRONMENT=production via env for production.",
     )
-    
+
     DEBUG: bool = Field(
         default=False,
-        description="Debug mode. Automatically set to False in production for security."
+        description="Debug mode. Set DEBUG=false or leave unset in production; docs are disabled when False.",
     )
     
     # Server Configuration
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 8001
     
     # Database Configuration
-    DATABASE_URL: str = "sqlite+aiosqlite:///./neuropredict.db"
-    DATABASE_URL_SYNC: str = "sqlite:///./neuropredict.db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/neuropredict_db"
+    DATABASE_URL_SYNC: str = "postgresql://postgres:postgres@localhost:5432/neuropredict_db"
     
     # Security
     SECRET_KEY: str = Field(
-        default="zzqnh591ytCa0DRYv-4mL6IZGC2oi3R005yTN3kQGKc",
+        ...,
         description="Secret key for JWT token signing. Must be set via SECRET_KEY environment variable.",
         min_length=32
     )
@@ -48,14 +48,15 @@ class Settings(BaseSettings):
             "your-secret-key-change-this-in-production",
             "your-super-secret-key-change-this",
             "secret-key",
-            "change-me"
+            "change-me",
+            ""
         ]
         if v in insecure_defaults:
             raise ValueError(
                 "SECRET_KEY must be set via environment variable and cannot use default/insecure values. "
                 "Generate a secure key using: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
-        if v and len(v) < 32:
+        if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters long for security")
         return v
     
@@ -86,10 +87,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:8080",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://localhost:5173",
-        "https://127.0.0.1:5173"
+        "http://127.0.0.1:3001"
     ]
     
     # File Upload
@@ -97,29 +95,16 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     DICOM_DIR: str = "uploads/dicom"
     MRI_DIR: str = "uploads/mri"
-    REPORTS_DIR: str = "uploads/reports"
     
     # AI Model Paths
+    MODELS_DIR: str = "models"
     ALZHEIMER_MODEL_PATH: str = "models/alzheimer_model.pth"
     PARKINSON_MODEL_PATH: str = "models/parkinson_model.pth"
     ENSEMBLE_MODEL_PATH: str = "models/ensemble_model.pth"
-    MODEL_REGISTRY_PATH: str = "models/registry.json"
     
     # Model Configuration
     MODEL_CONFIDENCE_THRESHOLD: float = 0.75
     BATCH_SIZE: int = 32
-    USE_TRAINED_MODEL: bool = True  # If True, loads trained model from registry
-    
-    # Training Configuration
-    TRAINING_DATA_DIR: Optional[str] = None  # Default: data/data/csv
-    TRAIN_RATIO: float = 0.7
-    VAL_RATIO: float = 0.15
-    TEST_RATIO: float = 0.15
-    TRAINING_EPOCHS: int = 100
-    TRAINING_BATCH_SIZE: int = 32
-    TRAINING_LEARNING_RATE: float = 0.001
-    TRAINING_WEIGHT_DECAY: float = 1e-5
-    TRAINING_PATIENCE: int = 10
     
     # Redis Configuration (for caching and task queue)
     REDIS_HOST: str = "localhost"
@@ -127,10 +112,39 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     
     # External Systems Integration
-    PACS_SERVER_URL: Optional[str] = None
-    EHR_API_URL: Optional[str] = None
-    HL7_FHIR_ENDPOINT: Optional[str] = None
-    INTEGRATION_HMAC_SECRET: Optional[str] = None
+    # Integration Settings
+    PACS_SERVER_URL: Optional[str] = Field(
+        default=None,
+        description="PACS server URL for DICOM integration"
+    )
+    PACS_AE_TITLE: str = Field(
+        default="NEUROPREDICT",
+        description="Application Entity Title for PACS"
+    )
+    EHR_API_URL: Optional[str] = Field(
+        default=None,
+        description="EHR/HIS API endpoint URL"
+    )
+    EHR_API_KEY: Optional[str] = Field(
+        default=None,
+        description="API key for EHR/HIS authentication"
+    )
+    HL7_FHIR_ENDPOINT: Optional[str] = Field(
+        default=None,
+        description="HL7 FHIR server endpoint"
+    )
+    HL7_FHIR_BASE_URL: str = Field(
+        default="http://localhost:8000/fhir",
+        description="Base URL for FHIR resources"
+    )
+    HL7_SERVER_URL: Optional[str] = Field(
+        default=None,
+        description="HL7 v2 server URL for medical devices"
+    )
+    HL7_AE_TITLE: str = Field(
+        default="NEUROPREDICT",
+        description="Application Entity Title for HL7 v2"
+    )
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -144,52 +158,14 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_PREDICTIONS: int = 10
     PREDICTION_TIMEOUT: int = 300  # seconds
 
-    # Rate Limiting Configuration
-    # Per-minute limits for IP-based rate limiting (Redis-based)
-    RATE_LIMIT_DEFAULT_PER_MINUTE: int = Field(
-        default=120,
-        description="Default rate limit per IP address per minute for general endpoints"
-    )
-    # Per-hour limit for authenticated users (by token)
-    RATE_LIMIT_USER_PER_HOUR: int = Field(
-        default=1000,
-        description="Rate limit per authenticated user per hour"
-    )
-    # Specialized limits for sensitive endpoints
-    RATE_LIMIT_LOGIN_PER_MINUTE: int = Field(
-        default=10,
-        description="Rate limit per IP for login attempts (brute-force protection)"
-    )
-    RATE_LIMIT_UPLOAD_PER_MINUTE: int = Field(
-        default=10,
-        description="Rate limit per IP for file upload endpoints"
-    )
-    RATE_LIMIT_PREDICTION_PER_MINUTE: int = Field(
-        default=20,
-        description="Rate limit per user for prediction endpoints (resource-intensive)"
-    )
-    # Rate limiting behavior
-    RATE_LIMIT_ENABLED: bool = Field(
-        default=True,
-        description="Enable/disable rate limiting globally"
-    )
-    RATE_LIMIT_FAIL_OPEN: bool = Field(
-        default=True,
-        description="If Redis is unavailable, allow requests (fail open) vs block (fail closed)"
-    )
+    # Rate limiting (per IP, per minute)
+    RATE_LIMIT_PREDICTIONS_PER_MINUTE: int = 20
+    RATE_LIMIT_AUTH_PER_MINUTE: int = 30
 
-    # Backup & DR
-    BACKUP_DIR: str = "backups"
-    BACKUP_OFFSITE_DIR: str = "backups_offsite"  # simulate offsite/secondary storage
-    BACKUP_FULL_INTERVAL_HOURS: int = 24  # daily full backup
-    BACKUP_WAL_INTERVAL_MINUTES: int = 15  # incremental/WAL archiving
-    BACKUP_RETENTION_DAYS: int = 14  # keep 7–14 daily copies
-    BACKUP_VERIFY_WEEKLY: bool = True
-    BACKUP_VERIFY_INTERVAL_DAYS: int = 7
-    
     class Config:
         env_file = ".env"
         case_sensitive = True
+        # ENVIRONMENT and DEBUG are read from env (e.g. ENVIRONMENT=production DEBUG=false)
 
 
 settings = Settings()

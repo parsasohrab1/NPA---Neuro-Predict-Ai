@@ -97,6 +97,28 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_from_token(token: str) -> Optional[User]:
+    """Get user from token (for WebSocket authentication)"""
+    try:
+        payload = decode_token(token)
+        user_id: str = payload.get("sub")
+        
+        if user_id is None:
+            return None
+        
+        # Create a new session for this query
+        from ..db.session import async_session_maker
+        async with async_session_maker() as db:
+            result = await db.execute(select(User).where(User.id == int(user_id)))
+            user = result.scalar_one_or_none()
+            
+            if user and user.is_active:
+                return user
+            return None
+    except Exception:
+        return None
+
+
 async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
@@ -112,7 +134,6 @@ def check_permission(user: User, required_role: str) -> bool:
         "admin": 3,
         "doctor": 2,
         "radiologist": 2,
-        "researcher": 2,
         "nurse": 1,
         "viewer": 0
     }
@@ -134,15 +155,3 @@ def require_role(required_role: str):
         return current_user
     return role_checker
 
-
-def require_any(*roles: str):
-    """Allow any of the provided roles (OR semantics)."""
-    async def checker(current_user: User = Depends(get_current_active_user)):
-        for r in roles:
-            if check_permission(current_user, r):
-                return current_user
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User lacks required roles: {', '.join(roles)}"
-        )
-    return checker

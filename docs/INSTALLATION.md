@@ -166,19 +166,13 @@ docker-compose up -d
 
 For production deployment:
 
-1. **Update SECRET_KEY in .env** - Generate a secure key
-2. **Set ENVIRONMENT=production** - Required for production
-3. **Set DEBUG=False** - DEBUG=True is automatically blocked in production
-4. Configure CORS_ORIGINS
-5. Use production database
-6. Enable HTTPS/SSL
-7. Configure proper backup strategies
-8. Setup monitoring and logging
-
-**⚠️ Security Note:** The application will automatically:
-- Block DEBUG=True when ENVIRONMENT=production
-- Disable API documentation endpoints in production
-- Prevent exposure of sensitive error information
+1. Update SECRET_KEY in .env
+2. Set DEBUG=False
+3. Configure CORS_ORIGINS
+4. Use production database
+5. Enable HTTPS/SSL
+6. Configure proper backup strategies
+7. Setup monitoring and logging
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed production deployment guide.
 

@@ -1,363 +1,232 @@
 """
-Pytest configuration and shared fixtures
+Pytest Configuration and Fixtures
 """
 import pytest
-from datetime import date, datetime
-from pathlib import Path
-from typing import AsyncGenerator, Callable, Awaitable
-from unittest.mock import AsyncMock
+import asyncio
+from typing import AsyncGenerator
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine
-)
-from sqlalchemy import select
-
-from app.core.config import settings
-from app.core.security import get_current_user, get_current_active_user
-from app.db.session import Base, get_db
 from app.main import app
+from app.db.session import Base, get_db
 from app.models.user import User, UserRole
 from app.models.patient import Patient, Gender
 from app.models.medical_record import MedicalRecord
 from app.models.prediction import Prediction, DiseaseType, RiskLevel
+from app.core.security import get_password_hash, create_access_token
+from datetime import datetime, date
 
 
-# ---------------------
-# Global seeds & faker
-# ---------------------
-@pytest.fixture(autouse=True, scope="session")
-def _global_seed():
-    """Set deterministic seeds for reproducibility across tests."""
-    import random
-    import numpy as np
-    random.seed(42)
-    np.random.seed(42)
-    try:
-        import torch  # type: ignore
-        torch.manual_seed(42)
-    except Exception:
-        pass
-    yield
+# Test database URL (in-memory SQLite for testing)
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
-class TestUser:
-    """Mock user for testing"""
-    def __init__(self, user_id=1, role=UserRole.DOCTOR, is_active=True):
-        self.id = user_id
-        self.role = role
-        self.is_active = is_active
-        self.email = "test@example.com"
-        self.username = "testuser"
-        self.full_name = "Test User"
-        self.is_verified = True
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create event loop for async tests"""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
 
 
-@pytest.fixture
-async def test_db_engine():
-    """Create in-memory test database"""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+@pytest.fixture(scope="function")
+async def test_db() -> AsyncGenerator[AsyncSession, None]:
+    """Create test database session"""
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield engine
+    
+    async_session_maker = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    
+    async with async_session_maker() as session:
+        yield session
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    
     await engine.dispose()
 
 
-@pytest.fixture
-async def test_session(test_db_engine):
-    """Create test database session"""
-    async_session = async_sessionmaker(
-        test_db_engine,
-        class_=AsyncSession,
-        expire_on_commit=False
-    )
-    async with async_session() as session:
-        yield session
-        await session.rollback()
-
-
-@pytest.fixture
-async def test_client(test_db_engine, tmp_path: Path):
-    """Create test HTTP client with database override"""
-    session_factory = async_sessionmaker(
-        test_db_engine,
-        class_=AsyncSession,
-        expire_on_commit=False
-    )
-
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        async with session_factory() as session:
-            yield session
-
-    # Override dependencies
+@pytest.fixture(scope="function")
+async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Create test client"""
+    async def override_get_db():
+        yield test_db
+    
     app.dependency_overrides[get_db] = override_get_db
     
-    # Save original settings
-    original_upload_dir = settings.UPLOAD_DIR
-    original_dicom_dir = settings.DICOM_DIR
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
     
-    # Use temporary directory for uploads
-    storage_root = tmp_path / "storage"
-    settings.UPLOAD_DIR = str(storage_root)
-    settings.DICOM_DIR = str(storage_root / "dicom")
-    Path(settings.DICOM_DIR).mkdir(parents=True, exist_ok=True)
-
-    transport = ASGITransport(app=app)
-    client = AsyncClient(transport=transport, base_url="http://test")
-
-    yield client
-
-    # Cleanup
-    await client.aclose()
-    await test_db_engine.dispose()
     app.dependency_overrides.clear()
-    settings.UPLOAD_DIR = original_upload_dir
-    settings.DICOM_DIR = original_dicom_dir
 
 
 @pytest.fixture
-def test_user():
+async def test_user(test_db: AsyncSession) -> User:
     """Create test user"""
-    return TestUser(user_id=1, role=UserRole.DOCTOR)
+    user = User(
+        email="test@example.com",
+        username="testuser",
+        full_name="Test User",
+        hashed_password=get_password_hash("testpass123"),
+        role=UserRole.DOCTOR,
+        is_active=True,
+        is_verified=True
+    )
+    test_db.add(user)
+    await test_db.commit()
+    await test_db.refresh(user)
+    return user
 
 
 @pytest.fixture
-def test_patient_data():
-    """Sample patient data for testing"""
-    return {
-        "patient_id": "PT-001",
-        "first_name": "John",
-        "last_name": "Doe",
-        "date_of_birth": "1980-01-15",
-        "gender": "male",
-        "email": "john.doe@example.com",
-        "phone": "+1234567890"
-    }
+async def test_admin(test_db: AsyncSession) -> User:
+    """Create test admin user"""
+    admin = User(
+        email="admin@example.com",
+        username="admin",
+        full_name="Admin User",
+        hashed_password=get_password_hash("admin123"),
+        role=UserRole.ADMIN,
+        is_active=True,
+        is_verified=True
+    )
+    test_db.add(admin)
+    await test_db.commit()
+    await test_db.refresh(admin)
+    return admin
 
 
 @pytest.fixture
-async def sample_patient(test_session: AsyncSession):
-    """Create a sample patient in database"""
+def auth_headers(test_user: User) -> dict:
+    """Create auth headers for test user"""
+    token = create_access_token({"sub": str(test_user.id)})
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_auth_headers(test_admin: User) -> dict:
+    """Create auth headers for admin user"""
+    token = create_access_token({"sub": str(test_admin.id)})
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def test_patient(test_db: AsyncSession, test_user: User) -> Patient:
+    """Create test patient"""
     patient = Patient(
-        patient_id="PT-001",
         first_name="John",
         last_name="Doe",
-        date_of_birth=date(1980, 1, 15),
+        date_of_birth=date(1950, 1, 1),
         gender=Gender.MALE,
-        email="john.doe@example.com"
+        email="john.doe@example.com",
+        phone="+1234567890",
+        address="123 Test St",
+        assigned_doctor_id=test_user.id
     )
-    test_session.add(patient)
-    await test_session.commit()
-    await test_session.refresh(patient)
+    test_db.add(patient)
+    await test_db.commit()
+    await test_db.refresh(patient)
     return patient
 
 
 @pytest.fixture
-async def sample_medical_record(test_session: AsyncSession, sample_patient: Patient):
-    """Create a sample medical record"""
+async def test_medical_record(test_db: AsyncSession, test_patient: Patient) -> MedicalRecord:
+    """Create test medical record"""
     record = MedicalRecord(
-        patient_id=sample_patient.id,
-        visit_date=datetime.utcnow(),
+        patient_id=test_patient.id,
+        visit_date=datetime.now(),
         visit_type="Initial",
         mmse_score=25.0,
         moca_score=24.0,
+        memory_score=50.0,
+        attention_score=50.0,
+        executive_function_score=50.0,
         amyloid_beta=600.0,
-        tau_protein=200.0
+        tau_protein=200.0,
+        dopamine_level=100.0,
+        apoe_e4_status=False,
+        hippocampal_volume=3500.0,
+        cortical_thickness=2.3,
+        ventricular_volume=30000.0,
+        white_matter_hyperintensities=2.0,
+        brain_volume_total=1100000.0
     )
-    test_session.add(record)
-    await test_session.commit()
-    await test_session.refresh(record)
+    test_db.add(record)
+    await test_db.commit()
+    await test_db.refresh(record)
     return record
 
 
 @pytest.fixture
-async def sample_prediction(test_session: AsyncSession, sample_patient: Patient):
-    """Create a sample prediction"""
+async def test_prediction(test_db: AsyncSession, test_patient: Patient, test_user: User) -> Prediction:
+    """Create test prediction"""
     prediction = Prediction(
-        patient_id=sample_patient.id,
-        created_by=1,
-        disease_type=DiseaseType.BOTH,
+        patient_id=test_patient.id,
+        created_by=test_user.id,
+        disease_type=DiseaseType.ALZHEIMER,
         alzheimer_risk_score=0.65,
         alzheimer_risk_level=RiskLevel.MEDIUM,
-        alzheimer_confidence=0.82,
-        parkinson_risk_score=0.35,
-        parkinson_risk_level=RiskLevel.LOW,
-        parkinson_confidence=0.78
+        alzheimer_confidence=0.75,
+        model_version="1.0.0",
+        model_name="TestModel"
     )
-    test_session.add(prediction)
-    await test_session.commit()
-    await test_session.refresh(prediction)
+    test_db.add(prediction)
+    await test_db.commit()
+    await test_db.refresh(prediction)
     return prediction
 
 
-def override_get_current_user(user: TestUser = None):
-    """Override for get_current_user dependency"""
-    if user is None:
-        user = TestUser()
-    
-    async def _get_current_user():
-        return user
-    
-    return _get_current_user
-
-
-def override_get_current_active_user(user: TestUser = None):
-    """Override for get_current_active_user dependency"""
-    if user is None:
-        user = TestUser()
-    
-    async def _get_current_active_user():
-        return user
-    
-    return _get_current_active_user
-
-
-def override_require_role(required_role):
-    """Override for require_role dependency"""
-    async def _require_role(current_user: TestUser = None):
-        if current_user is None:
-            current_user = TestUser()
-        if current_user.role != required_role:
-            from fastapi import HTTPException, status
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Requires {required_role} role"
-            )
-        return current_user
-    return _require_role
-
-
-# ---------------------
-# Factories
-# ---------------------
 @pytest.fixture
-def user_factory():
-    def _make_user(user_id: int = 1, role: UserRole = UserRole.DOCTOR) -> TestUser:
-        return TestUser(user_id=user_id, role=role)
-    return _make_user
+def sample_patient_data() -> dict:
+    """Sample patient data for testing"""
+    return {
+        "first_name": "Jane",
+        "last_name": "Smith",
+        "date_of_birth": "1960-05-15",
+        "gender": "female",
+        "email": "jane.smith@example.com",
+        "phone": "+1234567891",
+        "address": "456 Test Ave"
+    }
 
 
 @pytest.fixture
-def auth_token_factory():
-    from app.core.security import create_access_token
-    def _make_token(user_id: int) -> str:
-        return create_access_token({"sub": str(user_id)})
-    return _make_token
+def sample_prediction_data() -> dict:
+    """Sample prediction request data"""
+    return {
+        "patient_id": 1,
+        "disease_type": "alzheimer"
+    }
 
 
 @pytest.fixture
-async def make_patient(test_session: AsyncSession):
-    async def _create(
-        pid: str = "PT-FAKE",
-        first_name: str = "Ali",
-        last_name: str = "Rezaei",
-        gender: Gender = Gender.MALE,
-        dob: date = date(1985, 5, 20),
-    ) -> Patient:
-        p = Patient(
-            patient_id=pid,
-            first_name=first_name,
-            last_name=last_name,
-            date_of_birth=dob,
-            gender=gender,
-            email=f"{pid.lower()}@example.com",
-        )
-        test_session.add(p)
-        await test_session.commit()
-        await test_session.refresh(p)
-        return p
-    return _create
+def sample_medical_record_data() -> dict:
+    """Sample medical record data"""
+    return {
+        "visit_date": datetime.now().isoformat(),
+        "visit_type": "Follow-up",
+        "mmse_score": 26.0,
+        "moca_score": 25.0,
+        "memory_score": 55.0,
+        "attention_score": 55.0,
+        "executive_function_score": 55.0,
+        "amyloid_beta": 550.0,
+        "tau_protein": 180.0,
+        "dopamine_level": 110.0,
+        "apoe_e4_status": False,
+        "hippocampal_volume": 3600.0,
+        "cortical_thickness": 2.4,
+        "ventricular_volume": 28000.0,
+        "white_matter_hyperintensities": 1.5,
+        "brain_volume_total": 1120000.0
+    }
 
-
-@pytest.fixture
-async def make_medical_record(test_session: AsyncSession):
-    async def _create(
-        patient: Patient,
-        visit_date: datetime | None = None,
-        mmse: float = 26.0,
-        moca: float = 25.0,
-    ) -> MedicalRecord:
-        rec = MedicalRecord(
-            patient_id=patient.id,
-            visit_date=visit_date or datetime.utcnow(),
-            visit_type="Follow-up",
-            mmse_score=mmse,
-            moca_score=moca,
-            amyloid_beta=600.0,
-            tau_protein=200.0,
-        )
-        test_session.add(rec)
-        await test_session.commit()
-        await test_session.refresh(rec)
-        return rec
-    return _create
-
-
-# ---------------------
-# Mocks
-# ---------------------
-@pytest.fixture
-def mock_ai_model_service(monkeypatch):
-    """Mock AI model outputs with deterministic numbers."""
-    try:
-        from app.services import ai_model_service as _maybe  # type: ignore
-    except Exception:
-        _maybe = None
-
-    async def _predict_stub(patient_data):
-        return {
-            "alzheimer": {"risk_score": 0.42, "risk_level": RiskLevel.MEDIUM, "confidence": 0.9},
-            "parkinson": {"risk_score": 0.13, "risk_level": RiskLevel.LOW, "confidence": 0.88},
-            "attention_scores": {"MRI": 0.5, "Biomarker": 0.3, "Cognitive": 0.2},
-            "feature_importance": {"mmse_score": 0.4},
-            "recommendations": "mock",
-            "model_version": "test-1.0",
-            "model_name": "mock",
-        }
-    try:
-        from app.services.ai_model_service import ai_model_service
-        monkeypatch.setattr(ai_model_service, "predict", _predict_stub, raising=True)
-    except Exception:
-        pass
-    return True
-
-
-@pytest.fixture
-def mock_integration_service(monkeypatch):
-    """Mock integration service external calls."""
-    try:
-        from app.services import integration_service  # type: ignore
-    except Exception:
-        integration_service = None  # type: ignore
-
-    try:
-        from app.services.integration_service import IntegrationService
-        async def _ok(*args, **kwargs):
-            return {"ok": True}
-        monkeypatch.setattr(IntegrationService, "send_hl7_message", _ok, raising=False)
-        monkeypatch.setattr(IntegrationService, "send_fhir_resource", _ok, raising=False)
-        monkeypatch.setattr(IntegrationService, "get_fhir_resource", _ok, raising=False)
-        monkeypatch.setattr(IntegrationService, "query_fhir_resources", _ok, raising=False)
-        monkeypatch.setattr(IntegrationService, "fetch_pacs_study", _ok, raising=False)
-        monkeypatch.setattr(IntegrationService, "sync_imaging_from_pacs", _ok, raising=False)
-    except Exception:
-        pass
-    return True
-
-
-@pytest.fixture
-def redis_client_fake(monkeypatch):
-    """In-memory fake for cache layer style get/set during tests."""
-    store: dict[str, str] = {}
-
-    class FakeRedis:
-        async def get(self, k): return store.get(k)
-        async def set(self, k, v): store[k] = v; return True
-        async def setex(self, k, ttl, v): store[k] = v; return True
-        async def incr(self, k): store[k] = str(int(store.get(k, "0")) + 1); return int(store[k])
-        async def ping(self): return True
-        async def close(self): return True
-
-    return FakeRedis()

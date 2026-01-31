@@ -2,83 +2,36 @@
 
 This directory contains sample medical data for testing and demonstration of the NeuroPredict-AI system.
 
-## 📋 Overview
-
-This directory contains **two types of data**:
-
-1. **Synthetic Data** (`data/`) - 100 samples of completely synthetic data
-2. **Real Data** (`real_data/`) - 100 samples based on real research patterns (ADNI, OASIS, PPMI)
-
-**Total**: 200 samples
-
 ## ⚠️ Important Notice
 
-### Synthetic Data (`data/`)
 **This is SYNTHETIC DATA for demonstration purposes only.**
 - Not real patient data
 - Should NOT be used for actual medical decisions
 - Generated using statistical distributions
 - For development and testing only
 
-### Real Data (`real_data/`)
-**This is RESEARCH-BASED DATA inspired by real studies.**
-- Based on statistical patterns from ADNI, OASIS, and PPMI research
-- **NOT actual patient data** - simulated based on published statistics
-- Includes proper citations and source attribution
-- For research and development purposes
-- See [REAL_DATA_SOURCES.md](REAL_DATA_SOURCES.md) for detailed source information
-
 ## 📁 Directory Structure
 
 ```
 data/
-├── data/                         # Synthetic data (100 samples)
-│   ├── csv/
-│   │   ├── sample_dataset_complete.csv
-│   │   ├── demographic_data.csv
-│   │   ├── cognitive_data.csv
-│   │   ├── biomarker_data.csv
-│   │   ├── mri_features.csv
-│   │   └── labels.csv
-│   └── images/                   # 10 synthetic MRI images
-│
-├── real_data/                    # Real research-based data (100 samples)
-│   ├── csv/
-│   │   ├── real_dataset_complete.csv
-│   │   ├── real_demographic_data.csv
-│   │   ├── real_cognitive_data.csv
-│   │   ├── real_biomarker_data.csv
-│   │   ├── real_mri_features.csv
-│   │   ├── real_labels.csv
-│   │   └── data_sources.csv
-│   ├── images/                   # 100 realistic MRI images
-│   └── data_sources_metadata.json
-│
-├── generate_sample_data.py       # Generate synthetic data
-├── download_real_data.py         # Generate real research-based data
-├── README.md                     # This file
-└── REAL_DATA_SOURCES.md          # Real data sources documentation
+├── csv/                          # CSV datasets
+│   ├── sample_dataset_complete.csv   # Complete dataset (100 samples)
+│   ├── demographic_data.csv          # Patient demographics
+│   ├── cognitive_data.csv            # Cognitive test scores
+│   ├── biomarker_data.csv            # Biomarker levels
+│   ├── mri_features.csv              # MRI volumetric features
+│   └── labels.csv                    # Diagnosis labels
+├── images/                       # Sample MRI images
+│   └── *.npy                    # Numpy arrays (64x64 synthetic MRI)
+└── generate_sample_data.py      # Data generation script
 ```
 
 ## 📈 Dataset Statistics
 
-### Synthetic Data (`data/`)
 - **Total Samples**: 100
 - **Normal Controls**: 70 (70%)
 - **Alzheimer's Patients**: 20 (20%)
 - **Parkinson's Patients**: 10 (10%)
-- **MRI Images**: 10 samples
-
-### Real Research-Based Data (`real_data/`)
-- **Total Samples**: 100
-- **Normal Controls**: 55 (55%)
-- **Alzheimer's Patients**: 27 (27%)
-- **Parkinson's Patients**: 18 (18%)
-- **MRI Images**: 100 samples
-- **Data Sources**: 
-  - ADNI-Inspired: 40 samples
-  - OASIS-Inspired: 50 samples
-  - PPMI-Inspired: 10 samples
 
 ## 🔬 Data Features
 
@@ -134,7 +87,7 @@ The `images/` folder contains 10 sample synthetic MRI images:
 
 ## 🚀 Regenerating Data
 
-### Generate Synthetic Data
+To regenerate the sample data:
 
 ```bash
 cd data
@@ -145,21 +98,6 @@ This will create:
 - 100 patient records
 - 6 CSV files
 - 10 sample MRI images
-
-### Generate Real Research-Based Data
-
-```bash
-cd data
-python download_real_data.py
-```
-
-This will create:
-- 100 patient records (based on ADNI/OASIS/PPMI patterns)
-- 7 CSV files (including data sources)
-- 100 realistic MRI images
-- Metadata file with citations
-
-**Note**: See [REAL_DATA_SOURCES.md](REAL_DATA_SOURCES.md) for detailed information about data sources and citations.
 
 ## 📖 Usage in Application
 
@@ -237,19 +175,10 @@ The synthetic data is generated using statistical distributions that approximate
 
 ## 📚 References
 
-### Real Data Sources (Used in `real_data/`)
+For real medical data collection and usage, please refer to:
 - [ADNI](https://adni.loni.usc.edu/) - Alzheimer's Disease Neuroimaging Initiative
-- [OASIS](https://www.oasis-brains.org/) - Open Access Series of Imaging Studies
 - [PPMI](https://www.ppmi-info.org/) - Parkinson's Progression Markers Initiative
-
-**Detailed citations and source information**: See [REAL_DATA_SOURCES.md](REAL_DATA_SOURCES.md)
-
-### Other Public Datasets
-For additional real medical data collection:
-- [Kaggle Medical Datasets](https://www.kaggle.com/datasets?search=alzheimer)
-- [Google Dataset Search](https://datasetsearch.research.google.com/)
-- [Data.gov Health Data](https://www.data.gov/health/)
-- [AWS Open Data Registry](https://registry.opendata.aws/)
+- [OASIS](https://www.oasis-brains.org/) - Open Access Series of Imaging Studies
 
 ## ⚠️ Disclaimer
 

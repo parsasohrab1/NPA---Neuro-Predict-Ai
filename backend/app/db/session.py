@@ -7,24 +7,16 @@ from typing import AsyncGenerator
 
 from ..core.config import settings
 
-# Create async engine
-# SQLite doesn't support pool_size/max_overflow, so we need to check the database type
-engine_kwargs = {
-    "echo": settings.DEBUG,
-    "future": True,
-}
-
-# Add pooling parameters only for non-SQLite databases
-if not settings.DATABASE_URL.startswith("sqlite"):
-    engine_kwargs.update({
-        "pool_pre_ping": True,
-        "pool_size": 10,
-        "max_overflow": 20
-    })
-
+# Create async engine with optimized connection pooling
 engine = create_async_engine(
     settings.DATABASE_URL,
-    **engine_kwargs
+    echo=settings.DEBUG,
+    future=True,
+    pool_pre_ping=True,  # Verify connections before using
+    pool_size=20,  # Number of connections to maintain
+    max_overflow=10,  # Additional connections beyond pool_size
+    pool_timeout=30,  # Seconds to wait for connection
+    pool_recycle=3600,  # Recycle connections after 1 hour
 )
 
 # Create async session factory

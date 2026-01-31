@@ -37,11 +37,11 @@ class PredictionResponse(BaseModel):
     
     model_version: Optional[str] = None
     model_name: Optional[str] = None
-    
+
     feature_importance: Optional[Dict[str, float]] = None
     attention_scores: Optional[Dict[str, float]] = Field(
-        default=None,
-        description="Attention weights for each data modality (MRI, Biomarker, Cognitive)"
+        None,
+        description="Explainability: modality weights MRI, Biomarker, Cognitive (sum = 1.0)",
     )
     recommendations: Optional[str] = None
     follow_up_date: Optional[datetime] = None

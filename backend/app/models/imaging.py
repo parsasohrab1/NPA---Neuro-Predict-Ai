@@ -21,11 +21,11 @@ class ImagingStudy(Base):
     __tablename__ = "imaging_studies"
     
     id = Column(Integer, primary_key=True, index=True)
-    medical_record_id = Column(Integer, ForeignKey("medical_records.id"), nullable=False, index=True)
+    medical_record_id = Column(Integer, ForeignKey("medical_records.id"), nullable=False)
     
     # Study Information
     study_id = Column(String, unique=True, index=True, nullable=False)  # DICOM Study Instance UID
-    study_date = Column(DateTime(timezone=True), nullable=False, index=True)
+    study_date = Column(DateTime(timezone=True), nullable=False)
     modality = Column(Enum(ImagingModality), nullable=False)
     
     # File Information
@@ -58,7 +58,6 @@ class ImagingStudy(Base):
     
     # Relationships
     medical_record = relationship("MedicalRecord", back_populates="imaging_studies")
-    longitudinal_visits = relationship("LongitudinalVisit", back_populates="imaging_study")
     
     def __repr__(self):
         return f"<ImagingStudy(id={self.id}, study_id={self.study_id}, modality={self.modality})>"

@@ -1,18 +1,20 @@
 """
 AI Model Service for Disease Prediction
 """
-import logging
-from pathlib import Path
-from typing import Dict, Optional, Tuple
-
-import numpy as np
-
 try:
     import torch
     import torch.nn as nn
-except ImportError:  # pragma: no cover - optional dependency guard
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
     torch = None
     nn = None
+
+import asyncio
+import numpy as np
+from typing import Dict, Tuple, Optional
+import logging
+from pathlib import Path
 
 from ..core.config import settings
 from ..models.prediction import RiskLevel
@@ -20,129 +22,90 @@ from ..models.prediction import RiskLevel
 logger = logging.getLogger(__name__)
 
 
-if nn is not None:
-
-    class MultiModalNeuralNetwork(nn.Module):
-        """
-        Multi-modal deep learning model for Alzheimer's and Parkinson's prediction
-        Combines imaging features, clinical data, biomarkers, and genetic information
-        """
-
-        def __init__(self, input_dim: int = 50, hidden_dims: list = [256, 128, 64]):
-            super().__init__()
-
-            # Feature extraction layers
-            layers = []
-            prev_dim = input_dim
-
-            for hidden_dim in hidden_dims:
-                layers.append(nn.Linear(prev_dim, hidden_dim))
-                layers.append(nn.ReLU())
-                layers.append(nn.BatchNorm1d(hidden_dim))
-                layers.append(nn.Dropout(0.3))
-                prev_dim = hidden_dim
-
-            self.feature_extractor = nn.Sequential(*layers)
-
-            # Separate heads for Alzheimer's and Parkinson's
-            self.alzheimer_head = nn.Sequential(
-                nn.Linear(hidden_dims[-1], 32),
-                nn.ReLU(),
-                nn.Linear(32, 1),
-                nn.Sigmoid(),
-            )
-
-            self.parkinson_head = nn.Sequential(
-                nn.Linear(hidden_dims[-1], 32),
-                nn.ReLU(),
-                nn.Linear(32, 1),
-                nn.Sigmoid(),
-            )
-
-        def forward(self, x):
-            features = self.feature_extractor(x)
-            alzheimer_prob = self.alzheimer_head(features)
-            parkinson_prob = self.parkinson_head(features)
-            return alzheimer_prob, parkinson_prob
-
-else:
-
-    class MultiModalNeuralNetwork:  # type: ignore[override]
-        """Fallback stub when PyTorch is unavailable."""
-
-        def __init__(self, *args, **kwargs):
-            raise RuntimeError("pytorch_not_available")
+class MultiModalNeuralNetwork(nn.Module):
+    """
+    Multi-modal deep learning model for Alzheimer's and Parkinson's prediction
+    Combines imaging features, clinical data, biomarkers, and genetic information
+    """
+    def __init__(self, input_dim: int = 50, hidden_dims: list = [256, 128, 64]):
+        super(MultiModalNeuralNetwork, self).__init__()
+        
+        # Feature extraction layers
+        layers = []
+        prev_dim = input_dim
+        
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(prev_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.Dropout(0.3))
+            prev_dim = hidden_dim
+        
+        self.feature_extractor = nn.Sequential(*layers)
+        
+        # Separate heads for Alzheimer's and Parkinson's
+        self.alzheimer_head = nn.Sequential(
+            nn.Linear(hidden_dims[-1], 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+            nn.Sigmoid()
+        )
+        
+        self.parkinson_head = nn.Sequential(
+            nn.Linear(hidden_dims[-1], 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        features = self.feature_extractor(x)
+        alzheimer_prob = self.alzheimer_head(features)
+        parkinson_prob = self.parkinson_head(features)
+        return alzheimer_prob, parkinson_prob
 
 
 class AIModelService:
     """Service for AI-powered disease prediction"""
-    
-    def __init__(self):
-        self.model = None
-        self.feature_names: list[str] = []
-        if torch is None or nn is None:
-            logger.warning("PyTorch is not installed; AIModelService is disabled.")
-            self.device = None
-            self._available = False
-            return
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._available = True
+    def __init__(self):
+        self.use_mock = not TORCH_AVAILABLE
+        if not self.use_mock:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = None
+        self.feature_names = []
+        self._prediction_semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_PREDICTIONS)
         self._initialize_model()
     
     def _initialize_model(self):
         """Initialize or load pre-trained model"""
+        if self.use_mock:
+            logger.warning("Torch not available. Using mock predictions.")
+            self.feature_names = [
+                'age', 'gender_encoded', 'education_years',
+                'mmse_score', 'moca_score', 'memory_score', 'attention_score', 'executive_function_score',
+                'amyloid_beta', 'tau_protein', 'dopamine_level',
+                'apoe_e4_status',
+                'hippocampal_volume', 'cortical_thickness', 'ventricular_volume',
+                'white_matter_hyperintensities', 'brain_volume_total',
+                *[f'imaging_feature_{i}' for i in range(32)]
+            ]
+            return
+        
         try:
             # Initialize model architecture
             self.model = MultiModalNeuralNetwork(input_dim=50)
             
             # Try to load pre-trained weights if available
-            model_loaded = False
-            
-            if settings.USE_TRAINED_MODEL:
-                # Try to load from model registry first
-                try:
-                    from .training.model_registry import ModelRegistry
-                    registry = ModelRegistry(Path(settings.MODEL_REGISTRY_PATH))
-                    active_model = registry.get_active_model()
-                    
-                    if active_model and Path(active_model['model_path']).exists():
-                        model_path = Path(active_model['model_path'])
-                        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
-                        logger.info(f"Loaded active model from registry: {model_path} (version: {active_model['version']})")
-                        model_loaded = True
-                    else:
-                        # Try latest model
-                        latest_model = registry.get_latest_model()
-                        if latest_model and Path(latest_model['model_path']).exists():
-                            model_path = Path(latest_model['model_path'])
-                            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
-                            logger.info(f"Loaded latest model from registry: {model_path} (version: {latest_model['version']})")
-                            model_loaded = True
-                except Exception as e:
-                    logger.warning(f"Could not load model from registry: {e}")
-            
-            # Fallback to default model path
-            if not model_loaded:
-                model_path = Path(settings.ENSEMBLE_MODEL_PATH)
-                if model_path.exists():
-                    self.model.load_state_dict(torch.load(model_path, map_location=self.device))
-                    logger.info(f"Loaded pre-trained model from {model_path}")
-                    model_loaded = True
-                else:
-                    logger.warning(f"No pre-trained model found at {model_path}. Using random initialization.")
+            model_path = Path(settings.ENSEMBLE_MODEL_PATH)
+            if model_path.exists():
+                self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+                logger.info(f"Loaded pre-trained model from {model_path}")
+            else:
+                logger.warning(f"No pre-trained model found at {model_path}. Using random initialization.")
             
             self.model.to(self.device)
             self.model.eval()
-            
-            # Initialize XAI service
-            try:
-                from .xai_service import XAIService
-                self.xai_service = XAIService(self.model, self.device)
-                logger.info("XAI service initialized successfully")
-            except Exception as e:
-                logger.warning(f"Could not initialize XAI service: {e}")
-                self.xai_service = None
             
             # Define feature names for interpretability
             self.feature_names = [
@@ -163,7 +126,8 @@ class AIModelService:
             
         except Exception as e:
             logger.error(f"Error initializing model: {e}")
-            raise
+            self.use_mock = True
+            logger.warning("Falling back to mock predictions.")
     
     def extract_features(self, patient_data: Dict) -> np.ndarray:
         """
@@ -232,43 +196,15 @@ class AIModelService:
                                      alzheimer_prob: float, 
                                      parkinson_prob: float) -> Dict[str, float]:
         """
-        Calculate feature importance using advanced XAI methods
-        Falls back to simple heuristic if XAI service not available
+        Calculate feature importance using simple attribution
+        In production, use methods like SHAP or Integrated Gradients
         """
-        # Try to use advanced XAI methods
-        if hasattr(self, 'xai_service') and self.xai_service is not None:
-            try:
-                import torch
-                features_tensor = torch.from_numpy(features).unsqueeze(0).float().to(self.device)
-                
-                # Use Integrated Gradients for attribution
-                alz_attribution = self.xai_service._integrated_gradients(
-                    features_tensor, target_class=0, steps=50
-                )
-                park_attribution = self.xai_service._integrated_gradients(
-                    features_tensor, target_class=1, steps=50
-                )
-                
-                # Combine attributions
-                combined_attribution = abs(alz_attribution) * alzheimer_prob + abs(park_attribution) * parkinson_prob
-                
-                # Convert to dictionary
-                importance = dict(zip(self.feature_names, combined_attribution))
-                
-                # Normalize
-                total = sum(importance.values())
-                if total > 0:
-                    importance = {k: v/total for k, v in importance.items()}
-                
-                # Return top 10
-                sorted_importance = sorted(importance.items(), key=lambda x: x[1], reverse=True)
-                return dict(sorted_importance[:10])
-            except Exception as e:
-                logger.warning(f"XAI method failed, using fallback: {e}")
-        
-        # Fallback to simple heuristic
         importance = {}
+        
+        # Simple feature importance based on feature values and prediction
+        # This is a placeholder - in production use proper explainability methods
         for i, (feat_name, feat_value) in enumerate(zip(self.feature_names, features)):
+            # Simple heuristic importance
             if 'alzheimer' in feat_name.lower() or feat_name in ['mmse_score', 'hippocampal_volume', 'tau_protein']:
                 importance[feat_name] = float(abs(feat_value - 0.5) * alzheimer_prob)
             elif 'parkinson' in feat_name.lower() or feat_name in ['dopamine_level']:
@@ -284,7 +220,33 @@ class AIModelService:
         # Return top 10 most important features
         sorted_importance = sorted(importance.items(), key=lambda x: x[1], reverse=True)
         return dict(sorted_importance[:10])
-    
+
+    def _compute_attention_scores(self, feature_importance: Dict[str, float]) -> Dict[str, float]:
+        """
+        Derive modality attention scores (MRI, Biomarker, Cognitive) from feature_importance.
+        SRS: explainability per modality. Normalized so sum = 1.0.
+        """
+        mri_keys = {
+            "hippocampal_volume", "cortical_thickness", "ventricular_volume",
+            "white_matter_hyperintensities", "brain_volume_total",
+        } | {f"imaging_feature_{i}" for i in range(32)}
+        biomarker_keys = {"amyloid_beta", "tau_protein", "dopamine_level", "apoe_e4_status"}
+        cognitive_keys = {
+            "age", "gender_encoded", "education_years",
+            "mmse_score", "moca_score", "memory_score", "attention_score", "executive_function_score",
+        }
+        mri = sum(feature_importance.get(k, 0.0) for k in mri_keys)
+        biomarker = sum(feature_importance.get(k, 0.0) for k in biomarker_keys)
+        cognitive = sum(feature_importance.get(k, 0.0) for k in cognitive_keys)
+        total = mri + biomarker + cognitive
+        if total <= 0:
+            return {"MRI": 1.0 / 3, "Biomarker": 1.0 / 3, "Cognitive": 1.0 / 3}
+        return {
+            "MRI": round(mri / total, 4),
+            "Biomarker": round(biomarker / total, 4),
+            "Cognitive": round(cognitive / total, 4),
+        }
+
     def _generate_recommendations(self, alzheimer_risk: float, 
                                  parkinson_risk: float,
                                  patient_data: Dict) -> str:
@@ -324,7 +286,47 @@ class AIModelService:
         recommendations.append("- Regular cardiovascular exercise (150 min/week)")
         
         return "\n".join(recommendations)
-    
+
+    def _run_inference_sync(self, patient_data: Dict) -> Dict:
+        """
+        Synchronous model inference (CPU/GPU-bound).
+        Run via asyncio.to_thread() so the event loop is not blocked.
+        """
+        features = self.extract_features(patient_data)
+        features_tensor = torch.from_numpy(features).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            alzheimer_prob, parkinson_prob = self.model(features_tensor)
+            alzheimer_prob = float(alzheimer_prob.cpu().numpy()[0][0])
+            parkinson_prob = float(parkinson_prob.cpu().numpy()[0][0])
+        alzheimer_risk_level = self._determine_risk_level(alzheimer_prob)
+        parkinson_risk_level = self._determine_risk_level(parkinson_prob)
+        alzheimer_confidence = self._calculate_confidence(alzheimer_prob)
+        parkinson_confidence = self._calculate_confidence(parkinson_prob)
+        feature_importance = self._calculate_feature_importance(
+            features, alzheimer_prob, parkinson_prob
+        )
+        attention_scores = self._compute_attention_scores(feature_importance)
+        recommendations = self._generate_recommendations(
+            alzheimer_prob, parkinson_prob, patient_data
+        )
+        return {
+            "alzheimer": {
+                "risk_score": alzheimer_prob,
+                "risk_level": alzheimer_risk_level,
+                "confidence": alzheimer_confidence,
+            },
+            "parkinson": {
+                "risk_score": parkinson_prob,
+                "risk_level": parkinson_risk_level,
+                "confidence": parkinson_confidence,
+            },
+            "feature_importance": feature_importance,
+            "attention_scores": attention_scores,
+            "recommendations": recommendations,
+            "model_version": "1.0.0",
+            "model_name": "MultiModalNeuralNetwork",
+        }
+
     async def predict(self, patient_data: Dict) -> Dict:
         """
         Make disease risk prediction
@@ -335,87 +337,61 @@ class AIModelService:
         Returns:
             Dictionary with prediction results
         """
-        if not getattr(self, "_available", False) or self.model is None or torch is None:
-            raise RuntimeError("pytorch_not_available")
-
         try:
-            # Extract features
-            features = self.extract_features(patient_data)
-            
-            # Convert to torch tensor
-            features_tensor = torch.from_numpy(features).unsqueeze(0).to(self.device)
-            
-            # Make prediction
-            with torch.no_grad():
-                alzheimer_prob, parkinson_prob = self.model(features_tensor)
+            if self.use_mock:
+                # Mock predictions for development/testing
+                import random
+                age = patient_data.get('age', 65)
+                mmse = patient_data.get('mmse_score', 25) / 30.0
+                tau = patient_data.get('tau_protein', 200) / 800.0
                 
-                alzheimer_prob = float(alzheimer_prob.cpu().numpy()[0][0])
-                parkinson_prob = float(parkinson_prob.cpu().numpy()[0][0])
-            
-            # Calculate risk levels and confidence
-            alzheimer_risk_level = self._determine_risk_level(alzheimer_prob)
-            parkinson_risk_level = self._determine_risk_level(parkinson_prob)
-            
-            alzheimer_confidence = self._calculate_confidence(alzheimer_prob)
-            parkinson_confidence = self._calculate_confidence(parkinson_prob)
-            
-            # Calculate feature importance
-            feature_importance = self._calculate_feature_importance(
-                features, alzheimer_prob, parkinson_prob
-            )
-            
-            # Generate recommendations
-            recommendations = self._generate_recommendations(
-                alzheimer_prob, parkinson_prob, patient_data
-            )
-            
-            # Simple placeholder attention scores summing to 1.0
-            # In production, extract real attention from model
-            att_mri = max(0.05, min(0.9, 0.4 + (features[149] - 0.5) * 0.1))  # heuristic
-            att_bio = 0.3
-            att_cog = 1.0 - (att_mri + att_bio)
+                # Simple heuristic-based mock predictions
+                alzheimer_prob = max(0.1, min(0.9, (100 - age) / 100.0 + (1 - mmse) * 0.3 + tau * 0.2))
+                parkinson_prob = max(0.1, min(0.9, (100 - age) / 120.0 + random.uniform(-0.1, 0.1)))
+                
+                alzheimer_risk_level = self._determine_risk_level(alzheimer_prob)
+                parkinson_risk_level = self._determine_risk_level(parkinson_prob)
+                
+                alzheimer_confidence = self._calculate_confidence(alzheimer_prob)
+                parkinson_confidence = self._calculate_confidence(parkinson_prob)
+                
+                feature_importance = {
+                    'age': 0.25,
+                    'mmse_score': 0.20,
+                    'tau_protein': 0.15,
+                    'hippocampal_volume': 0.12,
+                    'moca_score': 0.10,
+                    'dopamine_level': 0.08,
+                    'apoe_e4_status': 0.05,
+                    'cortical_thickness': 0.03,
+                    'ventricular_volume': 0.02
+                }
+                attention_scores = self._compute_attention_scores(feature_importance)
+                recommendations = self._generate_recommendations(
+                    alzheimer_prob, parkinson_prob, patient_data
+                )
+                return {
+                    'alzheimer': {
+                        'risk_score': alzheimer_prob,
+                        'risk_level': alzheimer_risk_level,
+                        'confidence': alzheimer_confidence
+                    },
+                    'parkinson': {
+                        'risk_score': parkinson_prob,
+                        'risk_level': parkinson_risk_level,
+                        'confidence': parkinson_confidence
+                    },
+                    'feature_importance': feature_importance,
+                    'attention_scores': attention_scores,
+                    'recommendations': recommendations,
+                    'model_version': '1.0.0-mock',
+                    'model_name': 'MockPredictionModel'
+                }
 
-            result = {
-                'alzheimer': {
-                    'risk_score': alzheimer_prob,
-                    'risk_level': alzheimer_risk_level,
-                    'confidence': alzheimer_confidence
-                },
-                'parkinson': {
-                    'risk_score': parkinson_prob,
-                    'risk_level': parkinson_risk_level,
-                    'confidence': parkinson_confidence
-                },
-                'attention_scores': {
-                    'MRI': float(att_mri),
-                    'Biomarker': float(att_bio),
-                    'Cognitive': float(att_cog)
-                },
-                'feature_importance': feature_importance,
-                'recommendations': recommendations,
-                'model_version': '1.0.0',
-                'model_name': 'MultiModalNeuralNetwork'
-            }
-            
-            # Add advanced XAI explanations if available
-            if hasattr(self, 'xai_service') and self.xai_service is not None:
-                try:
-                    xai_explanation = self.xai_service.explain_prediction(
-                        features,
-                        result,
-                        self.feature_names,
-                        method='integrated_gradients'
-                    )
-                    result['xai_explanation'] = {
-                        'saliency_maps': xai_explanation.get('saliency_maps', {}),
-                        'top_contributing_features': xai_explanation.get('top_contributing_features', []),
-                        'confidence_analysis': xai_explanation.get('confidence_analysis', {})
-                    }
-                except Exception as e:
-                    logger.warning(f"Could not generate XAI explanation: {e}")
-            
-            return result
-            
+            # Limit concurrent inferences to avoid overload (config: MAX_CONCURRENT_PREDICTIONS)
+            async with self._prediction_semaphore:
+                return await asyncio.to_thread(self._run_inference_sync, patient_data)
+
         except Exception as e:
             logger.error(f"Error during prediction: {e}")
             raise

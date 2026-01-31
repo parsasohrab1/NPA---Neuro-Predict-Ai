@@ -1,124 +1,242 @@
 """
-Cache utilities for API endpoints
+Caching Service for Performance Optimization
+سرویس Cache برای بهینه‌سازی عملکرد
 """
-from typing import Optional, Dict, Any
-from fastapi import Request
+from typing import Optional, Any, Union
 import json
+import pickle
 import hashlib
+from datetime import timedelta
+import redis.asyncio as redis
+import logging
 
-from ..services.performance_service import PerformanceService
+from .config import settings
 
-
-async def get_cached_response(
-    cache_key: str,
-    expire_seconds: int = 300
-) -> Optional[Any]:
-    """Get cached response if available"""
-    return await PerformanceService.cache_service.get(cache_key)
+logger = logging.getLogger(__name__)
 
 
-async def set_cached_response(
-    cache_key: str,
-    value: Any,
-    expire_seconds: int = 300
-):
-    """Cache a response"""
-    await PerformanceService.cache_service.set(
-        cache_key,
-        value,
-        expire_seconds=expire_seconds
-    )
-
-
-def generate_cache_key(
-    prefix: str,
-    request: Optional[Request] = None,
-    current_user: Optional[Any] = None,
-    include_user: bool = False,
-    **kwargs
-) -> str:
-    """
-    Generate a cache key from request parameters
+class CacheService:
+    """Service for caching data to improve performance"""
     
-    Args:
-        prefix: Cache key prefix (e.g., "predictions", "patients")
-        request: FastAPI Request object
-        current_user: Current user object
-        include_user: Whether to include user ID in cache key
-        **kwargs: Additional parameters to include in cache key
-    """
-    cache_key_parts = [prefix]
+    def __init__(self):
+        self.redis_client: Optional[redis.Redis] = None
+        self.enabled = True
     
-    # Include query parameters
-    if request:
-        query_params = dict(request.query_params)
-        if query_params:
-            query_str = json.dumps(query_params, sort_keys=True)
-            cache_key_parts.append(f"q:{hashlib.md5(query_str.encode()).hexdigest()[:8]}")
+    async def connect(self):
+        """Connect to Redis"""
+        try:
+            self.redis_client = await redis.from_url(
+                f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
+                encoding="utf-8",
+                decode_responses=False  # We'll handle encoding ourselves
+            )
+            # Test connection
+            await self.redis_client.ping()
+            logger.info("Connected to Redis cache")
+        except Exception as e:
+            logger.warning(f"Redis connection failed: {e}. Caching disabled.")
+            self.enabled = False
+            self.redis_client = None
+    
+    async def disconnect(self):
+        """Disconnect from Redis"""
+        if self.redis_client:
+            await self.redis_client.close()
+            logger.info("Disconnected from Redis cache")
+    
+    def _serialize(self, value: Any) -> bytes:
+        """Serialize value for storage"""
+        try:
+            # Try JSON first (for simple types)
+            return json.dumps(value).encode('utf-8')
+        except (TypeError, ValueError):
+            # Fall back to pickle for complex types
+            return pickle.dumps(value)
+    
+    def _deserialize(self, value: bytes) -> Any:
+        """Deserialize value from storage"""
+        try:
+            # Try JSON first
+            return json.loads(value.decode('utf-8'))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            # Fall back to pickle
+            return pickle.loads(value)
+    
+    def _make_key(self, prefix: str, key: str) -> str:
+        """Create cache key"""
+        return f"{prefix}:{key}"
+    
+    async def get(
+        self,
+        prefix: str,
+        key: str,
+        default: Any = None
+    ) -> Optional[Any]:
+        """
+        Get value from cache
         
-        # Include path parameters
-        if hasattr(request, 'path_params') and request.path_params:
-            path_str = json.dumps(request.path_params, sort_keys=True)
-            cache_key_parts.append(f"p:{hashlib.md5(path_str.encode()).hexdigest()[:8]}")
+        Args:
+            prefix: Key prefix (e.g., 'patient', 'prediction')
+            key: Cache key
+            default: Default value if not found
+        
+        Returns:
+            Cached value or default
+        """
+        if not self.enabled or not self.redis_client:
+            return default
+        
+        try:
+            cache_key = self._make_key(prefix, key)
+            value = await self.redis_client.get(cache_key)
+            
+            if value is None:
+                return default
+            
+            return self._deserialize(value)
+        
+        except Exception as e:
+            logger.error(f"Error getting from cache: {e}")
+            return default
     
-    # Include user ID if needed
-    if include_user and current_user:
-        cache_key_parts.append(f"u:{current_user.id}")
+    async def set(
+        self,
+        prefix: str,
+        key: str,
+        value: Any,
+        ttl: Optional[int] = None
+    ) -> bool:
+        """
+        Set value in cache
+        
+        Args:
+            prefix: Key prefix
+            key: Cache key
+            value: Value to cache
+            ttl: Time to live in seconds (None for no expiration)
+        
+        Returns:
+            True if successful
+        """
+        if not self.enabled or not self.redis_client:
+            return False
+        
+        try:
+            cache_key = self._make_key(prefix, key)
+            serialized = self._serialize(value)
+            
+            if ttl:
+                await self.redis_client.setex(cache_key, ttl, serialized)
+            else:
+                await self.redis_client.set(cache_key, serialized)
+            
+            return True
+        
+        except Exception as e:
+            logger.error(f"Error setting cache: {e}")
+            return False
     
-    # Include relevant kwargs
-    relevant_kwargs = {}
-    for key in ['patient_id', 'prediction_id', 'skip', 'limit', 'search', 'report_type', 'start_date', 'end_date']:
-        if key in kwargs and kwargs[key] is not None:
-            relevant_kwargs[key] = kwargs[key]
+    async def delete(self, prefix: str, key: str) -> bool:
+        """Delete value from cache"""
+        if not self.enabled or not self.redis_client:
+            return False
+        
+        try:
+            cache_key = self._make_key(prefix, key)
+            await self.redis_client.delete(cache_key)
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting from cache: {e}")
+            return False
     
-    if relevant_kwargs:
-        kwargs_str = json.dumps(relevant_kwargs, sort_keys=True, default=str)
-        cache_key_parts.append(f"k:{hashlib.md5(kwargs_str.encode()).hexdigest()[:8]}")
+    async def delete_pattern(self, prefix: str, pattern: str) -> int:
+        """
+        Delete all keys matching pattern
+        
+        Args:
+            prefix: Key prefix
+            pattern: Pattern to match (e.g., 'patient:*')
+        
+        Returns:
+            Number of keys deleted
+        """
+        if not self.enabled or not self.redis_client:
+            return 0
+        
+        try:
+            full_pattern = self._make_key(prefix, pattern)
+            keys = []
+            async for key in self.redis_client.scan_iter(match=full_pattern):
+                keys.append(key)
+            
+            if keys:
+                return await self.redis_client.delete(*keys)
+            return 0
+        
+        except Exception as e:
+            logger.error(f"Error deleting pattern from cache: {e}")
+            return 0
     
-    # Use PerformanceService to generate final cache key
-    # The generate_cache_key method expects prefix and kwargs
-    key_string = "|".join(cache_key_parts)
-    return hashlib.md5(key_string.encode()).hexdigest()
-
-
-async def invalidate_cache_pattern(pattern: str):
-    """Invalidate cache entries matching a pattern"""
-    await PerformanceService.invalidate_cache_pattern(pattern)
-
-
-async def invalidate_patient_cache(patient_id: int):
-    """Invalidate all cache entries related to a patient"""
-    patterns = [
-        f"*patient:{patient_id}*",
-        f"*patients*",
-        f"*analytics*",
-        f"*predictions*patient_id:{patient_id}*"
-    ]
-    for pattern in patterns:
-        await invalidate_cache_pattern(pattern)
-
-
-async def invalidate_prediction_cache(prediction_id: Optional[int] = None, patient_id: Optional[int] = None):
-    """Invalidate cache entries related to predictions"""
-    patterns = [
-        "*predictions*",
-        "*analytics*"
-    ]
+    async def exists(self, prefix: str, key: str) -> bool:
+        """Check if key exists in cache"""
+        if not self.enabled or not self.redis_client:
+            return False
+        
+        try:
+            cache_key = self._make_key(prefix, key)
+            return await self.redis_client.exists(cache_key) > 0
+        except Exception as e:
+            logger.error(f"Error checking cache existence: {e}")
+            return False
     
-    if prediction_id:
-        patterns.append(f"*prediction:{prediction_id}*")
+    async def increment(self, prefix: str, key: str, amount: int = 1) -> Optional[int]:
+        """Increment numeric value in cache"""
+        if not self.enabled or not self.redis_client:
+            return None
+        
+        try:
+            cache_key = self._make_key(prefix, key)
+            return await self.redis_client.incrby(cache_key, amount)
+        except Exception as e:
+            logger.error(f"Error incrementing cache: {e}")
+            return None
     
-    if patient_id:
-        patterns.append(f"*predictions*patient_id:{patient_id}*")
-    
-    for pattern in patterns:
-        await invalidate_cache_pattern(pattern)
+    async def get_or_set(
+        self,
+        prefix: str,
+        key: str,
+        callable_func,
+        ttl: Optional[int] = None
+    ) -> Any:
+        """
+        Get value from cache or set it using callable
+        
+        Args:
+            prefix: Key prefix
+            key: Cache key
+            callable_func: Function to call if cache miss
+            ttl: Time to live in seconds
+        
+        Returns:
+            Cached or computed value
+        """
+        # Try to get from cache
+        cached = await self.get(prefix, key)
+        if cached is not None:
+            return cached
+        
+        # Compute value
+        if callable(callable_func):
+            value = await callable_func() if hasattr(callable_func, '__call__') else callable_func
+        else:
+            value = callable_func
+        
+        # Store in cache
+        await self.set(prefix, key, value, ttl)
+        
+        return value
 
 
-async def invalidate_product_cache(product_id: Optional[int] = None):
-    """Invalidate cache entries related to products"""
-    patterns = ["*products*", "*product*"]
-    if product_id is not None:
-        patterns.append(f"*product:{product_id}*")
-    for pattern in patterns:
-        await invalidate_cache_pattern(pattern)
+# Global cache service instance
+cache_service = CacheService()
+

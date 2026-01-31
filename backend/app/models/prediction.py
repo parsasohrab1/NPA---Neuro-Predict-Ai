@@ -1,7 +1,7 @@
 """
 AI Prediction Model
 """
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON, Text, Enum, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON, Text, Enum, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -23,10 +23,14 @@ class RiskLevel(str, enum.Enum):
 
 class Prediction(Base):
     __tablename__ = "predictions"
-    
+
+    __table_args__ = (
+        Index("idx_predictions_patient_created_at", "patient_id", "created_at"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Prediction Information
     disease_type = Column(Enum(DiseaseType), nullable=False)
@@ -50,9 +54,9 @@ class Prediction(Base):
     
     # Feature Importance (for explainability)
     feature_importance = Column(JSON, nullable=True)
-    # Attention/explainability scores per modality
+    # Attention scores per modality (MRI, Biomarker, Cognitive) for explainability
     attention_scores = Column(JSON, nullable=True)
-    
+
     # Clinical Recommendations
     recommendations = Column(Text, nullable=True)
     follow_up_date = Column(DateTime(timezone=True), nullable=True)
@@ -61,19 +65,18 @@ class Prediction(Base):
     report_path = Column(String, nullable=True)  # Path to generated PDF report
     
     # Validation & Review
-    is_reviewed = Column(Boolean, default=False)
-    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    is_reviewed = Column(String, default=False)
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     review_notes = Column(Text, nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
     patient = relationship("Patient", back_populates="predictions")
     created_by_user = relationship("User", foreign_keys=[created_by], back_populates="predictions")
-    longitudinal_visit = relationship("LongitudinalVisit", back_populates="prediction", uselist=False)
     
     def __repr__(self):
         return f"<Prediction(id={self.id}, patient_id={self.patient_id}, disease_type={self.disease_type})>"

@@ -1,20 +1,24 @@
 """
-Models package initialization
+Models Package
 """
 from .user import User, UserRole
 from .patient import Patient, Gender
 from .medical_record import MedicalRecord
+from .imaging import ImagingStudy, ImagingModality
 from .prediction import Prediction, DiseaseType, RiskLevel
-from .data_fusion_report import DataFusionReport
+from .audit import AuditLog
 
 __all__ = [
     "User",
     "UserRole",
-    "Gender",
     "Patient",
+    "Gender",
     "MedicalRecord",
+    "ImagingStudy",
+    "ImagingModality",
     "Prediction",
     "DiseaseType",
     "RiskLevel",
-    "DataFusionReport",
+    "AuditLog",
 ]
+

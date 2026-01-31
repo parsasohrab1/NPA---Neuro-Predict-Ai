@@ -3,38 +3,25 @@ NeuroPredict-AI Main Application
 FastAPI Backend for Alzheimer's and Parkinson's Disease Prediction
 """
 from fastapi import FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
-from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
-from http import HTTPStatus
 
 from .core.config import settings
 from .db.session import init_db, close_db
-from .api import (
-    auth, patients, predictions, imaging, reports, longitudinal,
-    security, monitoring, integration, backup, products, admin, system, maintenance,
-    notifications, comments, privacy, jobs, rum, ops, support, legal, webhooks,
-    disease_tracking, data_monitoring, analysis_3d, data_fusion, model_metrics
-)
-from .middleware.security_middleware import (
-    SecurityHeadersMiddleware,
-    RateLimitMiddleware,
-    RequestLoggingMiddleware,
-    RequestIdMiddleware,
-    IPWhitelistMiddleware
-)
-from .middleware.metrics_middleware import MetricsMiddleware
-from .middleware.prometheus_middleware import PrometheusMiddleware
-from .services.backup_service import BackupService
-import redis.asyncio as redis
-from .core.logging import setup_json_logging
+from .core.cache import cache_service
+from .api import auth, patients, predictions, reports, models, analytics, users, mock_data, monitoring, websocket, optimization
+from .api.integration import fhir, pacs, ehr, hl7v2, devices
+from .api.streaming import realtime
+from .services.streaming.realtime_service import realtime_service
 
 # Configure logging
-setup_json_logging(service_name=settings.APP_NAME, environment=settings.ENVIRONMENT, level=settings.LOG_LEVEL)
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 
@@ -43,15 +30,19 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     logger.info("Starting NeuroPredict-AI application...")
-    
+    logger.info(
+        "Config: ENVIRONMENT=%s, DEBUG=%s, API docs=%s",
+        settings.ENVIRONMENT,
+        settings.DEBUG,
+        "enabled" if settings.DEBUG else "disabled",
+    )
+
     # Create upload directories
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.DICOM_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.MRI_DIR).mkdir(parents=True, exist_ok=True)
-    Path(settings.REPORTS_DIR).mkdir(parents=True, exist_ok=True)
     Path("models").mkdir(parents=True, exist_ok=True)
     Path("logs").mkdir(parents=True, exist_ok=True)
-    Path("backups").mkdir(parents=True, exist_ok=True)
     
     # Initialize database
     try:
@@ -60,120 +51,39 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
     
-    # Initialize Redis connection for caching
+    # Connect Redis for cache
     try:
-        redis_client = redis.from_url(
-            f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
-            decode_responses=False
-        )
-        await redis_client.ping()
-        app.state.redis = redis_client
-        logger.info("Redis connection established")
+        await cache_service.connect()
+        logger.info("Cache service (Redis) connected")
     except Exception as e:
-        logger.warning(f"Redis connection failed: {e}")
-        app.state.redis = None
+        logger.warning(f"Cache connection failed: {e}. Response caching disabled.")
     
-    # Schedule background backup/verify tasks per policy
-    async def full_backup_loop():
-        interval = max(1, settings.BACKUP_FULL_INTERVAL_HOURS)
-        while True:
-            try:
-                logger.info("Running scheduled full backup...")
-                await BackupService.create_database_backup(backup_dir=settings.BACKUP_DIR)
-                await BackupService.cleanup_old_backups(
-                    backup_dir=settings.BACKUP_DIR,
-                    keep_days=settings.BACKUP_RETENTION_DAYS,
-                )
-            except Exception as e:
-                logger.error(f"Scheduled full backup failed: {e}")
-            await asyncio.sleep(interval * 3600)
-
-    async def wal_archive_loop():
-        minutes = max(1, settings.BACKUP_WAL_INTERVAL_MINUTES)
-        while True:
-            try:
-                await BackupService.archive_wal_segment(wal_dir=f"{settings.BACKUP_DIR}/wal")
-            except Exception as e:
-                logger.warning(f"WAL archive failed: {e}")
-            await asyncio.sleep(minutes * 60)
-
-    async def weekly_verify_loop():
-        if not settings.BACKUP_VERIFY_WEEKLY:
-            return
-        days = max(1, settings.BACKUP_VERIFY_INTERVAL_DAYS)
-        while True:
-            try:
-                logger.info("Running weekly backup verification...")
-                result = await BackupService.verify_latest_full_backup(backup_dir=settings.BACKUP_DIR)
-                if not result.get("valid", False):
-                    logger.error(f"Backup verification failed: {result}")
-            except Exception as e:
-                logger.error(f"Backup verification loop error: {e}")
-            await asyncio.sleep(days * 86400)
-
-    # Maintenance loops (weekly, biweekly, monthly, quarterly)
-    from .services.maintenance_service import MaintenanceService
-
-    async def weekly_maintenance_loop():
-        while True:
-            try:
-                logger.info("Running weekly maintenance review...")
-                # Requires DB session; here we call lightweight endpoints when available.
-                # In background mode we skip DB to avoid creating sessions; API endpoint can be used by ops.
-            except Exception as e:
-                logger.warning(f"Weekly maintenance loop error: {e}")
-            await asyncio.sleep(7 * 86400)
-
-    async def biweekly_maintenance_loop():
-        while True:
-            try:
-                logger.info("Running biweekly security maintenance...")
-                await MaintenanceService.biweekly_security_maintenance()
-            except Exception as e:
-                logger.warning(f"Biweekly maintenance loop error: {e}")
-            await asyncio.sleep(14 * 86400)
-
-    async def monthly_maintenance_loop():
-        while True:
-            try:
-                logger.info("Running monthly cost optimization scan...")
-                await MaintenanceService.monthly_cost_optimization()
-            except Exception as e:
-                logger.warning(f"Monthly maintenance loop error: {e}")
-            await asyncio.sleep(30 * 86400)
-
-    async def quarterly_maintenance_loop():
-        while True:
-            try:
-                logger.info("Running quarterly DR drill (verify latest backup)...")
-                await MaintenanceService.quarterly_dr_drill()
-            except Exception as e:
-                logger.warning(f"Quarterly DR drill loop error: {e}")
-            await asyncio.sleep(90 * 86400)
-
-    import asyncio
-    app.state._bg_tasks = [
-        asyncio.create_task(full_backup_loop()),
-        asyncio.create_task(wal_archive_loop()),
-        asyncio.create_task(weekly_verify_loop()),
-        asyncio.create_task(weekly_maintenance_loop()),
-        asyncio.create_task(biweekly_maintenance_loop()),
-        asyncio.create_task(monthly_maintenance_loop()),
-        asyncio.create_task(quarterly_maintenance_loop()),
-    ]
-
+    # Start real-time streaming service
+    try:
+        realtime_service.start()
+        logger.info("Real-time streaming service started")
+    except Exception as e:
+        logger.error(f"Failed to start streaming service: {e}")
+    
     yield
     
     # Shutdown
     logger.info("Shutting down NeuroPredict-AI application...")
-    # Cancel background tasks
+    
+    # Stop real-time streaming service
     try:
-        for t in getattr(app.state, "_bg_tasks", []):
-            t.cancel()
-    except Exception:
-        pass
-    if hasattr(app.state, 'redis') and app.state.redis:
-        await app.state.redis.close()
+        realtime_service.stop()
+        logger.info("Real-time streaming service stopped")
+    except Exception as e:
+        logger.error(f"Error stopping streaming service: {e}")
+    
+    # Disconnect cache
+    try:
+        await cache_service.disconnect()
+        logger.info("Cache service disconnected")
+    except Exception as e:
+        logger.error(f"Error disconnecting cache: {e}")
+    
     await close_db()
 
 
@@ -202,115 +112,97 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Security Middleware
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(IPWhitelistMiddleware)  # IP Whitelist check for authenticated requests
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RequestIdMiddleware)
-# (Metrics middleware will be added after redis_client initialization)
-try:
-    pass
-except Exception:
-    logger.warning("Metrics middleware disabled - Redis not available")
+# Compression Middleware for performance
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Prometheus Metrics Middleware (no Redis required)
-app.add_middleware(PrometheusMiddleware)
+# Cache Middleware for GET responses (patients, predictions, analytics)
+from .middleware.cache_middleware import CacheMiddleware
+app.add_middleware(CacheMiddleware, cache_ttl=300)
 
-# Rate Limiting Middleware (requires Redis)
-try:
-    redis_client = redis.from_url(
-        f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}",
-        decode_responses=False
-    )
-    app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
-    # Add metrics middleware now that redis_client is available
-    from .middleware.metrics_middleware import Metrics
-    app.add_middleware(MetricsMiddleware, name="metrics_middleware", redis_client=redis_client)
-except Exception:
-    logger.warning("Rate limiting or metrics middleware disabled - Redis not available")
+# Rate limiting for sensitive endpoints (POST /predictions, POST /auth)
+from .middleware.rate_limit_middleware import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware)
+
+# Metrics Middleware (for Prometheus)
+if settings.ENVIRONMENT == "production":
+    from .api.middleware import MetricsMiddleware
+    app.add_middleware(MetricsMiddleware)
 
 
 # Exception handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler"""
-    logger.error(
-        "Unhandled exception",
-        exc_info=True,
-        extra={
-            "request_id": getattr(request.state, "request_id", None),
-            "path": request.url.path,
-            "method": request.method,
-            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "error_code": "INTERNAL_SERVER_ERROR",
-        },
-    )
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "detail": "Internal server error occurred",
-            "code": "INTERNAL_SERVER_ERROR",
-            "trace_id": getattr(request.state, "request_id", None),
-        },
+        content={"detail": "Internal server error occurred"}
     )
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """HTTPException handler with standardized schema"""
-    logger.warning(
-        "HTTPException",
-        extra={
-            "request_id": getattr(request.state, "request_id", None),
-            "path": request.url.path,
-            "method": request.method,
-            "status_code": exc.status_code,
-            "error_code": getattr(exc, "code", None) or HTTPStatus(exc.status_code).phrase.replace(" ", "_").upper(),
-        },
-    )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "detail": exc.detail if isinstance(exc.detail, str) else "HTTP error",
-            "code": getattr(exc, "code", None) or HTTPStatus(exc.status_code).phrase.replace(" ", "_").upper(),
-            "trace_id": getattr(request.state, "request_id", None),
-        },
-        headers=exc.headers or None,
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Validation error handler aligned with error schema"""
-    logger.warning(
-        "Validation error",
-        extra={
-            "request_id": getattr(request.state, "request_id", None),
-            "path": request.url.path,
-            "method": request.method,
-            "status_code": status.HTTP_400_BAD_REQUEST,
-            "error_code": "BAD_REQUEST",
-        },
-    )
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={
-            "detail": "Invalid input data",
-            "code": "BAD_REQUEST",
-            "trace_id": getattr(request.state, "request_id", None),
-        },
-    )
-
-
-# Health check endpoints
+# Health check endpoints (DB and Redis connectivity for load balancer / monitoring)
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint"""
+    """Health check: verifies PostgreSQL and Redis. Returns 503 if DB or Redis is down."""
+    from sqlalchemy import text
+    from .db.session import engine
+
+    db_ok = False
+    redis_ok = False
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception as e:
+        logger.warning("Health check DB failed: %s", e)
+
+    try:
+        if cache_service.enabled and cache_service.redis_client:
+            await cache_service.redis_client.ping()
+            redis_ok = True
+        else:
+            redis_ok = True  # Redis optional; consider healthy if disabled
+    except Exception as e:
+        logger.warning("Health check Redis failed: %s", e)
+
+    if not db_ok:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "service": settings.APP_NAME,
+                "version": settings.APP_VERSION,
+                "database": "down",
+                "redis": "ok" if redis_ok else "down",
+            },
+        )
+    if not redis_ok:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "service": settings.APP_NAME,
+                "version": settings.APP_VERSION,
+                "database": "ok",
+                "redis": "down",
+            },
+        )
     return {
         "status": "healthy",
         "service": settings.APP_NAME,
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
+        "database": "ok",
+        "redis": "ok",
     }
+
+
+# Prometheus metrics endpoint
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics():
+    """Prometheus metrics endpoint"""
+    from .core.metrics import get_metrics_response
+    return get_metrics_response()
 
 
 @app.get("/", tags=["Root"])
@@ -328,31 +220,24 @@ async def root():
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(patients.router, prefix=settings.API_V1_PREFIX)
 app.include_router(predictions.router, prefix=settings.API_V1_PREFIX)
-app.include_router(imaging.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
-app.include_router(longitudinal.router, prefix=settings.API_V1_PREFIX)
-app.include_router(security.router, prefix=settings.API_V1_PREFIX)
+app.include_router(models.router, prefix=settings.API_V1_PREFIX)
+app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
+app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(monitoring.router, prefix=settings.API_V1_PREFIX)
-app.include_router(integration.router, prefix=settings.API_V1_PREFIX)
-app.include_router(backup.router, prefix=settings.API_V1_PREFIX)
-app.include_router(products.router, prefix=settings.API_V1_PREFIX)
-app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
-app.include_router(system.router, prefix=settings.API_V1_PREFIX)
-app.include_router(maintenance.router, prefix=settings.API_V1_PREFIX)
-app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
-app.include_router(comments.router, prefix=settings.API_V1_PREFIX)
-app.include_router(privacy.router, prefix=settings.API_V1_PREFIX)
-app.include_router(jobs.router, prefix=settings.API_V1_PREFIX)
-app.include_router(rum.router, prefix=settings.API_V1_PREFIX)
-app.include_router(ops.router, prefix=settings.API_V1_PREFIX)
-app.include_router(support.router, prefix=settings.API_V1_PREFIX)
-app.include_router(legal.router, prefix=settings.API_V1_PREFIX)
-app.include_router(webhooks.router, prefix=settings.API_V1_PREFIX)
-app.include_router(disease_tracking.router, prefix=settings.API_V1_PREFIX)
-app.include_router(data_monitoring.router, prefix=settings.API_V1_PREFIX)
-app.include_router(analysis_3d.router, prefix=settings.API_V1_PREFIX)
-app.include_router(data_fusion.router, prefix=settings.API_V1_PREFIX)
-app.include_router(model_metrics.router, prefix=settings.API_V1_PREFIX)
+app.include_router(websocket.router, prefix=settings.API_V1_PREFIX)
+app.include_router(mock_data.router, prefix=settings.API_V1_PREFIX)  # Mock data for development
+app.include_router(optimization.router, prefix=settings.API_V1_PREFIX)
+
+# Integration routers
+app.include_router(fhir.router, prefix=settings.API_V1_PREFIX)
+app.include_router(pacs.router, prefix=settings.API_V1_PREFIX)
+app.include_router(ehr.router, prefix=settings.API_V1_PREFIX)
+app.include_router(hl7v2.router, prefix=settings.API_V1_PREFIX)
+app.include_router(devices.router, prefix=settings.API_V1_PREFIX)
+
+# Streaming routers
+app.include_router(realtime.router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":

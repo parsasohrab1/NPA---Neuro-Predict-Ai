@@ -194,6 +194,20 @@ NeuroPredict-AI is a microservices-based clinical decision support system for ea
 - Automated backups
 - Disaster recovery procedures
 
+## Dashboard Architecture
+
+For detailed dashboard architecture documentation including UI/UX diagrams, tab structures, user workflows, and component breakdown, see:
+
+📊 **[Dashboard Architecture Documentation (Persian/Farsi)](DASHBOARD_ARCHITECTURE_FA.md)**
+
+This document includes:
+- Overall dashboard layout and structure
+- Detailed breakdown of all main tabs (Dashboard, Patient Management, Analysis & Prediction, Reports, etc.)
+- Data flow diagrams
+- User access hierarchy
+- Prediction workflow
+- UI/UX design principles and technology recommendations
+
 ## Future Enhancements
 
 1. **Mobile Application** (React Native)
