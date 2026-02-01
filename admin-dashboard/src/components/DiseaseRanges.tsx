@@ -2,10 +2,10 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { diseaseApi } from '../services/api';
 
-const RISK_LEVEL_LABELS: Record<string, { fa: string; en: string; color: string }> = {
-  low: { fa: 'سلامت', en: 'Healthy', color: 'emerald' },
-  medium: { fa: 'هشدار', en: 'At Risk', color: 'amber' },
-  high: { fa: 'پرریسک/بیمار', en: 'High Risk / Disease', color: 'rose' },
+const RISK_LEVEL_LABELS: Record<string, { label: string; color: string }> = {
+  low: { label: 'Healthy', color: 'emerald' },
+  medium: { label: 'At Risk', color: 'amber' },
+  high: { label: 'High Risk / Disease', color: 'rose' },
 };
 
 export default function DiseaseRanges() {
@@ -30,12 +30,12 @@ export default function DiseaseRanges() {
   const lowRisk = summaryData?.low_risk ?? 0;
 
   const biomarkerDisplay: { key: string; label: string; unit?: string }[] = [
-    { key: 'mmse_score', label: 'MMSE (شناختی)', unit: '' },
-    { key: 'moca_score', label: 'MoCA (شناختی)', unit: '' },
-    { key: 'dopamine_level', label: 'دوپامین (پارکینسون)', unit: 'ng/mL' },
-    { key: 'tau_protein', label: 'تاو (آلزایمر)', unit: 'pg/mL' },
-    { key: 'amyloid_beta', label: 'آمیلوئید بتا (آلزایمر)', unit: 'pg/mL' },
-    { key: 'hippocampal_volume', label: 'حجم هیپوکامپ (آلزایمر)', unit: 'mm³' },
+    { key: 'mmse_score', label: 'MMSE (Cognitive)', unit: '' },
+    { key: 'moca_score', label: 'MoCA (Cognitive)', unit: '' },
+    { key: 'dopamine_level', label: 'Dopamine (Parkinson)', unit: 'ng/mL' },
+    { key: 'tau_protein', label: 'Tau (Alzheimer)', unit: 'pg/mL' },
+    { key: 'amyloid_beta', label: 'Amyloid Beta (Alzheimer)', unit: 'pg/mL' },
+    { key: 'hippocampal_volume', label: 'Hippocampal Volume (Alzheimer)', unit: 'mm³' },
   ];
 
   return (
@@ -45,23 +45,22 @@ export default function DiseaseRanges() {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <span className="text-xl">📋</span>
           <h2 className="text-lg font-semibold text-slate-800">
-            محدوده امتیاز ریسک — آلزایمر و پارکینسون
+            Risk Score Ranges — Alzheimer and Parkinson
           </h2>
         </div>
         <div className="p-6">
           <p className="text-sm text-slate-500 mb-4">
-            تقسیم‌بندی امتیاز ریسک (۰ تا ۱) برای تعیین محدوده سلامت، هشدار و پرریسک/بیمار.
+            Risk score classification (0–1) for healthy, at-risk and high-risk/disease ranges.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {riskRanges?.alzheimer && (
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
                 <h3 className="text-base font-semibold text-slate-800 mb-3">
-                  آلزایمر (Alzheimer)
+                  Alzheimer
                 </h3>
                 <div className="space-y-2">
                   {['low', 'medium', 'high'].map((level) => {
                     const r = riskRanges.alzheimer[level];
-                    const labels = RISK_LEVEL_LABELS[level];
                     if (!r) return null;
                     return (
                       <div
@@ -74,7 +73,7 @@ export default function DiseaseRanges() {
                             : 'bg-rose-50 border-rose-200'
                         }`}
                       >
-                        <span className="font-medium text-slate-700">{r.label}</span>
+                        <span className="font-medium text-slate-700">{(r as any).label_en || r.label}</span>
                         <span className="text-sm text-slate-600">
                           {r.min} – {r.max}
                         </span>
@@ -87,7 +86,7 @@ export default function DiseaseRanges() {
             {riskRanges?.parkinson && (
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
                 <h3 className="text-base font-semibold text-slate-800 mb-3">
-                  پارکینسون (Parkinson)
+                  Parkinson
                 </h3>
                 <div className="space-y-2">
                   {['low', 'medium', 'high'].map((level) => {
@@ -104,7 +103,7 @@ export default function DiseaseRanges() {
                             : 'bg-rose-50 border-rose-200'
                         }`}
                       >
-                        <span className="font-medium text-slate-700">{r.label}</span>
+                        <span className="font-medium text-slate-700">{(r as any).label_en || r.label}</span>
                         <span className="text-sm text-slate-600">
                           {r.min} – {r.max}
                         </span>
@@ -123,17 +122,17 @@ export default function DiseaseRanges() {
         <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <h3 className="text-base font-semibold text-slate-800">
-              محدوده بیومارکرها (سلامت / هشدار / بحرانی)
+              Biomarker Ranges (Normal / Warning / Critical)
             </h3>
           </div>
           <div className="p-6 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 px-3 font-medium text-slate-700">ویژگی</th>
-                  <th className="text-left py-2 px-3 font-medium text-slate-700">سلامت (normal)</th>
-                  <th className="text-left py-2 px-3 font-medium text-slate-700">هشدار (warning)</th>
-                  <th className="text-left py-2 px-3 font-medium text-slate-700">بحرانی (critical)</th>
+                  <th className="text-left py-2 px-3 font-medium text-slate-700">Feature</th>
+                  <th className="text-left py-2 px-3 font-medium text-slate-700">Normal</th>
+                  <th className="text-left py-2 px-3 font-medium text-slate-700">Warning</th>
+                  <th className="text-left py-2 px-3 font-medium text-slate-700">Critical</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,58 +172,58 @@ export default function DiseaseRanges() {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <span className="text-xl">👥</span>
           <h2 className="text-lg font-semibold text-slate-800">
-            تقسیم‌بندی بیماران موجود در دیتابیس
+            Patient Classification in Database
           </h2>
         </div>
         <div className="p-6">
           {isLoading && (
-            <p className="text-slate-500 text-sm">در حال بارگذاری...</p>
+            <p className="text-slate-500 text-sm">Loading...</p>
           )}
           {error && (
-            <p className="text-rose-600 text-sm">خطا در دریافت داده‌ها.</p>
+            <p className="text-rose-600 text-sm">Error loading data.</p>
           )}
           {!isLoading && !error && (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                 <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-center">
-                  <p className="text-xs font-medium text-slate-500 uppercase">کل بیماران</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase">Total Patients</p>
                   <p className="text-xl font-bold text-slate-800 mt-1">{totalPatients}</p>
                 </div>
                 <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-center">
-                  <p className="text-xs font-medium text-slate-500 uppercase">پرریسک آلزایمر</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase">High Risk Alzheimer</p>
                   <p className="text-xl font-bold text-rose-600 mt-1">{highRiskAlzheimer}</p>
                 </div>
                 <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-center">
-                  <p className="text-xs font-medium text-slate-500 uppercase">پرریسک پارکینسون</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase">High Risk Parkinson</p>
                   <p className="text-xl font-bold text-rose-600 mt-1">{highRiskParkinson}</p>
                 </div>
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-center">
-                  <p className="text-xs font-medium text-slate-500 uppercase">هشدار آلزایمر</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase">At Risk Alzheimer</p>
                   <p className="text-xl font-bold text-amber-600 mt-1">{mediumRiskAlzheimer}</p>
                 </div>
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-center">
-                  <p className="text-xs font-medium text-slate-500 uppercase">هشدار پارکینسون</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase">At Risk Parkinson</p>
                   <p className="text-xl font-bold text-amber-600 mt-1">{mediumRiskParkinson}</p>
                 </div>
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-center">
-                  <p className="text-xs font-medium text-slate-500 uppercase">سلامت (کم‌ریسک)</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase">Healthy (Low Risk)</p>
                   <p className="text-xl font-bold text-emerald-600 mt-1">{lowRisk}</p>
                 </div>
               </div>
 
-              <h3 className="text-base font-semibold text-slate-800 mb-3">لیست بیماران و سطح ریسک</h3>
+              <h3 className="text-base font-semibold text-slate-800 mb-3">Patient List and Risk Level</h3>
               <div className="rounded-xl border border-slate-200 overflow-hidden">
                 <div className="max-h-96 overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50 sticky top-0">
                       <tr>
-                        <th className="text-left py-3 px-4 font-medium text-slate-700">شناسه</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-700">نام</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-700">ریسک آلزایمر</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-700">سطح آلزایمر</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-700">ریسک پارکینسون</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-700">سطح پارکینسون</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-700">آخرین پیش‌بینی</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-700">ID</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-700">Name</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-700">Alzheimer Risk</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-700">Alzheimer Level</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-700">Parkinson Risk</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-700">Parkinson Level</th>
+                        <th className="text-left py-3 px-4 font-medium text-slate-700">Last Prediction</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -243,7 +242,7 @@ export default function DiseaseRanges() {
                                   : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
-                              {RISK_LEVEL_LABELS[p.alzheimer_level]?.fa ?? p.alzheimer_level}
+                              {RISK_LEVEL_LABELS[p.alzheimer_level]?.label ?? p.alzheimer_level}
                             </span>
                           </td>
                           <td className="py-2 px-4">{(p.parkinson_risk ?? 0).toFixed(2)}</td>
@@ -257,12 +256,12 @@ export default function DiseaseRanges() {
                                   : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
-                              {RISK_LEVEL_LABELS[p.parkinson_level]?.fa ?? p.parkinson_level}
+                              {RISK_LEVEL_LABELS[p.parkinson_level]?.label ?? p.parkinson_level}
                             </span>
                           </td>
                           <td className="py-2 px-4 text-slate-500 text-xs">
                             {p.last_prediction_date
-                              ? new Date(p.last_prediction_date).toLocaleDateString('fa-IR')
+                              ? new Date(p.last_prediction_date).toLocaleDateString()
                               : '—'}
                           </td>
                         </tr>
@@ -272,7 +271,7 @@ export default function DiseaseRanges() {
                 </div>
                 {patients.length === 0 && (
                   <div className="py-8 text-center text-slate-500 text-sm">
-                    هیچ بیماری در دیتابیس یافت نشد.
+                    No patients found in database.
                   </div>
                 )}
               </div>

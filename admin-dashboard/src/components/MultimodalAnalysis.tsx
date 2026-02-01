@@ -15,9 +15,9 @@ import {
 } from 'recharts';
 
 const MODALITY_LABELS: Record<string, string> = {
-  MRI: 'تصویربرداری (MRI)',
-  Biomarker: 'بیومارکر',
-  Cognitive: 'شناختی',
+  MRI: 'Imaging (MRI)',
+  Biomarker: 'Biomarker',
+  Cognitive: 'Cognitive',
 };
 
 const MODALITY_COLORS = ['#8b5cf6', '#06b6d4', '#10b981'];
@@ -54,9 +54,9 @@ export default function MultimodalAnalysis() {
     const acc = multimodalData?.accuracy;
     const list = [];
     if (acc?.alzheimer_confidence_pct != null)
-      list.push({ disease: 'آلزایمر', دقت: acc.alzheimer_confidence_pct });
+      list.push({ disease: 'Alzheimer', accuracy: acc.alzheimer_confidence_pct });
     if (acc?.parkinson_confidence_pct != null)
-      list.push({ disease: 'پارکینسون', دقت: acc.parkinson_confidence_pct });
+      list.push({ disease: 'Parkinson', accuracy: acc.parkinson_confidence_pct });
     return list;
   }, [multimodalData?.accuracy]);
 
@@ -76,67 +76,66 @@ export default function MultimodalAnalysis() {
 
   return (
     <div className="space-y-6">
-      {/* معرفی و هدف */}
+      {/* Introduction */}
       <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <span className="text-xl">🔬</span>
-          <h2 className="text-lg font-semibold text-slate-800">آنالیز داده‌های مولتی‌مودال</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Multimodal Data Analysis</h2>
         </div>
         <div className="p-6">
           <p className="text-slate-600 text-sm leading-relaxed">
-            این بخش با ترکیب <strong>داده‌های مولتی‌مودال</strong> (تصویربرداری MRI، بیومارکر، شناختی) به پزشک در
-            <strong> تصمیم‌گیری پیش‌بینی</strong> و <strong>درصد احتمال ابتلا</strong> به بیماری‌های آلزایمر و پارکینسون
-            کمک می‌کند. <strong>درصد دقت و اطمینان مدل</strong> در هر بیماری و سهم هر مودالیتی در پیش‌بینی در زیر
-            نمایش داده می‌شود.
+            This section combines <strong>multimodal data</strong> (MRI imaging, biomarkers, cognitive) to support clinical
+            <strong> prediction decisions</strong> and <strong>disease probability</strong> for Alzheimer&apos;s and Parkinson&apos;s.
+            <strong> Model accuracy and confidence</strong> per disease and each modality&apos;s contribution to prediction are shown below.
           </p>
         </div>
       </section>
 
-      {/* کارت‌های دقت و احتمال */}
+      {/* Accuracy and probability cards */}
       <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="text-base font-semibold text-slate-800">دقت مدل و احتمال ابتلا</h3>
+          <h3 className="text-base font-semibold text-slate-800">Model Accuracy and Disease Probability</h3>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 text-center">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">دقت/اطمینان مدل — آلزایمر</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Model Accuracy — Alzheimer</p>
               <p className="text-2xl font-bold text-violet-600 mt-1">
                 {alzConfPct != null ? `${alzConfPct}%` : '—'}
               </p>
-              <p className="text-xs text-slate-500 mt-1">میانگین اطمینان پیش‌بینی</p>
+              <p className="text-xs text-slate-500 mt-1">Average prediction confidence</p>
             </div>
             <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 text-center">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">دقت/اطمینان مدل — پارکینسون</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Model Accuracy — Parkinson</p>
               <p className="text-2xl font-bold text-rose-600 mt-1">
                 {parkConfPct != null ? `${parkConfPct}%` : '—'}
               </p>
-              <p className="text-xs text-slate-500 mt-1">میانگین اطمینان پیش‌بینی</p>
+              <p className="text-xs text-slate-500 mt-1">Average prediction confidence</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-center">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">تعداد پیش‌بینی‌ها (۲۴h)</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Predictions (24h)</p>
               <p className="text-2xl font-bold text-slate-700 mt-1">{totalPredictions}</p>
             </div>
             <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 text-center">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">میانگین احتمال ابتلا</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Average Disease Probability</p>
               <p className="text-lg font-bold text-indigo-600 mt-1">
-                آلزایمر: {avgAlzRisk != null ? `${avgAlzRisk.toFixed(1)}%` : '—'}
+                Alzheimer: {avgAlzRisk != null ? `${avgAlzRisk.toFixed(1)}%` : '—'}
               </p>
-              <p className="text-lg font-bold text-indigo-600">پارکینسون: {avgParkRisk != null ? `${avgParkRisk.toFixed(1)}%` : '—'}</p>
+              <p className="text-lg font-bold text-indigo-600">Parkinson: {avgParkRisk != null ? `${avgParkRisk.toFixed(1)}%` : '—'}</p>
             </div>
           </div>
 
-          {/* نمودار میله‌ای دقت مدل */}
+          {/* Model accuracy bar chart */}
           {accuracyBarData.length > 0 && (
             <div className="mb-6">
-              <h4 className="text-sm font-semibold text-slate-700 mb-3">درصد دقت (اطمینان) مدل به تفکیک بیماری</h4>
+              <h4 className="text-sm font-semibold text-slate-700 mb-3">Model Accuracy by Disease</h4>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={accuracyBarData} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="disease" />
                   <YAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip formatter={(value: number) => [`${value}%`, 'دقت']} />
-                  <Bar dataKey="دقت" fill="#8b5cf6" name="دقت (%)" radius={[4, 4, 0, 0]} />
+                  <Tooltip formatter={(value: number) => [`${value}%`, 'Accuracy']} />
+                  <Bar dataKey="accuracy" fill="#8b5cf6" name="Accuracy (%)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -144,14 +143,14 @@ export default function MultimodalAnalysis() {
         </div>
       </section>
 
-      {/* سهم مودالیتی‌ها */}
+      {/* Modality contribution */}
       <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="text-base font-semibold text-slate-800">سهم مودالیتی‌ها در پیش‌بینی (توضیح‌پذیری)</h3>
+          <h3 className="text-base font-semibold text-slate-800">Modality Contribution to Prediction (Explainability)</h3>
         </div>
         <div className="p-6">
           <p className="text-slate-500 text-sm mb-4">
-            میانگین وزن هر منبع داده در پیش‌بینی‌های اخیر — تصویربرداری (MRI)، بیومارکر و شناختی.
+            Average weight of each data source in recent predictions — Imaging (MRI), Biomarker and Cognitive.
           </p>
           {modalityPieData.length > 0 ? (
             <div className="flex flex-col md:flex-row gap-6 items-center">
@@ -172,7 +171,7 @@ export default function MultimodalAnalysis() {
                       <Cell key={entry.key} fill={MODALITY_COLORS[index % MODALITY_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [`${value}%`, 'سهم']} />
+                  <Tooltip formatter={(value: number) => [`${value}%`, 'Share']} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 min-w-[200px]">
@@ -191,46 +190,43 @@ export default function MultimodalAnalysis() {
             </div>
           ) : (
             <div className="py-8 text-center text-slate-500 text-sm">
-              داده‌ای برای سهم مودالیتی‌ها در بازه انتخابی موجود نیست. پیش‌بینی‌های دارای attention_scores لازم است.
+              No data for modality contribution in selected range. Predictions with attention_scores are required.
             </div>
           )}
         </div>
       </section>
 
-      {/* خلاصه برای تصمیم‌گیری پزشک */}
+      {/* Decision summary */}
       <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <span className="text-xl">📋</span>
-          <h3 className="text-base font-semibold text-slate-800">خلاصه برای تصمیم‌گیری</h3>
+          <h3 className="text-base font-semibold text-slate-800">Decision Summary</h3>
         </div>
         <div className="p-6">
           <ul className="space-y-2 text-sm text-slate-700">
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">●</span>
               <span>
-                <strong>پیش‌بینی و احتمال ابتلا</strong> بر اساس داده‌های مولتی‌مودال (MRI، بیومارکر، شناختی) محاسبه
-                می‌شود.
+                <strong>Prediction and disease probability</strong> are computed from multimodal data (MRI, biomarker, cognitive).
               </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">●</span>
               <span>
-                <strong>درصد دقت (اطمینان مدل)</strong> نشان می‌دهد مدل چقدر در پیش‌بینی هر بیماری اطمینان دارد؛
-                عدد بالاتر یعنی اطمینان بیشتر.
+                <strong>Accuracy (model confidence)</strong> shows how confident the model is in predicting each disease;
+                higher value means more confidence.
               </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">●</span>
               <span>
-                <strong>سهم مودالیتی‌ها</strong> نشان می‌دهد کدام منبع (تصویر، بیومارکر، شناختی) در پیش‌بینی‌های
-                اخیر بیشتر نقش داشته است.
+                <strong>Modality contribution</strong> shows which source (imaging, biomarker, cognitive) played a larger role in recent predictions.
               </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">●</span>
               <span>
-                برای تصمیم نهایی، تب‌های <strong>پارکینسون و آلزایمر</strong> و <strong>احتمال بیماری</strong> را برای
-                مشاهده تقسیم‌بندی بیماران و درصد احتمال هر بیمار ببینید.
+                For final decision, see the <strong>Alzheimer &amp; Parkinson</strong> and <strong>Disease Probability</strong> tabs to view patient classification and per-patient probability.
               </span>
             </li>
           </ul>

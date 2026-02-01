@@ -55,17 +55,17 @@ const FEATURE_LABELS: Record<string, string> = {
   ventricular_volume: 'Ventricular Volume (mm³)',
   white_matter_hyperintensities: 'White Matter Hyperintensities',
   brain_volume_total: 'Total Brain Volume (mm³)',
-  blood_pressure_systolic: 'فشار خون سیستولیک (mmHg)',
-  blood_pressure_diastolic: 'فشار خون دیاستولیک (mmHg)',
-  temperature: 'درجه حرارت (°C)',
-  heart_rate: 'ضربان قلب (bpm)',
-  respiratory_rate: 'نرخ تنفس (breaths/min)',
-  oxygen_saturation: 'اشباع اکسیژن SpO2 (%)',
-  weight: 'وزن (kg)',
-  height: 'قد (cm)',
-  bmi: 'شاخص توده بدنی (kg/m²)',
-  blood_glucose: 'قند خون ناشتا (mg/dL)',
-  cholesterol_total: 'کلسترول کل (mg/dL)',
+  blood_pressure_systolic: 'Blood Pressure Systolic (mmHg)',
+  blood_pressure_diastolic: 'Blood Pressure Diastolic (mmHg)',
+  temperature: 'Temperature (°C)',
+  heart_rate: 'Heart Rate (bpm)',
+  respiratory_rate: 'Respiratory Rate (breaths/min)',
+  oxygen_saturation: 'Oxygen Saturation SpO2 (%)',
+  weight: 'Weight (kg)',
+  height: 'Height (cm)',
+  bmi: 'Body Mass Index (kg/m²)',
+  blood_glucose: 'Fasting Blood Glucose (mg/dL)',
+  cholesterol_total: 'Total Cholesterol (mg/dL)',
 }
 
 export default function DiseaseTrackingDashboard() {
@@ -88,7 +88,7 @@ export default function DiseaseTrackingDashboard() {
     retry: 2,
   })
 
-  // Get patient classification (تقسیم‌بندی بیماران - نرمال/آلزایمر/پارکینسون)
+  // Get patient classification (normal/alzheimer/parkinson)
   const { data: patientClassification } = useQuery({
     queryKey: ['patient-classification'],
     queryFn: () => diseaseTrackingApi.getPatientClassification(),
@@ -518,48 +518,48 @@ export default function DiseaseTrackingDashboard() {
         </div>
       )}
 
-      {/* Patient Classification - تقسیم‌بندی بیماران (نرمال/آلزایمر/پارکینسون) */}
+      {/* Patient Classification (Normal/Alzheimer/Parkinson) */}
       {patientClassification && (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
           <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
             <span>📋</span>
-            تقسیم‌بندی بیماران | Patient Classification
+            Patient Classification
           </h2>
           <p className="text-sm text-slate-400 mb-6">
-            محدوده سلامت و محدوده بیمار | Feature ranges for Alzheimer's and Parkinson's
+            Feature ranges for Alzheimer's and Parkinson's
           </p>
 
           {/* Classification Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="rounded-xl border border-emerald-800 bg-emerald-900/30 p-4">
-              <div className="text-xs uppercase text-slate-400">نرمال / Normal</div>
+              <div className="text-xs uppercase text-slate-400">Normal</div>
               <div className="text-2xl font-bold text-emerald-400">{patientClassification.classification_summary.normal}</div>
             </div>
             <div className="rounded-xl border border-rose-800 bg-rose-900/30 p-4">
-              <div className="text-xs uppercase text-slate-400">آلزایمر / Alzheimer</div>
+              <div className="text-xs uppercase text-slate-400">Alzheimer</div>
               <div className="text-2xl font-bold text-rose-400">{patientClassification.classification_summary.alzheimer}</div>
             </div>
             <div className="rounded-xl border border-amber-800 bg-amber-900/30 p-4">
-              <div className="text-xs uppercase text-slate-400">پارکینسون / Parkinson</div>
+              <div className="text-xs uppercase text-slate-400">Parkinson</div>
               <div className="text-2xl font-bold text-amber-400">{patientClassification.classification_summary.parkinson}</div>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-              <div className="text-xs uppercase text-slate-400">نامشخص / Unknown</div>
+              <div className="text-xs uppercase text-slate-400">Unknown</div>
               <div className="text-2xl font-bold text-slate-400">{patientClassification.classification_summary.unknown}</div>
             </div>
           </div>
 
           {/* Feature Ranges Table */}
           <div className="mb-6">
-            <h3 className="text-base font-semibold text-white mb-3">محدوده ویژگی‌ها | Feature Ranges (Health vs Patient)</h3>
+            <h3 className="text-base font-semibold text-white mb-3">Feature Ranges (Health vs Patient)</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left text-slate-300">
                 <thead>
                   <tr className="border-b border-slate-700">
-                    <th className="py-2 px-3 font-medium">ویژگی / Feature</th>
-                    <th className="py-2 px-3 font-medium">سالم / Normal</th>
-                    <th className="py-2 px-3 font-medium">آلزایمر</th>
-                    <th className="py-2 px-3 font-medium">پارکینسون</th>
+                    <th className="py-2 px-3 font-medium">Feature</th>
+                    <th className="py-2 px-3 font-medium">Normal</th>
+                    <th className="py-2 px-3 font-medium">Alzheimer</th>
+                    <th className="py-2 px-3 font-medium">Parkinson</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -594,16 +594,16 @@ export default function DiseaseTrackingDashboard() {
 
           {/* Patient List with Classification */}
           <div>
-            <h3 className="text-base font-semibold text-white mb-3">لیست بیماران | Patient List ({patientClassification.total_patients} total)</h3>
+            <h3 className="text-base font-semibold text-white mb-3">Patient List ({patientClassification.total_patients} total)</h3>
             <div className="overflow-x-auto max-h-80 overflow-y-auto">
               <table className="w-full text-sm text-left text-slate-300">
                 <thead className="sticky top-0 bg-slate-900 z-10">
                   <tr className="border-b border-slate-700">
-                    <th className="py-2 px-3 font-medium">بیمار</th>
-                    <th className="py-2 px-3 font-medium">سن</th>
-                    <th className="py-2 px-3 font-medium">تشخیص</th>
-                    <th className="py-2 px-3 font-medium">ریسک آلزایمر</th>
-                    <th className="py-2 px-3 font-medium">ریسک پارکینسون</th>
+                    <th className="py-2 px-3 font-medium">Patient</th>
+                    <th className="py-2 px-3 font-medium">Age</th>
+                    <th className="py-2 px-3 font-medium">Diagnosis</th>
+                    <th className="py-2 px-3 font-medium">Alzheimer Risk</th>
+                    <th className="py-2 px-3 font-medium">Parkinson Risk</th>
                     <th className="py-2 px-3 font-medium">MMSE</th>
                     <th className="py-2 px-3 font-medium">Amyloid</th>
                     <th className="py-2 px-3 font-medium">Tau</th>
@@ -1696,10 +1696,10 @@ function AddMedicalDataForm({
       </div>
 
       <div className="border-t border-slate-700 pt-4">
-        <h3 className="text-lg font-semibold text-white mb-3">علائم حیاتی و شرایط بالینی</h3>
+        <h3 className="text-lg font-semibold text-white mb-3">Vital Signs &amp; Clinical Conditions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">فشار خون سیستولیک (mmHg)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Blood Pressure Systolic (mmHg)</label>
             <input
               type="number"
               value={formData.blood_pressure_systolic}
@@ -1709,7 +1709,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">فشار خون دیاستولیک (mmHg)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Blood Pressure Diastolic (mmHg)</label>
             <input
               type="number"
               value={formData.blood_pressure_diastolic}
@@ -1719,7 +1719,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">درجه حرارت (°C)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Temperature (°C)</label>
             <input
               type="number"
               step="0.1"
@@ -1730,7 +1730,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">ضربان قلب (bpm)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Heart Rate (bpm)</label>
             <input
               type="number"
               value={formData.heart_rate}
@@ -1740,7 +1740,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">نرخ تنفس (breaths/min)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Respiratory Rate (breaths/min)</label>
             <input
               type="number"
               value={formData.respiratory_rate}
@@ -1750,7 +1750,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">اشباع اکسیژن SpO2 (%)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Oxygen Saturation SpO2 (%)</label>
             <input
               type="number"
               min="0"
@@ -1762,7 +1762,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">وزن (kg)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Weight (kg)</label>
             <input
               type="number"
               step="0.1"
@@ -1772,7 +1772,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">قد (cm)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Height (cm)</label>
             <input
               type="number"
               value={formData.height}
@@ -1781,7 +1781,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">شاخص توده بدنی BMI (kg/m²)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Body Mass Index BMI (kg/m²)</label>
             <input
               type="number"
               step="0.1"
@@ -1791,7 +1791,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">قند خون ناشتا (mg/dL)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Fasting Blood Glucose (mg/dL)</label>
             <input
               type="number"
               value={formData.blood_glucose}
@@ -1800,7 +1800,7 @@ function AddMedicalDataForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">کلسترول کل (mg/dL)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Total Cholesterol (mg/dL)</label>
             <input
               type="number"
               value={formData.cholesterol_total}

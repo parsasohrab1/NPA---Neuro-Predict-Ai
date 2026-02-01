@@ -8,6 +8,8 @@ import enum
 
 from ..db.session import Base
 
+# Lazy import to avoid circular dependency - Prediction used in foreign_keys
+
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
@@ -41,7 +43,11 @@ class User(Base):
     
     # Relationships
     patients = relationship("Patient", back_populates="assigned_doctor")
-    predictions = relationship("Prediction", back_populates="created_by_user")
+    predictions = relationship(
+        "Prediction",
+        back_populates="created_by_user",
+        foreign_keys="Prediction.created_by",
+    )
     audit_logs = relationship("AuditLog", back_populates="user")
     
     def __repr__(self):

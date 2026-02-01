@@ -166,8 +166,8 @@ def generate_medical_record(patient: Patient, visit_date: datetime):
         ventricular_volume=round(ventricular_volume, 2),
         white_matter_hyperintensities=round(white_matter, 2),
         brain_volume_total=round(brain_volume, 2),
-        symptoms="فراموشی خفیف، مشکلات حافظه کوتاه‌مدت",
-        clinical_notes="بیمار برای ارزیابی اولیه مراجعه کرده است",
+        symptoms="Mild forgetfulness, short-term memory issues",
+        clinical_notes="Patient presented for initial assessment",
     )
 
 
@@ -261,7 +261,7 @@ async def create_sample_data():
             doctor = User(
                 email="doctor@neuropredict.ai",
                 username="doctor",
-                full_name="دکتر نمونه",
+                full_name="Sample Doctor",
                 hashed_password=get_password_hash("doctor123"),
                 role=UserRole.DOCTOR,
                 is_active=True

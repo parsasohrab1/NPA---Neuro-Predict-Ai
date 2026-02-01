@@ -23,7 +23,7 @@ class MedicalRecordCreate(BaseModel):
     ventricular_volume: Optional[float] = None
     white_matter_hyperintensities: Optional[float] = None
     brain_volume_total: Optional[float] = None
-    # Vital Signs & Clinical Conditions (علائم حیاتی و شرایط بالینی)
+    # Vital Signs & Clinical Conditions
     blood_pressure_systolic: Optional[float] = None
     blood_pressure_diastolic: Optional[float] = None
     temperature: Optional[float] = None

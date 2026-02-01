@@ -111,7 +111,7 @@ class LongitudinalVisit(Base):
         cascade="all, delete-orphan",
         order_by="LongitudinalMetric.metric_key",
     )
-    medical_record = relationship("MedicalRecord", back_populates="longitudinal_visits")
+    medical_record = relationship("MedicalRecord")
     imaging_study = relationship("ImagingStudy", back_populates="longitudinal_visits")
     prediction = relationship("Prediction", back_populates="longitudinal_visit")
     alerts = relationship(

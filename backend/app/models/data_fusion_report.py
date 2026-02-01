@@ -195,7 +195,7 @@ class DataFusionReport(Base):
     # ============================================================================
     
     patient = relationship("Patient", back_populates="fusion_reports")
-    medical_record = relationship("MedicalRecord", back_populates="fusion_reports")
+    medical_record = relationship("MedicalRecord")
     
     def __repr__(self):
         return (

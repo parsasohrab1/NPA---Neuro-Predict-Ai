@@ -16,9 +16,9 @@ import {
 } from 'recharts';
 
 const LEVEL_LABELS: Record<string, string> = {
-  low: 'سلامت',
-  medium: 'هشدار',
-  high: 'پرریسک/بیمار',
+  low: 'Healthy',
+  medium: 'At Risk',
+  high: 'High Risk / Disease',
 };
 
 const COLORS = {
@@ -72,16 +72,16 @@ export default function DiseaseProbability() {
 
       const levelPercentData = [
         {
-          disease: 'آلزایمر',
-          سلامت: total ? (alzLow / total) * 100 : 0,
-          هشدار: total ? (alzMed / total) * 100 : 0,
-          'پرریسک/بیمار': total ? (alzHigh / total) * 100 : 0,
+          disease: 'Alzheimer',
+          Healthy: total ? (alzLow / total) * 100 : 0,
+          'At Risk': total ? (alzMed / total) * 100 : 0,
+          'High Risk': total ? (alzHigh / total) * 100 : 0,
         },
         {
-          disease: 'پارکینسون',
-          سلامت: total ? (parkLow / total) * 100 : 0,
-          هشدار: total ? (parkMed / total) * 100 : 0,
-          'پرریسک/بیمار': total ? (parkHigh / total) * 100 : 0,
+          disease: 'Parkinson',
+          Healthy: total ? (parkLow / total) * 100 : 0,
+          'At Risk': total ? (parkMed / total) * 100 : 0,
+          'High Risk': total ? (parkHigh / total) * 100 : 0,
         },
       ];
 
@@ -90,8 +90,8 @@ export default function DiseaseProbability() {
         .slice(0, 12)
         .map((p: any) => ({
           name: p.name?.split(' ')[0] || `#${p.patient_id}`,
-          آلزایمر: Number((((p.alzheimer_risk ?? 0) * 100).toFixed(1))),
-          پارکینسون: Number((((p.parkinson_risk ?? 0) * 100).toFixed(1))),
+          Alzheimer: Number((((p.alzheimer_risk ?? 0) * 100).toFixed(1))),
+          Parkinson: Number((((p.parkinson_risk ?? 0) * 100).toFixed(1))),
         }));
 
       return {
@@ -106,46 +106,46 @@ export default function DiseaseProbability() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-slate-500">
-        در حال بارگذاری...
+        Loading...
       </div>
     );
   }
   if (error) {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
-        خطا در دریافت داده‌ها.
+        Error loading data.
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* خلاصه درصدی */}
+      {/* Percentage summary */}
       <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <span className="text-xl">📈</span>
-          <h2 className="text-lg font-semibold text-slate-800">احتمال بیماری — درصد و خلاصه</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Disease Probability — Percentages and Summary</h2>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-indigo-50 to-white p-4 text-center">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">تعداد بیماران</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Patients</p>
               <p className="text-3xl font-bold text-indigo-600 mt-1">{totals.total}</p>
             </div>
             <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 text-center">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">میانگین احتمال آلزایمر</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Alzheimer Probability</p>
               <p className="text-3xl font-bold text-violet-600 mt-1">{totals.avgAlzheimer.toFixed(1)}%</p>
             </div>
             <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 text-center">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">میانگین احتمال پارکینسون</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Parkinson Probability</p>
               <p className="text-3xl font-bold text-rose-600 mt-1">{totals.avgParkinson.toFixed(1)}%</p>
             </div>
           </div>
 
-          {/* نمودار دایره‌ای: توزیع سطح ریسک */}
+          {/* Pie chart: risk level distribution */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-              <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">توزیع سطح ریسک آلزایمر</h3>
+              <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">Alzheimer Risk Level Distribution</h3>
               {alzheimerPieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
@@ -164,15 +164,15 @@ export default function DiseaseProbability() {
                         <Cell key={entry.level} fill={COLORS[entry.level as keyof typeof COLORS]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => [`${value} نفر`, 'تعداد']} />
+                    <Tooltip formatter={(value: number) => [`${value}`, 'Count']} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-52 flex items-center justify-center text-slate-500 text-sm">داده‌ای موجود نیست</div>
+                <div className="h-52 flex items-center justify-center text-slate-500 text-sm">No data available</div>
               )}
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-              <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">توزیع سطح ریسک پارکینسون</h3>
+              <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">Parkinson Risk Level Distribution</h3>
               {parkinsonPieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
@@ -191,18 +191,18 @@ export default function DiseaseProbability() {
                         <Cell key={entry.level} fill={COLORS[entry.level as keyof typeof COLORS]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => [`${value} نفر`, 'تعداد']} />
+                    <Tooltip formatter={(value: number) => [`${value}`, 'Count']} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-52 flex items-center justify-center text-slate-500 text-sm">داده‌ای موجود نیست</div>
+                <div className="h-52 flex items-center justify-center text-slate-500 text-sm">No data available</div>
               )}
             </div>
           </div>
 
-          {/* نمودار میله‌ای: درصد هر سطح به تفکیک بیماری */}
+          {/* Bar chart: percentage per level by disease */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 mb-6">
-            <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">درصد بیماران در هر سطح ریسک</h3>
+            <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">Patient Percentage per Risk Level</h3>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart
                 data={levelPercentData}
@@ -214,17 +214,17 @@ export default function DiseaseProbability() {
                 <YAxis type="category" dataKey="disease" width={56} />
                 <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, '']} />
                 <Legend />
-                <Bar dataKey="سلامت" stackId="a" fill="#10b981" name="سلامت" />
-                <Bar dataKey="هشدار" stackId="a" fill="#f59e0b" name="هشدار" />
-                <Bar dataKey="پرریسک/بیمار" stackId="a" fill="#ef4444" name="پرریسک/بیمار" />
+                <Bar dataKey="Healthy" stackId="a" fill="#10b981" name="Healthy" />
+                <Bar dataKey="At Risk" stackId="a" fill="#f59e0b" name="At Risk" />
+                <Bar dataKey="High Risk" stackId="a" fill="#ef4444" name="High Risk" />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {/* نمودار میله‌ای: احتمال درصدی هر بیمار (آلزایمر و پارکینسون) */}
+          {/* Bar chart: disease probability per patient */}
           {topPatientsBarData.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-              <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">احتمال بیماری (درصد) — نمونه بیماران</h3>
+              <h3 className="text-base font-semibold text-slate-800 mb-3 text-center">Disease Probability (%) — Sample Patients</h3>
               <ResponsiveContainer width="100%" height={340}>
                 <BarChart
                   data={topPatientsBarData}
@@ -235,8 +235,8 @@ export default function DiseaseProbability() {
                   <YAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                   <Tooltip formatter={(value: string) => [`${value}%`, '']} />
                   <Legend />
-                  <Bar dataKey="آلزایمر" fill="#8b5cf6" name="آلزایمر (%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="پارکینسون" fill="#ec4899" name="پارکینسون (%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Alzheimer" fill="#8b5cf6" name="Alzheimer (%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Parkinson" fill="#ec4899" name="Parkinson (%)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

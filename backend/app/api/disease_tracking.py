@@ -12,6 +12,7 @@ from ..core.security import require_role, get_current_user
 from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
 from ..models.prediction import Prediction, RiskLevel, DiseaseType
+from ..models.user import User, UserRole
 from ..services.ai_model_service import AIModelService
 
 router = APIRouter(prefix="/disease-tracking", tags=["Disease Tracking"])
@@ -275,6 +276,11 @@ async def get_patient_features(
             "dopamine_level": latest_record.dopamine_level if latest_record else None,
             "hippocampal_volume": latest_record.hippocampal_volume if latest_record else None,
             "cortical_thickness": latest_record.cortical_thickness if latest_record else None,
+            "ventricular_volume": latest_record.ventricular_volume if latest_record else None,
+            "brain_volume_total": latest_record.brain_volume_total if latest_record else None,
+            "memory_score": latest_record.memory_score if latest_record else None,
+            "attention_score": latest_record.attention_score if latest_record else None,
+            "executive_function_score": latest_record.executive_function_score if latest_record else None,
             "apoe_e4_status": latest_record.apoe_e4_status if latest_record else None,
             "blood_pressure_systolic": latest_record.blood_pressure_systolic if latest_record else None,
             "blood_pressure_diastolic": latest_record.blood_pressure_diastolic if latest_record else None,
@@ -575,42 +581,42 @@ async def health_check():
     return {"status": "ok", "message": "Disease tracking API is running"}
 
 
-# Feature ranges for Alzheimer vs Parkinson (health vs patient) - محدوده سلامت و محدوده بیمار
+# Feature ranges for Alzheimer vs Parkinson (health vs patient)
 CLASSIFICATION_FEATURE_RANGES = {
     "cognitive": {
         "mmse_score": {
-            "normal": {"min": 28, "max": 30, "label_fa": "سالم"},
-            "alzheimer": {"min": 12, "max": 28, "label_fa": "آلزایمر"},
-            "parkinson": {"min": 22, "max": 30, "label_fa": "پارکینسون خفیف"},
+            "normal": {"min": 28, "max": 30, "label": "Healthy"},
+            "alzheimer": {"min": 12, "max": 28, "label": "Alzheimer"},
+            "parkinson": {"min": 22, "max": 30, "label": "Mild Parkinson"},
         },
         "moca_score": {
-            "normal": {"min": 26, "max": 30, "label_fa": "سالم"},
-            "alzheimer": {"min": 10, "max": 26, "label_fa": "آلزایمر"},
-            "parkinson": {"min": 18, "max": 30, "label_fa": "پارکینسون خفیف"},
+            "normal": {"min": 26, "max": 30, "label": "Healthy"},
+            "alzheimer": {"min": 10, "max": 26, "label": "Alzheimer"},
+            "parkinson": {"min": 18, "max": 30, "label": "Mild Parkinson"},
         },
     },
     "biomarkers": {
         "amyloid_beta": {
-            "normal": {"min": 400, "max": 1000, "label_fa": "سالم"},
-            "alzheimer": {"min": 100, "max": 500, "label_fa": "پایین (تشخیصی آلزایمر)"},
-            "parkinson": {"min": 350, "max": 950, "label_fa": "نرمال"},
+            "normal": {"min": 400, "max": 1000, "label": "Healthy"},
+            "alzheimer": {"min": 100, "max": 500, "label": "Low (diagnostic Alzheimer)"},
+            "parkinson": {"min": 350, "max": 950, "label": "Normal"},
         },
         "tau_protein": {
-            "normal": {"min": 40, "max": 360, "label_fa": "سالم"},
-            "alzheimer": {"min": 300, "max": 900, "label_fa": "بالا (تشخیصی آلزایمر)"},
-            "parkinson": {"min": 50, "max": 450, "label_fa": "نرمال"},
+            "normal": {"min": 40, "max": 360, "label": "Healthy"},
+            "alzheimer": {"min": 300, "max": 900, "label": "High (diagnostic Alzheimer)"},
+            "parkinson": {"min": 50, "max": 450, "label": "Normal"},
         },
         "dopamine_level": {
-            "normal": {"min": 80, "max": 160, "label_fa": "سالم"},
-            "alzheimer": {"min": 60, "max": 160, "label_fa": "نرمال تا کمی پایین"},
-            "parkinson": {"min": 0, "max": 125, "label_fa": "پایین (تشخیصی پارکینسون)"},
+            "normal": {"min": 80, "max": 160, "label": "Healthy"},
+            "alzheimer": {"min": 60, "max": 160, "label": "Normal to slightly low"},
+            "parkinson": {"min": 0, "max": 125, "label": "Low (diagnostic Parkinson)"},
         },
     },
     "mri": {
         "hippocampal_volume": {
-            "normal": {"min": 3400, "max": 4600, "label_fa": "سالم"},
-            "alzheimer": {"min": 1500, "max": 3500, "label_fa": "آتروفی"},
-            "parkinson": {"min": 2700, "max": 4300, "label_fa": "کاهش خفیف"},
+            "normal": {"min": 3400, "max": 4600, "label": "Healthy"},
+            "alzheimer": {"min": 1500, "max": 3500, "label": "Atrophy"},
+            "parkinson": {"min": 2700, "max": 4300, "label": "Mild decrease"},
         },
     },
 }
@@ -620,19 +626,19 @@ CLASSIFICATION_FEATURE_RANGES = {
 async def get_feature_ranges() -> Dict[str, Any]:
     """
     Return healthy vs at-risk vs disease ranges for biomarkers (Alzheimer/Parkinson related).
-    Used by admin dashboard to display محدوده سلامت و محدوده بیمار.
+    Used by admin dashboard to display feature ranges.
     """
     return {
         "risk_score_ranges": {
             "alzheimer": {
-                "low": {"min": 0, "max": 0.33, "label": "سلامت", "label_en": "Healthy"},
-                "medium": {"min": 0.33, "max": 0.66, "label": "هشدار", "label_en": "At Risk"},
-                "high": {"min": 0.66, "max": 1.0, "label": "پرریسک/بیمار", "label_en": "High Risk / Disease"},
+                "low": {"min": 0, "max": 0.33, "label": "Healthy", "label_en": "Healthy"},
+                "medium": {"min": 0.33, "max": 0.66, "label": "At Risk", "label_en": "At Risk"},
+                "high": {"min": 0.66, "max": 1.0, "label": "High Risk / Disease", "label_en": "High Risk / Disease"},
             },
             "parkinson": {
-                "low": {"min": 0, "max": 0.33, "label": "سلامت", "label_en": "Healthy"},
-                "medium": {"min": 0.33, "max": 0.66, "label": "هشدار", "label_en": "At Risk"},
-                "high": {"min": 0.66, "max": 1.0, "label": "پرریسک/بیمار", "label_en": "High Risk / Disease"},
+                "low": {"min": 0, "max": 0.33, "label": "Healthy", "label_en": "Healthy"},
+                "medium": {"min": 0.33, "max": 0.66, "label": "At Risk", "label_en": "At Risk"},
+                "high": {"min": 0.66, "max": 1.0, "label": "High Risk / Disease", "label_en": "High Risk / Disease"},
             },
         },
         "biomarker_ranges": FEATURE_RANGES,
@@ -645,7 +651,7 @@ async def get_patient_classification(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
-    تقسیم‌بندی بیماران موجود در دیتابیس بر اساس تشخیص (نرمال/آلزایمر/پارکینسون).
+    Patient classification in database by diagnosis (normal/Alzheimer/Parkinson).
     Returns patient classification with diagnosis, feature ranges, and per-patient breakdown.
     """
     from sqlalchemy.orm import selectinload
@@ -714,7 +720,7 @@ async def get_patient_classification(
             "name": f"{patient.first_name} {patient.last_name}",
             "age": age,
             "diagnosis": diagnosis,
-            "diagnosis_fa": {"normal": "نرمال", "alzheimer": "آلزایمر", "parkinson": "پارکینسون", "unknown": "نامشخص"}.get(diagnosis, "نامشخص"),
+            "diagnosis_fa": {"normal": "Normal", "alzheimer": "Alzheimer", "parkinson": "Parkinson", "unknown": "Unknown"}.get(diagnosis, "Unknown"),
             "alzheimer_risk": round(latest_pred.alzheimer_risk_score, 3) if latest_pred else None,
             "parkinson_risk": round(latest_pred.parkinson_risk_score, 3) if latest_pred else None,
             "features": features,
@@ -724,10 +730,10 @@ async def get_patient_classification(
         "feature_ranges": CLASSIFICATION_FEATURE_RANGES,
         "classification_summary": classification_summary,
         "classification_summary_fa": {
-            "normal": f"نرمال: {classification_summary['normal']}",
-            "alzheimer": f"آلزایمر: {classification_summary['alzheimer']}",
-            "parkinson": f"پارکینسون: {classification_summary['parkinson']}",
-            "unknown": f"نامشخص: {classification_summary['unknown']}",
+            "normal": f"Normal: {classification_summary['normal']}",
+            "alzheimer": f"Alzheimer: {classification_summary['alzheimer']}",
+            "parkinson": f"Parkinson: {classification_summary['parkinson']}",
+            "unknown": f"Unknown: {classification_summary['unknown']}",
         },
         "total_patients": len(all_patients),
         "patients": patients_list,
@@ -1147,198 +1153,207 @@ async def load_sample_datasets(
     
         logger.info(f"Selected {len(selected_rows)} patients for sample (Target: 200)")
     
+        # Get or create a doctor user for created_by
+        user_result = await db.execute(select(User).where(User.role == UserRole.DOCTOR).limit(1))
+        doctor = user_result.scalar_one_or_none()
+        if not doctor:
+            user_result = await db.execute(select(User).limit(1))
+            doctor = user_result.scalar_one_or_none()
+        created_by_id = doctor.id if doctor else 1  # Fallback if no users exist
+    
         # Process each selected patient row from CSV
         for idx, row in enumerate(selected_rows):
             try:
                 # Validate required fields
                 if 'patient_id' not in row or pd.isna(row.get('patient_id')):
-                errors.append(f"Row {idx}: Missing patient_id")
-                continue
-                
-            patient_id = str(row['patient_id']).strip()
-            
-            # Check if patient already exists
-            result = await db.execute(
-                select(Patient).where(Patient.patient_id == patient_id)
-            )
-            patient = result.scalar_one_or_none()
-            
-            if patient:
-                # Check if patient already has medical records
-                result_mr = await db.execute(
-                    select(MedicalRecord).where(MedicalRecord.patient_id == patient.id)
-                )
-                if result_mr.scalar_one_or_none():
-                    skipped_patients += 1
+                    errors.append(f"Row {idx}: Missing patient_id")
                     continue
-            else:
-                # Create new patient from CSV data
-                age = int(row['age'])
-                dob = date(datetime.now().year - age, 1, 1)
                 
-                gender_str = str(row['gender']).lower()
-                gender = Gender.MALE if gender_str == 'male' else Gender.FEMALE if gender_str == 'female' else Gender.OTHER
-                
-                patient = Patient(
-                    patient_id=patient_id,
-                    first_name=f"Patient",
-                    last_name=patient_id.replace('PT_', ''),
-                    date_of_birth=dob,
-                    gender=gender,
-                    education_years=int(row.get('education_years', 12)) if pd.notna(row.get('education_years')) else None,
+                patient_id = str(row['patient_id']).strip()
+            
+                # Check if patient already exists
+                result = await db.execute(
+                    select(Patient).where(Patient.patient_id == patient_id)
                 )
+                patient = result.scalar_one_or_none()
+            
+                if patient:
+                    # Check if patient already has medical records
+                    result_mr = await db.execute(
+                        select(MedicalRecord).where(MedicalRecord.patient_id == patient.id)
+                    )
+                    if result_mr.scalar_one_or_none():
+                        skipped_patients += 1
+                        continue
+                else:
+                    # Create new patient from CSV data
+                    age = int(row['age'])
+                    dob = date(datetime.now().year - age, 1, 1)
                 
-                db.add(patient)
+                    gender_str = str(row['gender']).lower()
+                    gender = Gender.MALE if gender_str == 'male' else Gender.FEMALE if gender_str == 'female' else Gender.OTHER
+                
+                    patient = Patient(
+                        patient_id=patient_id,
+                        first_name=f"Patient",
+                        last_name=patient_id.replace('PT_', ''),
+                        date_of_birth=dob,
+                        gender=gender,
+                        education_years=int(row.get('education_years', 12)) if pd.notna(row.get('education_years')) else None,
+                    )
+                
+                    db.add(patient)
+                    await db.flush()
+            
+                # Parse visit date
+                try:
+                    visit_date = pd.to_datetime(row['visit_date'])
+                except:
+                    visit_date = datetime.now()
+            
+                # Create medical record from CSV
+                medical_record = MedicalRecord(
+                    patient_id=patient.id,
+                    visit_date=visit_date,
+                    visit_type="Initial",
+                    mmse_score=float(row['mmse_score']) if pd.notna(row['mmse_score']) else None,
+                    moca_score=float(row['moca_score']) if pd.notna(row['moca_score']) else None,
+                    memory_score=float(row['memory_score']) if pd.notna(row['memory_score']) else None,
+                    attention_score=float(row['attention_score']) if pd.notna(row['attention_score']) else None,
+                    executive_function_score=float(row['executive_function_score']) if pd.notna(row['executive_function_score']) else None,
+                    amyloid_beta=float(row['amyloid_beta']) if pd.notna(row['amyloid_beta']) else None,
+                    tau_protein=float(row['tau_protein']) if pd.notna(row['tau_protein']) else None,
+                    dopamine_level=float(row['dopamine_level']) if pd.notna(row['dopamine_level']) else None,
+                    apoe_e4_status=bool(int(row['apoe_e4_status'])) if pd.notna(row['apoe_e4_status']) else False,
+                    hippocampal_volume=float(row['hippocampal_volume']) if pd.notna(row['hippocampal_volume']) else None,
+                    cortical_thickness=float(row['cortical_thickness']) if pd.notna(row['cortical_thickness']) else None,
+                    ventricular_volume=float(row['ventricular_volume']) if pd.notna(row['ventricular_volume']) else None,
+                    white_matter_hyperintensities=float(row['white_matter_hyperintensities']) if pd.notna(row['white_matter_hyperintensities']) else None,
+                    brain_volume_total=float(row['brain_volume_total']) if pd.notna(row['brain_volume_total']) else None,
+                    clinical_notes=f"Sample data (200 patients). Diagnosis: {row.get('diagnosis', 'Unknown')}",
+                )
+            
+                db.add(medical_record)
                 await db.flush()
+                total_records_created += 1
             
-            # Parse visit date
-            try:
-                visit_date = pd.to_datetime(row['visit_date'])
-            except:
-                visit_date = datetime.now()
+                # Calculate risk scores based on diagnosis
+                diagnosis = str(row.get('diagnosis', 'Normal')).upper()
+                mmse = medical_record.mmse_score or 25
+                moca = medical_record.moca_score or 24
+                amyloid = medical_record.amyloid_beta or 600
+                tau = medical_record.tau_protein or 200
+                dopamine = medical_record.dopamine_level or 100
+                hippocampal = medical_record.hippocampal_volume or 3500
             
-            # Create medical record from CSV
-            medical_record = MedicalRecord(
-                patient_id=patient.id,
-                visit_date=visit_date,
-                visit_type="Initial",
-                mmse_score=float(row['mmse_score']) if pd.notna(row['mmse_score']) else None,
-                moca_score=float(row['moca_score']) if pd.notna(row['moca_score']) else None,
-                memory_score=float(row['memory_score']) if pd.notna(row['memory_score']) else None,
-                attention_score=float(row['attention_score']) if pd.notna(row['attention_score']) else None,
-                executive_function_score=float(row['executive_function_score']) if pd.notna(row['executive_function_score']) else None,
-                amyloid_beta=float(row['amyloid_beta']) if pd.notna(row['amyloid_beta']) else None,
-                tau_protein=float(row['tau_protein']) if pd.notna(row['tau_protein']) else None,
-                dopamine_level=float(row['dopamine_level']) if pd.notna(row['dopamine_level']) else None,
-                apoe_e4_status=bool(int(row['apoe_e4_status'])) if pd.notna(row['apoe_e4_status']) else False,
-                hippocampal_volume=float(row['hippocampal_volume']) if pd.notna(row['hippocampal_volume']) else None,
-                cortical_thickness=float(row['cortical_thickness']) if pd.notna(row['cortical_thickness']) else None,
-                ventricular_volume=float(row['ventricular_volume']) if pd.notna(row['ventricular_volume']) else None,
-                white_matter_hyperintensities=float(row['white_matter_hyperintensities']) if pd.notna(row['white_matter_hyperintensities']) else None,
-                brain_volume_total=float(row['brain_volume_total']) if pd.notna(row['brain_volume_total']) else None,
-                clinical_notes=f"Sample data (200 patients). Diagnosis: {row.get('diagnosis', 'Unknown')}",
-            )
+                alzheimer_risk = 0.0
+                parkinson_risk = 0.0
             
-            db.add(medical_record)
-            await db.flush()
-            total_records_created += 1
+                if diagnosis == 'ALZHEIMER':
+                    alzheimer_risk = 0.85
+                    if mmse < 20: alzheimer_risk = 0.95
+                    elif mmse < 24: alzheimer_risk = 0.80
+                    if tau > 500 and amyloid < 500: alzheimer_risk = min(0.98, alzheimer_risk + 0.1)
+                    if hippocampal < 2500: alzheimer_risk = min(0.98, alzheimer_risk + 0.08)
+                elif diagnosis == 'PARKINSON':
+                    parkinson_risk = 0.80
+                    if dopamine < 50: parkinson_risk = 0.90
+                    elif dopamine < 70: parkinson_risk = 0.75
+                    if mmse >= 26: parkinson_risk = min(0.95, parkinson_risk + 0.1)
+                else:  # Normal
+                    alzheimer_risk = 0.15
+                    parkinson_risk = 0.12
+                    if mmse >= 28 and moca >= 26:
+                        alzheimer_risk = 0.08
+                        parkinson_risk = 0.05
             
-            # Calculate risk scores based on diagnosis
-            diagnosis = str(row.get('diagnosis', 'Normal')).upper()
-            mmse = medical_record.mmse_score or 25
-            moca = medical_record.moca_score or 24
-            amyloid = medical_record.amyloid_beta or 600
-            tau = medical_record.tau_protein or 200
-            dopamine = medical_record.dopamine_level or 100
-            hippocampal = medical_record.hippocampal_volume or 3500
+                alzheimer_level = (
+                    RiskLevel.HIGH if alzheimer_risk >= 0.66
+                    else RiskLevel.MEDIUM if alzheimer_risk >= 0.33
+                    else RiskLevel.LOW
+                )
+                parkinson_level = (
+                    RiskLevel.HIGH if parkinson_risk >= 0.66
+                    else RiskLevel.MEDIUM if parkinson_risk >= 0.33
+                    else RiskLevel.LOW
+                )
             
-            alzheimer_risk = 0.0
-            parkinson_risk = 0.0
+                # Determine disease type
+                if diagnosis == 'ALZHEIMER':
+                    disease_type = DiseaseType.ALZHEIMER
+                elif diagnosis == 'PARKINSON':
+                    disease_type = DiseaseType.PARKINSON
+                else:  # Normal - assessed for both diseases
+                    disease_type = DiseaseType.BOTH
             
-            if diagnosis == 'ALZHEIMER':
-                alzheimer_risk = 0.85
-                if mmse < 20: alzheimer_risk = 0.95
-                elif mmse < 24: alzheimer_risk = 0.80
-                if tau > 500 and amyloid < 500: alzheimer_risk = min(0.98, alzheimer_risk + 0.1)
-                if hippocampal < 2500: alzheimer_risk = min(0.98, alzheimer_risk + 0.08)
-            elif diagnosis == 'PARKINSON':
-                parkinson_risk = 0.80
-                if dopamine < 50: parkinson_risk = 0.90
-                elif dopamine < 70: parkinson_risk = 0.75
-                if mmse >= 26: parkinson_risk = min(0.95, parkinson_risk + 0.1)
-            else:  # Normal
-                alzheimer_risk = 0.15
-                parkinson_risk = 0.12
-                if mmse >= 28 and moca >= 26:
-                    alzheimer_risk = 0.08
-                    parkinson_risk = 0.05
+                # Create prediction
+                prediction = Prediction(
+                    patient_id=patient.id,
+                    created_by=created_by_id,
+                    disease_type=disease_type,
+                    alzheimer_risk_score=round(alzheimer_risk, 2),
+                    parkinson_risk_score=round(parkinson_risk, 2),
+                    alzheimer_risk_level=alzheimer_level,
+                    parkinson_risk_level=parkinson_level,
+                    created_at=datetime.now(),
+                )
             
-            alzheimer_level = (
-                RiskLevel.HIGH if alzheimer_risk >= 0.66
-                else RiskLevel.MEDIUM if alzheimer_risk >= 0.33
-                else RiskLevel.LOW
-            )
-            parkinson_level = (
-                RiskLevel.HIGH if parkinson_risk >= 0.66
-                else RiskLevel.MEDIUM if parkinson_risk >= 0.33
-                else RiskLevel.LOW
-            )
+                db.add(prediction)
+                total_predictions_created += 1
+                total_patients_processed += 1
             
-            # Determine disease type
-            if diagnosis == 'ALZHEIMER':
-                disease_type = DiseaseType.ALZHEIMER
-            elif diagnosis == 'PARKINSON':
-                disease_type = DiseaseType.PARKINSON
-            else:  # Normal - assessed for both diseases
-                disease_type = DiseaseType.BOTH
+                if (idx + 1) % 50 == 0:
+                    logger.info(f"Progress: {idx + 1}/{len(selected_rows)} records processed...")
             
-            # Create prediction
-            prediction = Prediction(
-                patient_id=patient.id,
-                disease_type=disease_type,
-                alzheimer_risk_score=round(alzheimer_risk, 2),
-                parkinson_risk_score=round(parkinson_risk, 2),
-                alzheimer_risk_level=alzheimer_level,
-                parkinson_risk_level=parkinson_level,
-                created_at=datetime.now(),
-            )
-            
-            db.add(prediction)
-            total_predictions_created += 1
-            total_patients_processed += 1
-            
-            if (idx + 1) % 50 == 0:
-                logger.info(f"Progress: {idx + 1}/{len(selected_rows)} records processed...")
-            
+            except Exception as e:
+                logger.error(f"Error processing row {idx}: {str(e)}", exc_info=True)
+                errors.append(f"Row {idx}: {str(e)[:100]}")
+                continue
+    
+        # Commit all changes
+        try:
+            await db.commit()
+            logger.info(f"SUCCESS: {total_patients_processed} patients (200 sample), {total_records_created} records, {total_predictions_created} predictions")
         except Exception as e:
-            logger.error(f"Error processing row {idx}: {str(e)}", exc_info=True)
-            errors.append(f"Row {idx}: {str(e)[:100]}")
-            continue
-    
-    # Commit all changes
-    try:
-        await db.commit()
-        logger.info(f"SUCCESS: {total_patients_processed} patients (200 sample), {total_records_created} records, {total_predictions_created} predictions")
-    except Exception as e:
-        logger.error(f"Failed to commit: {e}", exc_info=True)
-        await db.rollback()
+            logger.error(f"Failed to commit: {e}", exc_info=True)
+            await db.rollback()
         
-        # Provide detailed error message
-        error_detail = f"Failed to save data: {str(e)}"
-        if errors:
-            error_detail += f". Processing errors: {len(errors)} errors occurred. First error: {errors[0] if errors else 'Unknown'}"
+            # Provide detailed error message
+            error_detail = f"Failed to save data: {str(e)}"
+            if errors:
+                error_detail += f". Processing errors: {len(errors)} errors occurred. First error: {errors[0] if errors else 'Unknown'}"
         
-        raise HTTPException(
-            status_code=500,
-            detail=error_detail
-        )
+            raise HTTPException(
+                status_code=500,
+                detail=error_detail
+            )
     
-    # Count categories from loaded rows
-    normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'NORMAL'])
-    alzheimer_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'ALZHEIMER'])
-    parkinson_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'PARKINSON'])
+        # Count categories from loaded rows
+        normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'NORMAL'])
+        alzheimer_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'ALZHEIMER'])
+        parkinson_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'PARKINSON'])
     
-    # Create appropriate message
-    if skipped_patients > 0 and total_patients_processed == 0:
-        message = f"⚠️ All {len(selected_rows)} patients already exist in database! Please use 'Clear All Data' button first, then try loading again."
-    elif skipped_patients > 0:
-        message = f"Loaded {total_patients_processed} patients successfully ({skipped_patients} skipped - already exist)"
-    elif errors:
-        message = f"Loaded {total_patients_processed} patients with {len(errors)} errors"
-    else:
-        message = f"Successfully loaded {total_patients_processed} patients!"
+        # Create appropriate message
+        if skipped_patients > 0 and total_patients_processed == 0:
+            message = f"⚠️ All {len(selected_rows)} patients already exist in database! Please use 'Clear All Data' button first, then try loading again."
+        elif skipped_patients > 0:
+            message = f"Loaded {total_patients_processed} patients successfully ({skipped_patients} skipped - already exist)"
+        elif errors:
+            message = f"Loaded {total_patients_processed} patients with {len(errors)} errors"
+        else:
+            message = f"Successfully loaded {total_patients_processed} patients!"
     
-    return {
-        "message": message,
-        "total_patients": total_patients_processed,
-        "total_records": total_records_created,
-        "total_predictions": total_predictions_created,
-        "skipped": skipped_patients,
-        "sample_size": len(selected_rows),
-        "categories_included": f"Normal: {normal_count}, Alzheimer: {alzheimer_count}, Parkinson: {parkinson_count}",
-        "source_distribution": f"{len(selected_rows)} total available in CSV files",
-        "errors": errors[:10] if errors else [],
-        "error_count": len(errors),
+        return {
+            "message": message,
+            "total_patients": total_patients_processed,
+            "total_records": total_records_created,
+            "total_predictions": total_predictions_created,
+            "skipped": skipped_patients,
+            "sample_size": len(selected_rows),
+            "categories_included": f"Normal: {normal_count}, Alzheimer: {alzheimer_count}, Parkinson: {parkinson_count}",
+            "source_distribution": f"{len(selected_rows)} total available in CSV files",
+            "errors": errors[:10] if errors else [],
+            "error_count": len(errors),
         }
     except Exception as e:
         logger.error(f"Unexpected error in load_sample_datasets: {e}", exc_info=True)

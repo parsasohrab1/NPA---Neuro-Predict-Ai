@@ -23,6 +23,11 @@ export interface PatientFeatures {
     dopamine_level?: number | null
     hippocampal_volume?: number | null
     cortical_thickness?: number | null
+    ventricular_volume?: number | null
+    brain_volume_total?: number | null
+    memory_score?: number | null
+    attention_score?: number | null
+    executive_function_score?: number | null
     apoe_e4_status?: boolean | null
     blood_pressure_systolic?: number | null
     blood_pressure_diastolic?: number | null

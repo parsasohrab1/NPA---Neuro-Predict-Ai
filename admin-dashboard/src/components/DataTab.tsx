@@ -16,21 +16,21 @@ import {
 const TIME_RANGE = '30d';
 const CATEGORY_CONFIG = {
   cognitive: {
-    title: 'داده‌های شناختی',
+    title: 'Cognitive Data',
     icon: '🧠',
-    description: 'نمرات شناختی تولیدشده توسط دیتا جنریتور: MMSE، MoCA، حافظه، توجه، عملکرد اجرایی.',
+    description: 'Cognitive scores from data generator: MMSE, MoCA, memory, attention, executive function.',
     color: '#10b981',
   },
   biomarker: {
-    title: 'داده‌های بیومارکر',
+    title: 'Biomarker Data',
     icon: '🧪',
-    description: 'بیومارکرهای سنتتیک: آمیلوئید بتا، تاو، دوپامین و سایر نشانگرهای زیستی.',
+    description: 'Synthetic biomarkers: amyloid beta, tau, dopamine and other biological markers.',
     color: '#06b6d4',
   },
   imaging: {
-    title: 'داده‌های MRI',
+    title: 'MRI Data',
     icon: '🖼️',
-    description: 'داده‌های تصویربرداری MRI سنتتیک: حجم هیپوکامپ، ضخامت قشری، حجم بطنی و غیره.',
+    description: 'Synthetic MRI imaging data: hippocampal volume, cortical thickness, ventricular volume, etc.',
     color: '#8b5cf6',
   },
 } as const;
@@ -55,7 +55,7 @@ function CategorySection({ category }: { category: CategoryKey }) {
           <span className="text-xl">{config.icon}</span>
           <h2 className="text-lg font-semibold text-slate-800">{config.title}</h2>
         </div>
-        <div className="p-6 text-center text-slate-500">در حال بارگذاری...</div>
+        <div className="p-6 text-center text-slate-500">Loading...</div>
       </section>
     );
   }
@@ -66,7 +66,7 @@ function CategorySection({ category }: { category: CategoryKey }) {
           <span className="text-xl">{config.icon}</span>
           <h2 className="text-lg font-semibold text-slate-800">{config.title}</h2>
         </div>
-        <div className="p-6 text-rose-600 text-sm">خطا در دریافت داده.</div>
+        <div className="p-6 text-rose-600 text-sm">Error loading data.</div>
       </section>
     );
   }
@@ -81,7 +81,7 @@ function CategorySection({ category }: { category: CategoryKey }) {
         <p className="text-sm text-slate-500 mt-1">{config.description}</p>
       </div>
       <div className="p-6 space-y-6">
-        {/* کارت‌های خلاصه متریک‌ها */}
+        {/* Metric summary cards */}
         {metrics.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {metrics.slice(0, 5).map((m: any, i: number) => (
@@ -101,51 +101,51 @@ function CategorySection({ category }: { category: CategoryKey }) {
           </div>
         )}
 
-        {/* نمودار توزیع */}
+        {/* Distribution chart */}
         {distribution.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-3">توزیع داده</h4>
+            <h4 className="text-sm font-semibold text-slate-700 mb-3">Data Distribution</h4>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={distribution} margin={{ top: 8, right: 16, left: 8, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="range" tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="count" fill={config.color} name="تعداد" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" fill={config.color} name="Count" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* نمودار سری زمانی */}
+        {/* Time series chart */}
         {timeSeries.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-3">روند زمانی (میانگین)</h4>
+            <h4 className="text-sm font-semibold text-slate-700 mb-3">Time Series (Average)</h4>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={timeSeries} margin={{ top: 8, right: 16, left: 8, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis />
                 <Tooltip />
-                <Line type="monotone" dataKey="avg_value" stroke={config.color} name="میانگین" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="avg_value" stroke={config.color} name="Average" strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* جدول متریک‌ها */}
+        {/* Metrics table */}
         {metrics.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-3">خلاصه متریک‌ها (میانگین / min / max)</h4>
+            <h4 className="text-sm font-semibold text-slate-700 mb-3">Metrics Summary (avg / min / max)</h4>
             <div className="rounded-xl border border-slate-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left py-2 px-3 font-medium text-slate-700">ویژگی</th>
-                    <th className="text-left py-2 px-3 font-medium text-slate-700">میانگین</th>
-                    <th className="text-left py-2 px-3 font-medium text-slate-700">کمینه</th>
-                    <th className="text-left py-2 px-3 font-medium text-slate-700">بیشینه</th>
-                    <th className="text-left py-2 px-3 font-medium text-slate-700">تعداد</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-700">Feature</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-700">Average</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-700">Min</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-700">Max</th>
+                    <th className="text-left py-2 px-3 font-medium text-slate-700">Count</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -166,7 +166,7 @@ function CategorySection({ category }: { category: CategoryKey }) {
 
         {metrics.length === 0 && distribution.length === 0 && timeSeries.length === 0 && (
           <div className="py-8 text-center text-slate-500 text-sm">
-            در این بازه زمانی داده‌ای ثبت نشده. می‌توانید از دیتا جنریتور داده سنتتیک بارگذاری کنید.
+            No data recorded in this time range. You can load synthetic data from the data generator.
           </div>
         )}
       </div>
@@ -182,30 +182,29 @@ export default function DataTab() {
 
   return (
     <div className="space-y-6">
-      {/* خلاصه کلی */}
+      {/* Overview summary */}
       <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <span className="text-xl">📊</span>
-          <h2 className="text-lg font-semibold text-slate-800">داده‌های دیتاست — سه دسته مولتی‌مودال</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Dataset — Three Multimodal Categories</h2>
         </div>
         <div className="p-6">
           <p className="text-slate-600 text-sm mb-4">
-            داده‌های سنتتیک تولیدشده توسط دیتا جنریتور در سه دسته: <strong>داده‌های MRI</strong>،{' '}
-            <strong>داده‌های بیومارکر</strong> و <strong>داده‌های شناختی</strong>. هر دسته با گراف توزیع، روند
-            زمانی و جدول متریک‌ها نمایش داده می‌شود.
+            Synthetic data from the data generator in three categories: <strong>MRI data</strong>,{' '}
+            <strong>biomarker data</strong>, and <strong>cognitive data</strong>. Each category shows distribution chart, time series and metrics table.
           </p>
           {!overviewLoading && overview && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                <p className="text-xs font-medium text-slate-500 uppercase">کل رکوردها</p>
+                <p className="text-xs font-medium text-slate-500 uppercase">Total Records</p>
                 <p className="text-2xl font-bold text-slate-800 mt-1">{overview.total_records ?? 0}</p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                <p className="text-xs font-medium text-slate-500 uppercase">تعداد بیماران</p>
+                <p className="text-xs font-medium text-slate-500 uppercase">Total Patients</p>
                 <p className="text-2xl font-bold text-slate-800 mt-1">{overview.total_patients ?? 0}</p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                <p className="text-xs font-medium text-slate-500 uppercase">امتیاز کیفیت داده</p>
+                <p className="text-xs font-medium text-slate-500 uppercase">Data Quality Score</p>
                 <p className="text-2xl font-bold text-slate-800 mt-1">{overview.data_quality_score ?? 0}</p>
               </div>
             </div>
@@ -213,13 +212,13 @@ export default function DataTab() {
         </div>
       </section>
 
-      {/* داده‌های شناختی */}
+      {/* Cognitive data */}
       <CategorySection category="cognitive" />
 
-      {/* داده‌های بیومارکر */}
+      {/* Biomarker data */}
       <CategorySection category="biomarker" />
 
-      {/* داده‌های MRI */}
+      {/* MRI data */}
       <CategorySection category="imaging" />
     </div>
   );
