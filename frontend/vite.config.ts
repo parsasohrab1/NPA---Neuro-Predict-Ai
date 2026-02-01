@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [react()],
   build: {
     rollupOptions: {
       output: {
@@ -37,7 +36,27 @@ export default defineConfig({
         target: 'http://localhost:8001',
         changeOrigin: true,
       },
+      '/health': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
     },
   },
+  plugins: [
+    react(),
+    {
+      name: 'favicon-fallback',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url === '/favicon.ico') {
+            res.writeHead(302, { Location: '/brain-icon.svg' });
+            res.end();
+            return;
+          }
+          next();
+        });
+      },
+    },
+  ],
 })
 

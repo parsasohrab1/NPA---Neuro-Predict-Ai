@@ -44,46 +44,49 @@ export default function ClinicalMonitoring() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4">🏥 Clinical & Longitudinal Monitoring</h2>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-red-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">High Severity Alerts</h3>
-            <p className="text-2xl font-bold text-red-600">
-              {alerts?.high_severity_count || 0}
-            </p>
-          </div>
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Medium Severity Alerts</h3>
-            <p className="text-2xl font-bold text-yellow-600">
-              {mediumSeverityAlerts.length}
-            </p>
-          </div>
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Total Alerts</h3>
-            <p className="text-2xl font-bold text-blue-600">
-              {alerts?.total_alerts || 0}
-            </p>
-          </div>
-          <div className="bg-purple-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Queue Length</h3>
-            <p className="text-2xl font-bold text-purple-600">
-              {queue?.queue_length || 0}
-            </p>
-          </div>
+      <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+          <span className="text-xl">🏥</span>
+          <h2 className="text-lg font-semibold text-slate-800">Clinical & Longitudinal Monitoring</h2>
         </div>
+        <div className="p-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">High Severity Alerts</p>
+              <p className="text-xl font-bold text-rose-600 mt-1">
+                {alerts?.high_severity_count || 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Medium Severity</p>
+              <p className="text-xl font-bold text-amber-600 mt-1">
+                {mediumSeverityAlerts.length}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-indigo-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Alerts</p>
+              <p className="text-xl font-bold text-indigo-600 mt-1">
+                {alerts?.total_alerts || 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-violet-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Queue Length</p>
+              <p className="text-xl font-bold text-violet-600 mt-1">
+                {queue?.queue_length || 0}
+              </p>
+            </div>
+          </div>
 
-        {/* Smart Alerts */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Smart Alerts</h3>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {alerts?.alerts && alerts.alerts.length > 0 ? (
-              alerts.alerts.slice(0, 20).map((alert: any, idx: number) => (
-                <div
-                  key={idx}
-                  className={`border-l-4 rounded-lg p-4 ${
+          {/* Smart Alerts */}
+          <div className="mb-6">
+            <h3 className="text-base font-semibold text-slate-800 mb-3">Smart Alerts</h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {alerts?.alerts && alerts.alerts.length > 0 ? (
+                alerts.alerts.slice(0, 20).map((alert: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className={`border-l-4 rounded-xl p-4 ${
                     alert.severity === 'high'
                       ? 'bg-red-50 border-red-500'
                       : alert.severity === 'medium'
@@ -115,7 +118,7 @@ export default function ClinicalMonitoring() {
                 </div>
               ))
             ) : (
-              <div className="text-center text-gray-500 py-8">No alerts</div>
+              <div className="text-center text-slate-500 py-8">No alerts</div>
             )}
           </div>
         </div>
@@ -123,8 +126,8 @@ export default function ClinicalMonitoring() {
         {/* Prediction Queue */}
         {queue && (
           <div>
-            <h3 className="text-lg font-semibold mb-3">Prediction Queue</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="text-base font-semibold text-slate-800 mb-3">Prediction Queue</h3>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm font-medium">Queue Length</span>
                 <span className="text-2xl font-bold text-purple-600">
@@ -153,12 +156,13 @@ export default function ClinicalMonitoring() {
                       </span>
                     </div>
                   ))}
-                </div>
-              )}
+              </div>
+            )}
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -5,8 +5,16 @@ const API_URL = '/api/v1'
 const USE_MOCK_DATA =
   import.meta.env.VITE_USE_MOCK_DATA === undefined
     ? true
-    : import.meta.env.VITE_USE_MOCK_DATA === 'true' ||
+    :       import.meta.env.VITE_USE_MOCK_DATA === 'true' ||
       import.meta.env.VITE_USE_MOCK_DATA === true
+
+/** Backend health check (proxied to backend /health) */
+export const backendHealthApi = {
+  check: async (): Promise<{ status: string; service?: string; database?: string; redis?: string }> => {
+    const response = await axios.get('/health', { timeout: 5000 })
+    return response.data
+  },
+}
 
 export interface Patient {
   id: number
@@ -98,14 +106,12 @@ export const predictionsApi = {
       const data = await mockDataService.getPredictions(patientId)
       return data.slice(skip, skip + limit) as Prediction[]
     }
-    
+
     try {
-      const response = await axios.get(`${API_URL}/mock/predictions`)
-      let data = response.data as any[]
-      if (patientId) {
-        data = data.filter((p: any) => p.patient_id === patientId)
-      }
-      return data.slice(skip, skip + limit) as Prediction[]
+      const response = await axios.get(`${API_URL}/predictions`, {
+        params: { skip, limit, patient_id: patientId ?? undefined },
+      })
+      return response.data as Prediction[]
     } catch (error) {
       console.error('Error fetching predictions:', error)
       const data = await mockDataService.getPredictions(patientId)
@@ -137,9 +143,11 @@ export const reportsApi = {
     if (USE_MOCK_DATA) {
       return await mockDataService.getReportSummary()
     }
-    
+
     try {
-      const response = await axios.get(`${API_URL}/mock/reports/summary`)
+      const response = await axios.get(`${API_URL}/reports/summary`, {
+        params: { report_type: reportType, start_date: startDate, end_date: endDate },
+      })
       return response.data
     } catch (error) {
       console.error('Error fetching report summary:', error)
@@ -151,9 +159,11 @@ export const reportsApi = {
     if (USE_MOCK_DATA) {
       return await mockDataService.getPredictionsTrend(days)
     }
-    
+
     try {
-      const response = await axios.get(`${API_URL}/mock/reports/predictions-trend?days=${days}`)
+      const response = await axios.get(`${API_URL}/reports/predictions-trend`, {
+        params: { days },
+      })
       return response.data
     } catch (error) {
       console.error('Error fetching predictions trend:', error)
@@ -165,9 +175,9 @@ export const reportsApi = {
     if (USE_MOCK_DATA) {
       return await mockDataService.getRiskDistribution()
     }
-    
+
     try {
-      const response = await axios.get(`${API_URL}/mock/reports/risk-distribution`)
+      const response = await axios.get(`${API_URL}/reports/risk-distribution`)
       return response.data
     } catch (error) {
       console.error('Error fetching risk distribution:', error)

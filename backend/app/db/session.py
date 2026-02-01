@@ -7,17 +7,23 @@ from typing import AsyncGenerator
 
 from ..core.config import settings
 
-# Create async engine with optimized connection pooling
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True,
-    pool_pre_ping=True,  # Verify connections before using
-    pool_size=20,  # Number of connections to maintain
-    max_overflow=10,  # Additional connections beyond pool_size
-    pool_timeout=30,  # Seconds to wait for connection
-    pool_recycle=3600,  # Recycle connections after 1 hour
-)
+# Pool options only for non-SQLite (SQLite uses NullPool and rejects these)
+_engine_kw: dict = {
+    "echo": settings.DEBUG,
+    "future": True,
+}
+if "sqlite" not in settings.DATABASE_URL:
+    _engine_kw.update(
+        pool_pre_ping=True,
+        pool_size=20,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=3600,
+    )
+else:
+    _engine_kw["connect_args"] = {"check_same_thread": False}
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kw)
 
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(

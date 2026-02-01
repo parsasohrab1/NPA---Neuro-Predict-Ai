@@ -175,6 +175,64 @@ async def get_feature_importance(
     }
 
 
+@router.get("/ai/multimodal-summary")
+async def get_multimodal_summary(
+    hours: int = Query(24, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    """
+    خلاصه آنالیز مولتی‌مودال برای کمک به تصمیم‌گیری پزشک:
+    سهم مودالیتی‌ها (MRI, Biomarker, Cognitive)، میانگین دقت/اطمینان مدل برای آلزایمر و پارکینسون.
+    """
+    cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+    result = await db.execute(
+        select(Prediction)
+        .where(Prediction.created_at >= cutoff_time)
+        .order_by(Prediction.created_at.desc())
+    )
+    predictions = result.scalars().all()
+
+    if not predictions:
+        return {
+            "time_range_hours": hours,
+            "total_predictions": 0,
+            "modality_weights": {"MRI": 0.33, "Biomarker": 0.33, "Cognitive": 0.34},
+            "accuracy": {"alzheimer_confidence_pct": None, "parkinson_confidence_pct": None},
+            "message": "No predictions in the specified time range",
+        }
+
+    # Aggregate attention_scores (modality weights)
+    mri_list, bio_list, cog_list = [], [], []
+    for p in predictions:
+        if p.attention_scores:
+            mri_list.append(p.attention_scores.get("MRI", 0) or 0)
+            bio_list.append(p.attention_scores.get("Biomarker", 0) or 0)
+            cog_list.append(p.attention_scores.get("Cognitive", 0) or 0)
+    if mri_list:
+        modality_weights = {
+            "MRI": round(statistics.mean(mri_list), 4),
+            "Biomarker": round(statistics.mean(bio_list), 4),
+            "Cognitive": round(statistics.mean(cog_list), 4),
+        }
+    else:
+        modality_weights = {"MRI": 0.33, "Biomarker": 0.33, "Cognitive": 0.34}
+
+    alz_conf = [p.alzheimer_confidence for p in predictions if p.alzheimer_confidence is not None]
+    park_conf = [p.parkinson_confidence for p in predictions if p.parkinson_confidence is not None]
+    accuracy = {
+        "alzheimer_confidence_pct": round(statistics.mean(alz_conf) * 100, 2) if alz_conf else None,
+        "parkinson_confidence_pct": round(statistics.mean(park_conf) * 100, 2) if park_conf else None,
+    }
+
+    return {
+        "time_range_hours": hours,
+        "total_predictions": len(predictions),
+        "modality_weights": modality_weights,
+        "accuracy": accuracy,
+    }
+
+
 @router.get("/ai/model-performance")
 async def get_model_performance(
     model_version: Optional[str] = None,

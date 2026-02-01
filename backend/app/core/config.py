@@ -3,7 +3,7 @@ Application Configuration
 """
 from pydantic_settings import BaseSettings
 from pydantic import Field, field_validator, model_validator
-from typing import Optional
+from typing import Optional, List
 import os
 import secrets
 
@@ -82,13 +82,23 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
-    # CORS
-    CORS_ORIGINS: list = [
+    # CORS (allow frontend and admin-dashboard origins)
+    CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:8080",
-        "http://127.0.0.1:3001"
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:8080",
     ]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):  # type: ignore
+        """Accept list or comma-separated string from env."""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
     
     # File Upload
     MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB

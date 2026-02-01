@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+// Use proxy in dev (Vite proxies /api -> localhost:8001) to avoid CORS and wrong port
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -9,14 +10,27 @@ const api = axios.create({
   },
 });
 
-// Add token to requests
+// Add token to requests (use same key as LoginPage / devAuth: auth_token)
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+// On 401, clear auth and redirect to login
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
 
 export const monitoringApi = {
   // AI/ML Health
@@ -31,6 +45,9 @@ export const monitoringApi = {
     if (modelVersion) params.append('model_version', modelVersion);
     return api.get(`/monitoring/ai/model-performance?${params}`);
   },
+
+  getMultimodalSummary: (hours: number = 24) =>
+    api.get(`/monitoring/ai/multimodal-summary?hours=${hours}`),
 
   // Clinical Monitoring
   getLongitudinalTracking: (patientId: number) =>
@@ -67,6 +84,12 @@ export const monitoringApi = {
   
   getAdminActivity: (hours: number = 24) =>
     api.get(`/monitoring/security/admin-activity?hours=${hours}`),
+};
+
+// Disease tracking: Parkinson's & Alzheimer's ranges and patient classification
+export const diseaseApi = {
+  getFeatureRanges: () => api.get('/disease-tracking/feature-ranges'),
+  getPatientsSummary: () => api.get('/disease-tracking/all-patients/summary'),
 };
 
 export default api;

@@ -14,6 +14,7 @@ export interface PatientFeatures {
   biomarker_features: FeatureDataPoint[]
   mri_features: FeatureDataPoint[]
   genetic_features: FeatureDataPoint[]
+  vital_signs_features?: FeatureDataPoint[]
   latest_values: {
     mmse_score?: number | null
     moca_score?: number | null
@@ -23,6 +24,17 @@ export interface PatientFeatures {
     hippocampal_volume?: number | null
     cortical_thickness?: number | null
     apoe_e4_status?: boolean | null
+    blood_pressure_systolic?: number | null
+    blood_pressure_diastolic?: number | null
+    temperature?: number | null
+    heart_rate?: number | null
+    respiratory_rate?: number | null
+    oxygen_saturation?: number | null
+    weight?: number | null
+    height?: number | null
+    bmi?: number | null
+    blood_glucose?: number | null
+    cholesterol_total?: number | null
   }
   trends: {
     mmse_trend?: number
@@ -117,6 +129,27 @@ const diseaseTrackingApi = {
     return response.data
   },
 
+  async getPatientClassification(): Promise<{
+    feature_ranges: Record<string, any>
+    classification_summary: { normal: number; alzheimer: number; parkinson: number; unknown: number }
+    classification_summary_fa: Record<string, string>
+    total_patients: number
+    patients: Array<{
+      patient_id: number
+      patient_external_id: string
+      name: string
+      age: number | null
+      diagnosis: string
+      diagnosis_fa: string
+      alzheimer_risk: number | null
+      parkinson_risk: number | null
+      features: Record<string, number | null | undefined>
+    }>
+  }> {
+    const response = await axios.get('/api/v1/disease-tracking/patient-classification')
+    return response.data
+  },
+
   async getAllPatientsSummary(): Promise<{
     total_patients: number
     high_risk_alzheimer: number
@@ -171,6 +204,17 @@ const diseaseTrackingApi = {
     ventricular_volume?: number
     white_matter_hyperintensities?: number
     brain_volume_total?: number
+    blood_pressure_systolic?: number
+    blood_pressure_diastolic?: number
+    temperature?: number
+    heart_rate?: number
+    respiratory_rate?: number
+    oxygen_saturation?: number
+    weight?: number
+    height?: number
+    bmi?: number
+    blood_glucose?: number
+    cholesterol_total?: number
     symptoms?: string
     clinical_notes?: string
   }): Promise<any> {

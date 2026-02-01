@@ -55,6 +55,17 @@ const FEATURE_LABELS: Record<string, string> = {
   ventricular_volume: 'Ventricular Volume (mm³)',
   white_matter_hyperintensities: 'White Matter Hyperintensities',
   brain_volume_total: 'Total Brain Volume (mm³)',
+  blood_pressure_systolic: 'فشار خون سیستولیک (mmHg)',
+  blood_pressure_diastolic: 'فشار خون دیاستولیک (mmHg)',
+  temperature: 'درجه حرارت (°C)',
+  heart_rate: 'ضربان قلب (bpm)',
+  respiratory_rate: 'نرخ تنفس (breaths/min)',
+  oxygen_saturation: 'اشباع اکسیژن SpO2 (%)',
+  weight: 'وزن (kg)',
+  height: 'قد (cm)',
+  bmi: 'شاخص توده بدنی (kg/m²)',
+  blood_glucose: 'قند خون ناشتا (mg/dL)',
+  cholesterol_total: 'کلسترول کل (mg/dL)',
 }
 
 export default function DiseaseTrackingDashboard() {
@@ -73,6 +84,14 @@ export default function DiseaseTrackingDashboard() {
   const { data: patientsSummary, error: patientsError } = useQuery({
     queryKey: ['patients-summary'],
     queryFn: () => diseaseTrackingApi.getAllPatientsSummary(),
+    refetchInterval: refreshInterval,
+    retry: 2,
+  })
+
+  // Get patient classification (تقسیم‌بندی بیماران - نرمال/آلزایمر/پارکینسون)
+  const { data: patientClassification } = useQuery({
+    queryKey: ['patient-classification'],
+    queryFn: () => diseaseTrackingApi.getPatientClassification(),
     refetchInterval: refreshInterval,
     retry: 2,
   })
@@ -108,6 +127,7 @@ export default function DiseaseTrackingDashboard() {
     mutationFn: (patientData: any) => diseaseTrackingApi.createPatient(patientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-classification'] })
       setShowAddPatientModal(false)
       setNotification({ type: 'success', message: 'Patient created successfully!' })
       setTimeout(() => setNotification(null), 3000)
@@ -128,6 +148,7 @@ export default function DiseaseTrackingDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patient-features', selectedPatientId] })
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-classification'] })
       queryClient.invalidateQueries({ queryKey: ['future-risk', selectedPatientId] })
       queryClient.invalidateQueries({ queryKey: ['recommendations', selectedPatientId] })
       setShowAddDataModal(false)
@@ -148,6 +169,7 @@ export default function DiseaseTrackingDashboard() {
     mutationFn: () => diseaseTrackingApi.loadAllDatasets(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-classification'] })
       setShowLoadDataConfirm(false)
       
       let message = `All datasets loaded! ${data.total_patients} patients, ${data.total_records} records, ${data.total_predictions} predictions created.`
@@ -185,6 +207,7 @@ export default function DiseaseTrackingDashboard() {
     onSuccess: (data) => {
       // Invalidate all related queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-classification'] })
       queryClient.invalidateQueries({ queryKey: ['patient-features'] })
       queryClient.invalidateQueries({ queryKey: ['future-risk'] })
       
@@ -215,6 +238,7 @@ export default function DiseaseTrackingDashboard() {
     mutationFn: () => diseaseTrackingApi.loadSampleDatasets(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['patients-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-classification'] })
       queryClient.invalidateQueries({ queryKey: ['patient-features'] })
       queryClient.invalidateQueries({ queryKey: ['future-risk'] })
       setShowLoadSampleDataConfirm(false)
@@ -489,6 +513,128 @@ export default function DiseaseTrackingDashboard() {
             <div className="text-xs uppercase tracking-wide text-slate-400">Low Risk</div>
             <div className="mt-2 text-3xl font-semibold text-emerald-400">
               {patientsSummary.low_risk}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Patient Classification - تقسیم‌بندی بیماران (نرمال/آلزایمر/پارکینسون) */}
+      {patientClassification && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <span>📋</span>
+            تقسیم‌بندی بیماران | Patient Classification
+          </h2>
+          <p className="text-sm text-slate-400 mb-6">
+            محدوده سلامت و محدوده بیمار | Feature ranges for Alzheimer's and Parkinson's
+          </p>
+
+          {/* Classification Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="rounded-xl border border-emerald-800 bg-emerald-900/30 p-4">
+              <div className="text-xs uppercase text-slate-400">نرمال / Normal</div>
+              <div className="text-2xl font-bold text-emerald-400">{patientClassification.classification_summary.normal}</div>
+            </div>
+            <div className="rounded-xl border border-rose-800 bg-rose-900/30 p-4">
+              <div className="text-xs uppercase text-slate-400">آلزایمر / Alzheimer</div>
+              <div className="text-2xl font-bold text-rose-400">{patientClassification.classification_summary.alzheimer}</div>
+            </div>
+            <div className="rounded-xl border border-amber-800 bg-amber-900/30 p-4">
+              <div className="text-xs uppercase text-slate-400">پارکینسون / Parkinson</div>
+              <div className="text-2xl font-bold text-amber-400">{patientClassification.classification_summary.parkinson}</div>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+              <div className="text-xs uppercase text-slate-400">نامشخص / Unknown</div>
+              <div className="text-2xl font-bold text-slate-400">{patientClassification.classification_summary.unknown}</div>
+            </div>
+          </div>
+
+          {/* Feature Ranges Table */}
+          <div className="mb-6">
+            <h3 className="text-base font-semibold text-white mb-3">محدوده ویژگی‌ها | Feature Ranges (Health vs Patient)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-slate-300">
+                <thead>
+                  <tr className="border-b border-slate-700">
+                    <th className="py-2 px-3 font-medium">ویژگی / Feature</th>
+                    <th className="py-2 px-3 font-medium">سالم / Normal</th>
+                    <th className="py-2 px-3 font-medium">آلزایمر</th>
+                    <th className="py-2 px-3 font-medium">پارکینسون</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patientClassification.feature_ranges?.cognitive && Object.entries(patientClassification.feature_ranges.cognitive).map(([key, val]: [string, any]) => (
+                    <tr key={key} className="border-b border-slate-800">
+                      <td className="py-2 px-3">{FEATURE_LABELS[key] || key}</td>
+                      <td className="py-2 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
+                      <td className="py-2 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
+                      <td className="py-2 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
+                    </tr>
+                  ))}
+                  {patientClassification.feature_ranges?.biomarkers && Object.entries(patientClassification.feature_ranges.biomarkers).map(([key, val]: [string, any]) => (
+                    <tr key={key} className="border-b border-slate-800">
+                      <td className="py-2 px-3">{FEATURE_LABELS[key] || key}</td>
+                      <td className="py-2 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
+                      <td className="py-2 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
+                      <td className="py-2 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
+                    </tr>
+                  ))}
+                  {patientClassification.feature_ranges?.mri && Object.entries(patientClassification.feature_ranges.mri).map(([key, val]: [string, any]) => (
+                    <tr key={key} className="border-b border-slate-800">
+                      <td className="py-2 px-3">{FEATURE_LABELS[key] || key}</td>
+                      <td className="py-2 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
+                      <td className="py-2 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
+                      <td className="py-2 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Patient List with Classification */}
+          <div>
+            <h3 className="text-base font-semibold text-white mb-3">لیست بیماران | Patient List ({patientClassification.total_patients} total)</h3>
+            <div className="overflow-x-auto max-h-80 overflow-y-auto">
+              <table className="w-full text-sm text-left text-slate-300">
+                <thead className="sticky top-0 bg-slate-900 z-10">
+                  <tr className="border-b border-slate-700">
+                    <th className="py-2 px-3 font-medium">بیمار</th>
+                    <th className="py-2 px-3 font-medium">سن</th>
+                    <th className="py-2 px-3 font-medium">تشخیص</th>
+                    <th className="py-2 px-3 font-medium">ریسک آلزایمر</th>
+                    <th className="py-2 px-3 font-medium">ریسک پارکینسون</th>
+                    <th className="py-2 px-3 font-medium">MMSE</th>
+                    <th className="py-2 px-3 font-medium">Amyloid</th>
+                    <th className="py-2 px-3 font-medium">Tau</th>
+                    <th className="py-2 px-3 font-medium">Dopamine</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patientClassification.patients.map((p) => (
+                    <tr key={p.patient_id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                      <td className="py-2 px-3 font-medium">{p.name}</td>
+                      <td className="py-2 px-3">{p.age ?? '-'}</td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          p.diagnosis === 'normal' ? 'bg-emerald-900/50 text-emerald-400' :
+                          p.diagnosis === 'alzheimer' ? 'bg-rose-900/50 text-rose-400' :
+                          p.diagnosis === 'parkinson' ? 'bg-amber-900/50 text-amber-400' :
+                          'bg-slate-700 text-slate-400'
+                        }`}>
+                          {p.diagnosis_fa}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3">{p.alzheimer_risk != null ? (p.alzheimer_risk * 100).toFixed(1) + '%' : '-'}</td>
+                      <td className="py-2 px-3">{p.parkinson_risk != null ? (p.parkinson_risk * 100).toFixed(1) + '%' : '-'}</td>
+                      <td className="py-2 px-3">{p.features?.mmse_score ?? '-'}</td>
+                      <td className="py-2 px-3">{p.features?.amyloid_beta ?? '-'}</td>
+                      <td className="py-2 px-3">{p.features?.tau_protein ?? '-'}</td>
+                      <td className="py-2 px-3">{p.features?.dopamine_level ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1466,6 +1612,17 @@ function AddMedicalDataForm({
     ventricular_volume: '',
     white_matter_hyperintensities: '',
     brain_volume_total: '',
+    blood_pressure_systolic: '',
+    blood_pressure_diastolic: '',
+    temperature: '',
+    heart_rate: '',
+    respiratory_rate: '',
+    oxygen_saturation: '',
+    weight: '',
+    height: '',
+    bmi: '',
+    blood_glucose: '',
+    cholesterol_total: '',
     symptoms: '',
     clinical_notes: '',
   })
@@ -1494,6 +1651,17 @@ function AddMedicalDataForm({
     if (formData.white_matter_hyperintensities)
       data.white_matter_hyperintensities = parseFloat(formData.white_matter_hyperintensities)
     if (formData.brain_volume_total) data.brain_volume_total = parseFloat(formData.brain_volume_total)
+    if (formData.blood_pressure_systolic) data.blood_pressure_systolic = parseFloat(formData.blood_pressure_systolic)
+    if (formData.blood_pressure_diastolic) data.blood_pressure_diastolic = parseFloat(formData.blood_pressure_diastolic)
+    if (formData.temperature) data.temperature = parseFloat(formData.temperature)
+    if (formData.heart_rate) data.heart_rate = parseFloat(formData.heart_rate)
+    if (formData.respiratory_rate) data.respiratory_rate = parseFloat(formData.respiratory_rate)
+    if (formData.oxygen_saturation) data.oxygen_saturation = parseFloat(formData.oxygen_saturation)
+    if (formData.weight) data.weight = parseFloat(formData.weight)
+    if (formData.height) data.height = parseFloat(formData.height)
+    if (formData.bmi) data.bmi = parseFloat(formData.bmi)
+    if (formData.blood_glucose) data.blood_glucose = parseFloat(formData.blood_glucose)
+    if (formData.cholesterol_total) data.cholesterol_total = parseFloat(formData.cholesterol_total)
     if (formData.symptoms) data.symptoms = formData.symptoms
     if (formData.clinical_notes) data.clinical_notes = formData.clinical_notes
 
@@ -1524,6 +1692,122 @@ function AddMedicalDataForm({
             <option value="Follow-up">Follow-up</option>
             <option value="Emergency">Emergency</option>
           </select>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-700 pt-4">
+        <h3 className="text-lg font-semibold text-white mb-3">علائم حیاتی و شرایط بالینی</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">فشار خون سیستولیک (mmHg)</label>
+            <input
+              type="number"
+              value={formData.blood_pressure_systolic}
+              onChange={(e) => setFormData({ ...formData, blood_pressure_systolic: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+              placeholder="120"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">فشار خون دیاستولیک (mmHg)</label>
+            <input
+              type="number"
+              value={formData.blood_pressure_diastolic}
+              onChange={(e) => setFormData({ ...formData, blood_pressure_diastolic: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+              placeholder="80"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">درجه حرارت (°C)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={formData.temperature}
+              onChange={(e) => setFormData({ ...formData, temperature: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+              placeholder="36.6"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">ضربان قلب (bpm)</label>
+            <input
+              type="number"
+              value={formData.heart_rate}
+              onChange={(e) => setFormData({ ...formData, heart_rate: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+              placeholder="72"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">نرخ تنفس (breaths/min)</label>
+            <input
+              type="number"
+              value={formData.respiratory_rate}
+              onChange={(e) => setFormData({ ...formData, respiratory_rate: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+              placeholder="16"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">اشباع اکسیژن SpO2 (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={formData.oxygen_saturation}
+              onChange={(e) => setFormData({ ...formData, oxygen_saturation: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+              placeholder="98"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">وزن (kg)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={formData.weight}
+              onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">قد (cm)</label>
+            <input
+              type="number"
+              value={formData.height}
+              onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">شاخص توده بدنی BMI (kg/m²)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={formData.bmi}
+              onChange={(e) => setFormData({ ...formData, bmi: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">قند خون ناشتا (mg/dL)</label>
+            <input
+              type="number"
+              value={formData.blood_glucose}
+              onChange={(e) => setFormData({ ...formData, blood_glucose: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">کلسترول کل (mg/dL)</label>
+            <input
+              type="number"
+              value={formData.cholesterol_total}
+              onChange={(e) => setFormData({ ...formData, cholesterol_total: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+            />
+          </div>
         </div>
       </div>
 

@@ -65,38 +65,41 @@ export default function AIMLHealth() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4">🤖 AI/ML Health Monitoring</h2>
-        
-        {/* Overall Status */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Status</h3>
-            <p className="text-2xl font-bold text-blue-600">
-              {mlHealth?.status === 'healthy' ? '✓ Healthy' : '⚠ Warning'}
-            </p>
-          </div>
-          <div className="bg-green-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Total Predictions</h3>
-            <p className="text-2xl font-bold text-green-600">
-              {mlHealth?.total_predictions || 0}
-            </p>
-          </div>
-          <div className="bg-purple-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Avg Confidence</h3>
-            <p className="text-2xl font-bold text-purple-600">
-              {mlHealth?.confidence_distribution?.avg_confidence
-                ? (mlHealth.confidence_distribution.avg_confidence * 100).toFixed(1) + '%'
-                : 'N/A'}
-            </p>
-          </div>
+      <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+          <span className="text-xl">🤖</span>
+          <h2 className="text-lg font-semibold text-slate-800">AI/ML Health Monitoring</h2>
         </div>
+        <div className="p-6">
+          {/* Overall Status */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-indigo-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Status</p>
+              <p className="text-xl font-bold text-indigo-600 mt-1">
+                {mlHealth?.status === 'healthy' ? '✓ Healthy' : '⚠ Warning'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-emerald-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Predictions</p>
+              <p className="text-xl font-bold text-emerald-600 mt-1">
+                {mlHealth?.total_predictions || 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-violet-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Confidence</p>
+              <p className="text-xl font-bold text-violet-600 mt-1">
+                {mlHealth?.confidence_distribution?.avg_confidence
+                  ? (mlHealth.confidence_distribution.avg_confidence * 100).toFixed(1) + '%'
+                  : 'N/A'}
+              </p>
+            </div>
+          </div>
 
-        {/* Data Drift Indicators */}
-        {mlHealth?.data_drift && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Data Drift Indicators</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
+          {/* Data Drift Indicators */}
+          {mlHealth?.data_drift && (
+            <div className="mb-6">
+              <h3 className="text-base font-semibold text-slate-800 mb-3">Data Drift Indicators</h3>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Overall Status</span>
                 <span
@@ -134,10 +137,10 @@ export default function AIMLHealth() {
         {/* Performance Metrics */}
         {modelPerformance && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Model Performance</h3>
+            <h3 className="text-base font-semibold text-slate-800 mb-3">Model Performance</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Alzheimer's Disease</h4>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h4 className="font-medium text-slate-700 mb-2">Alzheimer's Disease</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span>High Risk Rate:</span>
@@ -155,8 +158,8 @@ export default function AIMLHealth() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Parkinson's Disease</h4>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h4 className="font-medium text-slate-700 mb-2">Parkinson's Disease</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span>High Risk Rate:</span>
@@ -181,7 +184,7 @@ export default function AIMLHealth() {
         {/* Confidence Distribution */}
         {confidenceData.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Confidence Score Distribution</h3>
+            <h3 className="text-base font-semibold text-slate-800 mb-3">Confidence Score Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -207,7 +210,7 @@ export default function AIMLHealth() {
         {/* Feature Importance */}
         {featureImportance?.features && featureImportance.features.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold mb-3">Feature Importance (Explainability)</h3>
+            <h3 className="text-base font-semibold text-slate-800 mb-3">Feature Importance (Explainability)</h3>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={featureImportance.features.slice(0, 10)}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -226,7 +229,8 @@ export default function AIMLHealth() {
             </ResponsiveContainer>
           </div>
         )}
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -41,6 +41,19 @@ class MedicalRecord(Base):
     white_matter_hyperintensities = Column(Float, nullable=True)
     brain_volume_total = Column(Float, nullable=True)  # mm³
     
+    # Vital Signs & Clinical Conditions (علائم حیاتی و شرایط بالینی)
+    blood_pressure_systolic = Column(Float, nullable=True)  # mmHg - فشار خون سیستولیک
+    blood_pressure_diastolic = Column(Float, nullable=True)  # mmHg - فشار خون دیاستولیک
+    temperature = Column(Float, nullable=True)  # °C - درجه حرارت بدن
+    heart_rate = Column(Float, nullable=True)  # bpm - ضربان قلب
+    respiratory_rate = Column(Float, nullable=True)  # breaths/min - نرخ تنفس
+    oxygen_saturation = Column(Float, nullable=True)  # % SpO2 - اشباع اکسیژن
+    weight = Column(Float, nullable=True)  # kg - وزن
+    height = Column(Float, nullable=True)  # cm - قد
+    bmi = Column(Float, nullable=True)  # kg/m² - شاخص توده بدنی
+    blood_glucose = Column(Float, nullable=True)  # mg/dL - قند خون ناشتا
+    cholesterol_total = Column(Float, nullable=True)  # mg/dL - کلسترول کل
+    
     # Clinical Notes
     symptoms = Column(Text, nullable=True)
     clinical_notes = Column(Text, nullable=True)
@@ -55,6 +68,8 @@ class MedicalRecord(Base):
     # Relationships
     patient = relationship("Patient", back_populates="medical_records")
     imaging_studies = relationship("ImagingStudy", back_populates="medical_record", cascade="all, delete-orphan")
+    longitudinal_visits = relationship("LongitudinalVisit", back_populates="medical_record", lazy="select")
+    fusion_reports = relationship("DataFusionReport", back_populates="medical_record", lazy="select")
     
     def __repr__(self):
         return f"<MedicalRecord(id={self.id}, patient_id={self.patient_id}, visit_date={self.visit_date})>"

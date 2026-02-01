@@ -1,10 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { patientsApi, predictionsApi, reportsApi } from '../services/api'
+import { patientsApi, predictionsApi, reportsApi, backendHealthApi } from '../services/api'
 import { Link } from 'react-router-dom'
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 export default function DashboardPage() {
-  const { data: allPatients = [] } = useQuery({
+  // Backend connection status (refetch every 30s)
+  const { data: health, isSuccess: backendConnected, isError: backendError } = useQuery({
+    queryKey: ['backend-health'],
+    queryFn: () => backendHealthApi.check(),
+    refetchInterval: 30_000,
+    retry: 1,
+    staleTime: 10_000,
+  })
+
+  const { data: allPatients = [], isLoading: patientsLoading } = useQuery({
     queryKey: ['patients-all'],
     queryFn: () => patientsApi.getAll(0, 1000),
   })
@@ -14,7 +23,7 @@ export default function DashboardPage() {
     queryFn: () => patientsApi.getAll(0, 10),
   })
 
-  const { data: allPredictions = [] } = useQuery({
+  const { data: allPredictions = [], isLoading: predictionsLoading } = useQuery({
     queryKey: ['predictions-all'],
     queryFn: () => predictionsApi.getAll(undefined, 0, 1000),
   })
@@ -128,12 +137,38 @@ export default function DashboardPage() {
     })),
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 8)
 
+  const dataLoading = patientsLoading || predictionsLoading
+
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 Dashboard</h1>
-        <p className="text-gray-600">Overview of system activity and key metrics</p>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 Dashboard</h1>
+          <p className="text-gray-600">Overview of system activity and key metrics</p>
+        </div>
+        {/* Backend connection status */}
+        <div className="flex items-center gap-2">
+          {backendConnected && health?.status === 'healthy' && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Backend connected
+            </span>
+          )}
+          {(backendError || (health && health.status !== 'healthy')) && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              Backend offline / mock data
+            </span>
+          )}
+        </div>
       </div>
+
+      {dataLoading && (
+        <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm flex items-center gap-2">
+          <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent" />
+          Loading dashboard data…
+        </div>
+      )}
 
       {/* Enhanced Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">

@@ -16,6 +16,16 @@ from ..services.ai_model_service import AIModelService
 
 router = APIRouter(prefix="/disease-tracking", tags=["Disease Tracking"])
 
+# Normal ranges for vital signs (for alerting) - (min, max) per range
+VITAL_SIGN_RANGES = {
+    "blood_pressure_systolic": {"normal": (90, 120), "warning": (80, 90), "critical": (0, 80)},  # mmHg - flag if <80 or >140
+    "blood_pressure_diastolic": {"normal": (60, 80), "warning": (50, 60), "critical": (0, 50)},
+    "temperature": {"normal": (36.1, 37.2), "warning": (35.5, 38.5), "critical": (0, 35)},  # °C
+    "heart_rate": {"normal": (60, 100), "warning": (50, 120), "critical": (0, 50)},  # bpm
+    "respiratory_rate": {"normal": (12, 20), "warning": (10, 24), "critical": (0, 10)},
+    "oxygen_saturation": {"normal": (95, 100), "warning": (90, 95), "critical": (0, 90)},  # %
+}
+
 # Normal ranges for features (for alerting)
 FEATURE_RANGES = {
     "mmse_score": {"normal": (24, 30), "warning": (18, 24), "critical": (0, 18)},
@@ -83,9 +93,33 @@ async def get_patient_features(
     biomarker_features = []
     mri_features = []
     genetic_features = []
+    vital_signs_features = []
 
     for record in records:
         date = record.visit_date.isoformat()
+        
+        # Vital signs & clinical conditions
+        if any([
+            record.blood_pressure_systolic is not None,
+            record.blood_pressure_diastolic is not None,
+            record.temperature is not None,
+            record.heart_rate is not None,
+            record.oxygen_saturation is not None,
+        ]):
+            vital_signs_features.append({
+                "date": date,
+                "blood_pressure_systolic": record.blood_pressure_systolic,
+                "blood_pressure_diastolic": record.blood_pressure_diastolic,
+                "temperature": record.temperature,
+                "heart_rate": record.heart_rate,
+                "respiratory_rate": record.respiratory_rate,
+                "oxygen_saturation": record.oxygen_saturation,
+                "weight": record.weight,
+                "height": record.height,
+                "bmi": record.bmi,
+                "blood_glucose": record.blood_glucose,
+                "cholesterol_total": record.cholesterol_total,
+            })
         
         # Cognitive scores
         if record.mmse_score is not None or record.moca_score is not None:
@@ -139,6 +173,7 @@ async def get_patient_features(
             "biomarker_features": [],
             "mri_features": [],
             "genetic_features": [],
+            "vital_signs_features": [],
             "latest_values": {},
             "trends": {},
             "alerts": [],
@@ -181,6 +216,26 @@ async def get_patient_features(
                         "normal_range": ranges["normal"],
                         "message": f"{feature_name} is outside normal range: {value}",
                     })
+        # Vital signs alerts
+        for vs_name, ranges in VITAL_SIGN_RANGES.items():
+            value = getattr(latest_record, vs_name, None)
+            if value is not None:
+                if value < ranges["critical"][0] or value > ranges["critical"][1]:
+                    alerts.append({
+                        "feature": vs_name,
+                        "severity": "critical",
+                        "value": value,
+                        "normal_range": ranges["normal"],
+                        "message": f"{vs_name} is in critical range: {value}",
+                    })
+                elif value < ranges["warning"][0] or value > ranges["warning"][1]:
+                    alerts.append({
+                        "feature": vs_name,
+                        "severity": "warning",
+                        "value": value,
+                        "normal_range": ranges["normal"],
+                        "message": f"{vs_name} is outside normal range: {value}",
+                    })
 
     # Calculate feature trends
     feature_trends = {}
@@ -211,6 +266,7 @@ async def get_patient_features(
         "biomarker_features": biomarker_features,
         "mri_features": mri_features,
         "genetic_features": genetic_features,
+        "vital_signs_features": vital_signs_features,
         "latest_values": {
             "mmse_score": latest_record.mmse_score if latest_record else None,
             "moca_score": latest_record.moca_score if latest_record else None,
@@ -220,6 +276,17 @@ async def get_patient_features(
             "hippocampal_volume": latest_record.hippocampal_volume if latest_record else None,
             "cortical_thickness": latest_record.cortical_thickness if latest_record else None,
             "apoe_e4_status": latest_record.apoe_e4_status if latest_record else None,
+            "blood_pressure_systolic": latest_record.blood_pressure_systolic if latest_record else None,
+            "blood_pressure_diastolic": latest_record.blood_pressure_diastolic if latest_record else None,
+            "temperature": latest_record.temperature if latest_record else None,
+            "heart_rate": latest_record.heart_rate if latest_record else None,
+            "respiratory_rate": latest_record.respiratory_rate if latest_record else None,
+            "oxygen_saturation": latest_record.oxygen_saturation if latest_record else None,
+            "weight": latest_record.weight if latest_record else None,
+            "height": latest_record.height if latest_record else None,
+            "bmi": latest_record.bmi if latest_record else None,
+            "blood_glucose": latest_record.blood_glucose if latest_record else None,
+            "cholesterol_total": latest_record.cholesterol_total if latest_record else None,
         },
         "trends": feature_trends,
         "alerts": alerts,
@@ -508,6 +575,165 @@ async def health_check():
     return {"status": "ok", "message": "Disease tracking API is running"}
 
 
+# Feature ranges for Alzheimer vs Parkinson (health vs patient) - محدوده سلامت و محدوده بیمار
+CLASSIFICATION_FEATURE_RANGES = {
+    "cognitive": {
+        "mmse_score": {
+            "normal": {"min": 28, "max": 30, "label_fa": "سالم"},
+            "alzheimer": {"min": 12, "max": 28, "label_fa": "آلزایمر"},
+            "parkinson": {"min": 22, "max": 30, "label_fa": "پارکینسون خفیف"},
+        },
+        "moca_score": {
+            "normal": {"min": 26, "max": 30, "label_fa": "سالم"},
+            "alzheimer": {"min": 10, "max": 26, "label_fa": "آلزایمر"},
+            "parkinson": {"min": 18, "max": 30, "label_fa": "پارکینسون خفیف"},
+        },
+    },
+    "biomarkers": {
+        "amyloid_beta": {
+            "normal": {"min": 400, "max": 1000, "label_fa": "سالم"},
+            "alzheimer": {"min": 100, "max": 500, "label_fa": "پایین (تشخیصی آلزایمر)"},
+            "parkinson": {"min": 350, "max": 950, "label_fa": "نرمال"},
+        },
+        "tau_protein": {
+            "normal": {"min": 40, "max": 360, "label_fa": "سالم"},
+            "alzheimer": {"min": 300, "max": 900, "label_fa": "بالا (تشخیصی آلزایمر)"},
+            "parkinson": {"min": 50, "max": 450, "label_fa": "نرمال"},
+        },
+        "dopamine_level": {
+            "normal": {"min": 80, "max": 160, "label_fa": "سالم"},
+            "alzheimer": {"min": 60, "max": 160, "label_fa": "نرمال تا کمی پایین"},
+            "parkinson": {"min": 0, "max": 125, "label_fa": "پایین (تشخیصی پارکینسون)"},
+        },
+    },
+    "mri": {
+        "hippocampal_volume": {
+            "normal": {"min": 3400, "max": 4600, "label_fa": "سالم"},
+            "alzheimer": {"min": 1500, "max": 3500, "label_fa": "آتروفی"},
+            "parkinson": {"min": 2700, "max": 4300, "label_fa": "کاهش خفیف"},
+        },
+    },
+}
+
+
+@router.get("/feature-ranges")
+async def get_feature_ranges() -> Dict[str, Any]:
+    """
+    Return healthy vs at-risk vs disease ranges for biomarkers (Alzheimer/Parkinson related).
+    Used by admin dashboard to display محدوده سلامت و محدوده بیمار.
+    """
+    return {
+        "risk_score_ranges": {
+            "alzheimer": {
+                "low": {"min": 0, "max": 0.33, "label": "سلامت", "label_en": "Healthy"},
+                "medium": {"min": 0.33, "max": 0.66, "label": "هشدار", "label_en": "At Risk"},
+                "high": {"min": 0.66, "max": 1.0, "label": "پرریسک/بیمار", "label_en": "High Risk / Disease"},
+            },
+            "parkinson": {
+                "low": {"min": 0, "max": 0.33, "label": "سلامت", "label_en": "Healthy"},
+                "medium": {"min": 0.33, "max": 0.66, "label": "هشدار", "label_en": "At Risk"},
+                "high": {"min": 0.66, "max": 1.0, "label": "پرریسک/بیمار", "label_en": "High Risk / Disease"},
+            },
+        },
+        "biomarker_ranges": FEATURE_RANGES,
+        "classification_feature_ranges": CLASSIFICATION_FEATURE_RANGES,
+    }
+
+
+@router.get("/patient-classification")
+async def get_patient_classification(
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    تقسیم‌بندی بیماران موجود در دیتابیس بر اساس تشخیص (نرمال/آلزایمر/پارکینسون).
+    Returns patient classification with diagnosis, feature ranges, and per-patient breakdown.
+    """
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(Patient).options(selectinload(Patient.medical_records))
+    )
+    all_patients = result.scalars().unique().all()
+
+    classification_summary = {
+        "normal": 0,
+        "alzheimer": 0,
+        "parkinson": 0,
+        "unknown": 0,
+    }
+    patients_list = []
+
+    for patient in all_patients:
+        pred_result = await db.execute(
+            select(Prediction)
+            .where(Prediction.patient_id == patient.id)
+            .order_by(Prediction.created_at.desc())
+            .limit(1)
+        )
+        latest_pred = pred_result.scalar_one_or_none()
+
+        mr_result = await db.execute(
+            select(MedicalRecord)
+            .where(MedicalRecord.patient_id == patient.id)
+            .order_by(MedicalRecord.visit_date.desc())
+            .limit(1)
+        )
+        latest_record = mr_result.scalar_one_or_none()
+
+        diagnosis = "unknown"
+        if latest_pred and latest_pred.disease_type:
+            dt_val = latest_pred.disease_type.value if hasattr(latest_pred.disease_type, "value") else str(latest_pred.disease_type)
+            dt = (dt_val or "").lower()
+            if dt == "alzheimer":
+                diagnosis = "alzheimer"
+                classification_summary["alzheimer"] += 1
+            elif dt == "parkinson":
+                diagnosis = "parkinson"
+                classification_summary["parkinson"] += 1
+            else:
+                diagnosis = "normal"
+                classification_summary["normal"] += 1
+        else:
+            classification_summary["unknown"] += 1
+
+        age = (datetime.now().date() - patient.date_of_birth).days // 365 if patient.date_of_birth else None
+        features = {}
+        if latest_record:
+            features = {
+                "mmse_score": latest_record.mmse_score,
+                "moca_score": latest_record.moca_score,
+                "amyloid_beta": latest_record.amyloid_beta,
+                "tau_protein": latest_record.tau_protein,
+                "dopamine_level": latest_record.dopamine_level,
+                "hippocampal_volume": latest_record.hippocampal_volume,
+            }
+
+        patients_list.append({
+            "patient_id": patient.id,
+            "patient_external_id": patient.patient_id,
+            "name": f"{patient.first_name} {patient.last_name}",
+            "age": age,
+            "diagnosis": diagnosis,
+            "diagnosis_fa": {"normal": "نرمال", "alzheimer": "آلزایمر", "parkinson": "پارکینسون", "unknown": "نامشخص"}.get(diagnosis, "نامشخص"),
+            "alzheimer_risk": round(latest_pred.alzheimer_risk_score, 3) if latest_pred else None,
+            "parkinson_risk": round(latest_pred.parkinson_risk_score, 3) if latest_pred else None,
+            "features": features,
+        })
+
+    return {
+        "feature_ranges": CLASSIFICATION_FEATURE_RANGES,
+        "classification_summary": classification_summary,
+        "classification_summary_fa": {
+            "normal": f"نرمال: {classification_summary['normal']}",
+            "alzheimer": f"آلزایمر: {classification_summary['alzheimer']}",
+            "parkinson": f"پارکینسون: {classification_summary['parkinson']}",
+            "unknown": f"نامشخص: {classification_summary['unknown']}",
+        },
+        "total_patients": len(all_patients),
+        "patients": patients_list,
+    }
+
+
 @router.get("/all-patients/summary")
 async def get_all_patients_summary(
     db: AsyncSession = Depends(get_db),
@@ -559,11 +785,15 @@ async def get_all_patients_summary(
         else:
             summary["low_risk"] += 1
         
+        alz_level = "high" if alz_risk >= 0.66 else "medium" if alz_risk >= 0.33 else "low"
+        park_level = "high" if park_risk >= 0.66 else "medium" if park_risk >= 0.33 else "low"
         summary["patients"].append({
             "patient_id": patient.id,
             "name": f"{patient.first_name} {patient.last_name}",
-            "alzheimer_risk": alz_risk,
-            "parkinson_risk": park_risk,
+            "alzheimer_risk": round(alz_risk, 3),
+            "parkinson_risk": round(park_risk, 3),
+            "alzheimer_level": alz_level,
+            "parkinson_level": park_level,
             "last_prediction_date": latest_prediction.created_at.isoformat() if latest_prediction else None,
         })
 
@@ -725,7 +955,7 @@ async def load_all_datasets(
             elif 'PD' in patient_id_upper or 'PARKINSON' in patient_id_upper:
                 disease_type = DiseaseType.PARKINSON
             else:
-                disease_type = DiseaseType.NORMAL
+                disease_type = DiseaseType.BOTH
             
             # Create prediction
             prediction = Prediction(

@@ -18,13 +18,18 @@ export function useWebSocket(
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
     if (!token) {
-      console.error('No token found for WebSocket connection');
+      // Skip WebSocket when not authenticated; avoid noisy error in console
       return;
     }
 
-    const wsUrl = `ws://localhost:8000/api/v1/ws/monitoring?token=${encodeURIComponent(token)}&channel=${channel}`;
+    // Use same origin in dev so Vite proxy can forward to backend (8001)
+    const wsProtocol = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = import.meta.env.DEV && typeof location !== 'undefined'
+      ? `${location.host}`
+      : (import.meta.env.VITE_WS_HOST || 'localhost:8001');
+    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/ws/monitoring?token=${encodeURIComponent(token)}&channel=${channel}`;
     
     const connect = () => {
       try {

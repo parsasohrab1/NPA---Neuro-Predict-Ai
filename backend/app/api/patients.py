@@ -4,12 +4,15 @@ Patient Management API Endpoints
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 
 from ..db.session import get_db
 from ..models.user import User
 from ..models.patient import Patient
+from ..models.medical_record import MedicalRecord
 from ..schemas.patient import PatientCreate, PatientUpdate, PatientResponse
+from ..schemas.medical_record import MedicalRecordCreate, MedicalRecordResponse
 from ..core.security import get_current_user, require_role
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
@@ -69,6 +72,58 @@ async def get_patients(
     patients = result.scalars().all()
     
     return patients
+
+
+@router.get("/{patient_id}/medical-records", response_model=List[MedicalRecordResponse])
+async def get_patient_medical_records(
+    patient_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get medical records for a patient"""
+    result = await db.execute(
+        select(Patient).where(Patient.id == patient_id)
+    )
+    patient = result.scalar_one_or_none()
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient with ID {patient_id} not found"
+        )
+    result = await db.execute(
+        select(MedicalRecord)
+        .where(MedicalRecord.patient_id == patient_id)
+        .order_by(MedicalRecord.visit_date.desc())
+    )
+    records = result.scalars().all()
+    return records
+
+
+@router.post("/{patient_id}/medical-records", response_model=MedicalRecordResponse, status_code=status.HTTP_201_CREATED)
+async def create_patient_medical_record(
+    patient_id: int,
+    record_data: MedicalRecordCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("nurse"))
+):
+    """Create a new medical record for a patient"""
+    result = await db.execute(
+        select(Patient).where(Patient.id == patient_id)
+    )
+    patient = result.scalar_one_or_none()
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient with ID {patient_id} not found"
+        )
+    medical_record = MedicalRecord(
+        patient_id=patient_id,
+        **record_data.model_dump()
+    )
+    db.add(medical_record)
+    await db.commit()
+    await db.refresh(medical_record)
+    return medical_record
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)

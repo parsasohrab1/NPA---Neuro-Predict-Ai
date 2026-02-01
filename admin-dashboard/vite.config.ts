@@ -27,9 +27,15 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    // Proxy /api and /health to backend to avoid CORS. Backend default port is 8001; use 8000 if you run backend there.
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/health': {
+        target: 'http://localhost:8001',
         changeOrigin: true,
       },
     },

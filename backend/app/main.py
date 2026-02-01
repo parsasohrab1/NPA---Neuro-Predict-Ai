@@ -2,7 +2,7 @@
 NeuroPredict-AI Main Application
 FastAPI Backend for Alzheimer's and Parkinson's Disease Prediction
 """
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -12,10 +12,27 @@ from pathlib import Path
 from .core.config import settings
 from .db.session import init_db, close_db
 from .core.cache import cache_service
-from .api import auth, patients, predictions, reports, models, analytics, users, mock_data, monitoring, websocket, optimization
-from .api.integration import fhir, pacs, ehr, hl7v2, devices
-from .api.streaming import realtime
-from .services.streaming.realtime_service import realtime_service
+from .api import auth, patients, predictions, reports, models, analytics, users, mock_data, monitoring, websocket, optimization, disease_tracking
+
+# Optional integration routers (FHIR etc. may require extra deps / Pydantic compatibility)
+_integration = None
+try:
+    from .api.integration import fhir, pacs, ehr, hl7v2, devices
+    _integration = (fhir, pacs, ehr, hl7v2, devices)
+except Exception as e:
+    import warnings
+    warnings.warn(f"Integration routers (FHIR, PACS, EHR, HL7v2, devices) not loaded: {e}")
+
+_realtime_router = None
+_realtime_service = None
+try:
+    from .api.streaming import realtime
+    from .services.streaming.realtime_service import realtime_service
+    _realtime_router = realtime
+    _realtime_service = realtime_service
+except Exception as e:
+    import warnings
+    warnings.warn(f"Streaming router not loaded: {e}")
 
 # Configure logging
 logging.basicConfig(
@@ -58,24 +75,26 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Cache connection failed: {e}. Response caching disabled.")
     
-    # Start real-time streaming service
-    try:
-        realtime_service.start()
-        logger.info("Real-time streaming service started")
-    except Exception as e:
-        logger.error(f"Failed to start streaming service: {e}")
+    # Start real-time streaming service (if loaded)
+    if _realtime_service:
+        try:
+            _realtime_service.start()
+            logger.info("Real-time streaming service started")
+        except Exception as e:
+            logger.error(f"Failed to start streaming service: {e}")
     
     yield
     
     # Shutdown
     logger.info("Shutting down NeuroPredict-AI application...")
     
-    # Stop real-time streaming service
-    try:
-        realtime_service.stop()
-        logger.info("Real-time streaming service stopped")
-    except Exception as e:
-        logger.error(f"Error stopping streaming service: {e}")
+    # Stop real-time streaming service (if loaded)
+    if _realtime_service:
+        try:
+            _realtime_service.stop()
+            logger.info("Real-time streaming service stopped")
+        except Exception as e:
+            logger.error(f"Error stopping streaming service: {e}")
     
     # Disconnect cache
     try:
@@ -130,14 +149,38 @@ if settings.ENVIRONMENT == "production":
     app.add_middleware(MetricsMiddleware)
 
 
-# Exception handlers
+def _cors_headers(request: Request) -> dict:
+    """Return CORS headers for the request origin if allowed."""
+    origin = request.headers.get("origin")
+    if origin and origin in settings.CORS_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
+    return {}
+
+
+# Exception handlers (include CORS so browser shows real error instead of CORS error)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler"""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    headers = _cors_headers(request)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error occurred"}
+        content={"detail": "Internal server error occurred"},
+        headers=headers,
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Ensure 4xx responses include CORS headers so browser doesn't report CORS instead of status."""
+    headers = _cors_headers(request)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers,
     )
 
 
@@ -228,16 +271,20 @@ app.include_router(monitoring.router, prefix=settings.API_V1_PREFIX)
 app.include_router(websocket.router, prefix=settings.API_V1_PREFIX)
 app.include_router(mock_data.router, prefix=settings.API_V1_PREFIX)  # Mock data for development
 app.include_router(optimization.router, prefix=settings.API_V1_PREFIX)
+app.include_router(disease_tracking.router, prefix=settings.API_V1_PREFIX)
 
-# Integration routers
-app.include_router(fhir.router, prefix=settings.API_V1_PREFIX)
-app.include_router(pacs.router, prefix=settings.API_V1_PREFIX)
-app.include_router(ehr.router, prefix=settings.API_V1_PREFIX)
-app.include_router(hl7v2.router, prefix=settings.API_V1_PREFIX)
-app.include_router(devices.router, prefix=settings.API_V1_PREFIX)
+# Integration routers (optional)
+if _integration:
+    fhir, pacs, ehr, hl7v2, devices = _integration
+    app.include_router(fhir.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(pacs.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(ehr.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(hl7v2.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(devices.router, prefix=settings.API_V1_PREFIX)
 
-# Streaming routers
-app.include_router(realtime.router, prefix=settings.API_V1_PREFIX)
+# Streaming routers (optional)
+if _realtime_router:
+    app.include_router(_realtime_router.router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":

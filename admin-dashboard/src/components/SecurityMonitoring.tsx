@@ -33,44 +33,47 @@ export default function SecurityMonitoring() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4">🔐 Security & Compliance Monitoring</h2>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-red-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">High-Risk Activities</h3>
-            <p className="text-2xl font-bold text-red-600">
-              {auditLogs?.high_risk_count || 0}
-            </p>
-          </div>
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Total Audit Logs</h3>
-            <p className="text-2xl font-bold text-blue-600">
-              {auditLogs?.total_count || 0}
-            </p>
-          </div>
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Failed Logins</h3>
-            <p className="text-2xl font-bold text-yellow-600">
-              {authMonitoring?.login_statistics?.failed || 0}
-            </p>
-          </div>
-          <div className="bg-purple-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-600">Active Admins</h3>
-            <p className="text-2xl font-bold text-purple-600">
-              {adminActivity?.active_admin_count || 0}
-            </p>
-          </div>
+      <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+          <span className="text-xl">🔐</span>
+          <h2 className="text-lg font-semibold text-slate-800">Security & Compliance Monitoring</h2>
         </div>
+        <div className="p-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">High-Risk Activities</p>
+              <p className="text-xl font-bold text-rose-600 mt-1">
+                {auditLogs?.high_risk_count || 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-indigo-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Audit Logs</p>
+              <p className="text-xl font-bold text-indigo-600 mt-1">
+                {auditLogs?.total_count || 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Failed Logins</p>
+              <p className="text-xl font-bold text-amber-600 mt-1">
+                {authMonitoring?.login_statistics?.failed || 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-violet-50 to-white p-4">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Active Admins</p>
+              <p className="text-xl font-bold text-violet-600 mt-1">
+                {adminActivity?.active_admin_count || 0}
+              </p>
+            </div>
+          </div>
 
-        {/* Authentication Monitoring */}
-        {authMonitoring && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Authentication Monitoring</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Login Statistics</h4>
+          {/* Authentication Monitoring */}
+          {authMonitoring && (
+            <div className="mb-6">
+              <h3 className="text-base font-semibold text-slate-800 mb-3">Authentication Monitoring</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                  <h4 className="font-medium text-slate-700 mb-2">Login Statistics</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Attempts</span>
@@ -98,8 +101,8 @@ export default function SecurityMonitoring() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Security Alerts</h4>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h4 className="font-medium text-slate-700 mb-2">Security Alerts</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Brute Force IPs</span>
@@ -203,8 +206,8 @@ export default function SecurityMonitoring() {
         {/* Admin Activity */}
         {adminActivity && (
           <div>
-            <h3 className="text-lg font-semibold mb-3">Admin Activity</h3>
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <h3 className="text-base font-semibold text-slate-800 mb-3">Admin Activity</h3>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 mb-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-600">Active Admins:</span>
@@ -221,7 +224,7 @@ export default function SecurityMonitoring() {
             {adminActivity.activity_summary && adminActivity.activity_summary.length > 0 && (
               <div className="space-y-2">
                 {adminActivity.activity_summary.map((activity: any, idx: number) => (
-                  <div key={idx} className="bg-gray-50 rounded-lg p-4 text-sm">
+                  <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-sm">
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-medium">{activity.user_email}</p>
@@ -253,7 +256,8 @@ export default function SecurityMonitoring() {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
