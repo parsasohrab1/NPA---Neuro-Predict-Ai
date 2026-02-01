@@ -278,7 +278,7 @@ async def create_report(
         report = await longitudinal_service.create_report(
             db=db,
             episode_id=episode_id,
-            created_by=getattr(current_user, "id", None),
+            created_by=None,  # Fixed: removed undefined current_user reference
             start_date=payload.start_date,
             end_date=payload.end_date,
             report_format=payload.format,

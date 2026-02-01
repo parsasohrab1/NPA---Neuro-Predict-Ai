@@ -77,6 +77,7 @@ class Prediction(Base):
     # Relationships
     patient = relationship("Patient", back_populates="predictions")
     created_by_user = relationship("User", foreign_keys=[created_by], back_populates="predictions")
+    longitudinal_visit = relationship("LongitudinalVisit", back_populates="prediction", uselist=False)
     
     def __repr__(self):
         return f"<Prediction(id={self.id}, patient_id={self.patient_id}, disease_type={self.disease_type})>"

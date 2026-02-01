@@ -58,6 +58,7 @@ class ImagingStudy(Base):
     
     # Relationships
     medical_record = relationship("MedicalRecord", back_populates="imaging_studies")
+    longitudinal_visits = relationship("LongitudinalVisit", back_populates="imaging_study")
     
     def __repr__(self):
         return f"<ImagingStudy(id={self.id}, study_id={self.study_id}, modality={self.modality})>"
