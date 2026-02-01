@@ -71,13 +71,14 @@ const FEATURE_LABELS: Record<string, string> = {
 export default function DiseaseTrackingDashboard() {
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [monthsAhead, setMonthsAhead] = useState(12)
-  const [refreshInterval, setRefreshInterval] = useState(10000) // 10 seconds
+  const [refreshInterval, setRefreshInterval] = useState(10000)
   const [showAddPatientModal, setShowAddPatientModal] = useState(false)
   const [showAddDataModal, setShowAddDataModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showLoadDataConfirm, setShowLoadDataConfirm] = useState(false)
   const [showLoadSampleDataConfirm, setShowLoadSampleDataConfirm] = useState(false)
   const [showClearDataConfirm, setShowClearDataConfirm] = useState(false)
+  const [showFeatureRanges, setShowFeatureRanges] = useState(false)
   const queryClient = useQueryClient()
 
   // Get all patients summary
@@ -341,7 +342,7 @@ export default function DiseaseTrackingDashboard() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-5">
       {/* Notification */}
       {notification && (
         <div
@@ -369,63 +370,60 @@ export default function DiseaseTrackingDashboard() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Disease Tracking Dashboard</h1>
-          <p className="text-slate-400 mt-1">
-            Real-time monitoring of Alzheimer's and Parkinson's disease indicators
+          <h1 className="text-2xl font-bold text-white">Disease Tracking</h1>
+          <p className="text-slate-400 text-sm mt-0.5">
+            Monitor Alzheimer&apos;s and Parkinson&apos;s indicators
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowAddPatientModal(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-colors"
           >
-            <UserPlusIcon className="h-5 w-5" />
+            <UserPlusIcon className="h-4 w-4" />
             Add Patient
           </button>
           {selectedPatientId && (
             <button
               onClick={() => setShowAddDataModal(true)}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm transition-colors"
             >
-              <DocumentPlusIcon className="h-5 w-5" />
+              <DocumentPlusIcon className="h-4 w-4" />
               Add Data
             </button>
           )}
           <button
-            onClick={() => setShowClearDataConfirm(true)}
-            className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg transition-colors"
-            title="Clear all disease tracking data (patients, records, predictions)"
-          >
-            <TrashIcon className="h-5 w-5" />
-            Clear All Data
-          </button>
-          <button
             onClick={() => setShowLoadSampleDataConfirm(true)}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors"
-            title="Load 200 sample patients: 120 Normal, 40 Alzheimer, 40 Parkinson"
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm transition-colors"
           >
-            <PlusIcon className="h-5 w-5" />
-            Load Sample Data (200)
+            <PlusIcon className="h-4 w-4" />
+            Load Sample (200)
           </button>
           <button
             onClick={() => setShowLoadDataConfirm(true)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-            title="Load all synthetic and real datasets"
+            className="flex items-center gap-1.5 bg-slate-600 hover:bg-slate-500 text-white px-3 py-2 rounded-lg text-sm transition-colors"
           >
-            <PlusIcon className="h-5 w-5" />
             Load All Data
+          </button>
+          <button
+            onClick={() => setShowClearDataConfirm(true)}
+            className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-600 text-white px-3 py-2 rounded-lg text-sm transition-colors"
+            title="Clear all data"
+          >
+            <TrashIcon className="h-4 w-4" />
+            Clear
           </button>
           <select
             value={refreshInterval}
             onChange={(e) => setRefreshInterval(Number(e.target.value))}
-            className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1"
+            className="bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-2 py-1.5"
           >
-            <option value={5000}>Update every 5s</option>
-            <option value={10000}>Update every 10s</option>
-            <option value={30000}>Update every 30s</option>
-            <option value={60000}>Update every 1m</option>
+            <option value={5000}>5s</option>
+            <option value={10000}>10s</option>
+            <option value={30000}>30s</option>
+            <option value={60000}>1m</option>
           </select>
         </div>
       </div>
@@ -458,144 +456,113 @@ export default function DiseaseTrackingDashboard() {
         </div>
       )}
 
-      {/* Help Banner - Show when no patients exist */}
+      {/* Help - No patients */}
       {!patientsError && patientsSummary && patientsSummary.patients.length === 0 && (
-        <div className="bg-blue-900/30 border-2 border-blue-700 rounded-xl p-5">
-          <div className="flex items-start gap-4">
-            <div className="text-4xl">📊</div>
-            <div className="flex-1">
-              <h3 className="text-lg font-bold text-blue-200 mb-2">No patients in database</h3>
-              <p className="text-slate-300 text-sm mb-3">
-                To get started, load sample data into the system:
-              </p>
-              <div className="space-y-2 text-sm text-slate-300">
-                <div className="flex items-start gap-2">
-                  <span className="text-indigo-400 font-bold mt-0.5">1.</span>
-                  <span>Click <strong className="text-indigo-300">"Load Sample Data (200)"</strong> to load sample patients (183 available in CSV files)</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-purple-400 font-bold mt-0.5">2.</span>
-                  <span>Or click <strong className="text-purple-300">"Load All Data"</strong> to load all available datasets</span>
-                </div>
-              </div>
-              <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
-                <p className="text-amber-200 text-xs">
-                  <strong>💡 Tip:</strong> If you've already loaded data and want to refresh, use <strong>"Clear All Data"</strong> first (red button), then load again.
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className="rounded-lg border border-blue-700/50 bg-blue-900/20 p-4">
+          <p className="text-blue-200 text-sm">
+            <strong>No patients yet.</strong> Click <strong>Load Sample (200)</strong> or <strong>Load All Data</strong> to populate. Use <strong>Clear</strong> before reloading.
+          </p>
         </div>
       )}
 
       {/* Summary Cards */}
       {patientsSummary && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-400">Total Patients</div>
-            <div className="mt-2 text-3xl font-semibold text-white">
-              {patientsSummary.total_patients}
-            </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+            <div className="text-xs text-slate-400">Total</div>
+            <div className="text-2xl font-bold text-white">{patientsSummary.total_patients}</div>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-400">High Risk Alzheimer</div>
-            <div className="mt-2 text-3xl font-semibold text-rose-400">
-              {patientsSummary.high_risk_alzheimer}
-            </div>
+          <div className="rounded-lg border border-rose-800/50 bg-rose-900/20 p-3">
+            <div className="text-xs text-slate-400">High Risk Alzheimer</div>
+            <div className="text-2xl font-bold text-rose-400">{patientsSummary.high_risk_alzheimer}</div>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-400">High Risk Parkinson</div>
-            <div className="mt-2 text-3xl font-semibold text-amber-400">
-              {patientsSummary.high_risk_parkinson}
-            </div>
+          <div className="rounded-lg border border-amber-800/50 bg-amber-900/20 p-3">
+            <div className="text-xs text-slate-400">High Risk Parkinson</div>
+            <div className="text-2xl font-bold text-amber-400">{patientsSummary.high_risk_parkinson}</div>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-400">Low Risk</div>
-            <div className="mt-2 text-3xl font-semibold text-emerald-400">
-              {patientsSummary.low_risk}
-            </div>
+          <div className="rounded-lg border border-emerald-800/50 bg-emerald-900/20 p-3">
+            <div className="text-xs text-slate-400">Low Risk</div>
+            <div className="text-2xl font-bold text-emerald-400">{patientsSummary.low_risk}</div>
           </div>
         </div>
       )}
 
-      {/* Patient Classification (Normal/Alzheimer/Parkinson) */}
+      {/* Patient Classification */}
       {patientClassification && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-            <span>📋</span>
-            Patient Classification
-          </h2>
-          <p className="text-sm text-slate-400 mb-6">
-            Feature ranges for Alzheimer's and Parkinson's
-          </p>
-
-          {/* Classification Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="rounded-xl border border-emerald-800 bg-emerald-900/30 p-4">
-              <div className="text-xs uppercase text-slate-400">Normal</div>
-              <div className="text-2xl font-bold text-emerald-400">{patientClassification.classification_summary.normal}</div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <h2 className="text-lg font-semibold text-white mb-4">Patient Classification</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="rounded-lg border border-emerald-800/50 bg-emerald-900/20 p-3">
+              <div className="text-xs text-slate-400">Normal</div>
+              <div className="text-xl font-bold text-emerald-400">{patientClassification.classification_summary.normal}</div>
             </div>
-            <div className="rounded-xl border border-rose-800 bg-rose-900/30 p-4">
-              <div className="text-xs uppercase text-slate-400">Alzheimer</div>
-              <div className="text-2xl font-bold text-rose-400">{patientClassification.classification_summary.alzheimer}</div>
+            <div className="rounded-lg border border-rose-800/50 bg-rose-900/20 p-3">
+              <div className="text-xs text-slate-400">Alzheimer</div>
+              <div className="text-xl font-bold text-rose-400">{patientClassification.classification_summary.alzheimer}</div>
             </div>
-            <div className="rounded-xl border border-amber-800 bg-amber-900/30 p-4">
-              <div className="text-xs uppercase text-slate-400">Parkinson</div>
-              <div className="text-2xl font-bold text-amber-400">{patientClassification.classification_summary.parkinson}</div>
+            <div className="rounded-lg border border-amber-800/50 bg-amber-900/20 p-3">
+              <div className="text-xs text-slate-400">Parkinson</div>
+              <div className="text-xl font-bold text-amber-400">{patientClassification.classification_summary.parkinson}</div>
             </div>
-            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-              <div className="text-xs uppercase text-slate-400">Unknown</div>
-              <div className="text-2xl font-bold text-slate-400">{patientClassification.classification_summary.unknown}</div>
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+              <div className="text-xs text-slate-400">Unknown</div>
+              <div className="text-xl font-bold text-slate-400">{patientClassification.classification_summary.unknown}</div>
             </div>
           </div>
 
-          {/* Feature Ranges Table */}
-          <div className="mb-6">
-            <h3 className="text-base font-semibold text-white mb-3">Feature Ranges (Health vs Patient)</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-slate-300">
-                <thead>
-                  <tr className="border-b border-slate-700">
-                    <th className="py-2 px-3 font-medium">Feature</th>
-                    <th className="py-2 px-3 font-medium">Normal</th>
-                    <th className="py-2 px-3 font-medium">Alzheimer</th>
-                    <th className="py-2 px-3 font-medium">Parkinson</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {patientClassification.feature_ranges?.cognitive && Object.entries(patientClassification.feature_ranges.cognitive).map(([key, val]: [string, any]) => (
-                    <tr key={key} className="border-b border-slate-800">
-                      <td className="py-2 px-3">{FEATURE_LABELS[key] || key}</td>
-                      <td className="py-2 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
-                      <td className="py-2 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
-                      <td className="py-2 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
+          {/* Collapsible Feature Ranges */}
+          <div className="mb-4">
+            <button
+              onClick={() => setShowFeatureRanges(!showFeatureRanges)}
+              className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1"
+            >
+              {showFeatureRanges ? '▼' : '▶'} Feature Ranges (Normal vs Disease)
+            </button>
+            {showFeatureRanges && (
+              <div className="mt-2 overflow-x-auto rounded-lg border border-slate-700/50">
+                <table className="w-full text-xs text-left text-slate-300">
+                  <thead>
+                    <tr className="border-b border-slate-700 bg-slate-800/50">
+                      <th className="py-2 px-3 font-medium">Feature</th>
+                      <th className="py-2 px-3 font-medium">Normal</th>
+                      <th className="py-2 px-3 font-medium">Alzheimer</th>
+                      <th className="py-2 px-3 font-medium">Parkinson</th>
                     </tr>
-                  ))}
-                  {patientClassification.feature_ranges?.biomarkers && Object.entries(patientClassification.feature_ranges.biomarkers).map(([key, val]: [string, any]) => (
-                    <tr key={key} className="border-b border-slate-800">
-                      <td className="py-2 px-3">{FEATURE_LABELS[key] || key}</td>
-                      <td className="py-2 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
-                      <td className="py-2 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
-                      <td className="py-2 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
-                    </tr>
-                  ))}
-                  {patientClassification.feature_ranges?.mri && Object.entries(patientClassification.feature_ranges.mri).map(([key, val]: [string, any]) => (
-                    <tr key={key} className="border-b border-slate-800">
-                      <td className="py-2 px-3">{FEATURE_LABELS[key] || key}</td>
-                      <td className="py-2 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
-                      <td className="py-2 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
-                      <td className="py-2 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {patientClassification.feature_ranges?.cognitive && Object.entries(patientClassification.feature_ranges.cognitive).map(([key, val]: [string, any]) => (
+                      <tr key={key} className="border-b border-slate-800/50">
+                        <td className="py-1.5 px-3">{FEATURE_LABELS[key] || key}</td>
+                        <td className="py-1.5 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
+                        <td className="py-1.5 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
+                        <td className="py-1.5 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
+                      </tr>
+                    ))}
+                    {patientClassification.feature_ranges?.biomarkers && Object.entries(patientClassification.feature_ranges.biomarkers).map(([key, val]: [string, any]) => (
+                      <tr key={key} className="border-b border-slate-800/50">
+                        <td className="py-1.5 px-3">{FEATURE_LABELS[key] || key}</td>
+                        <td className="py-1.5 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
+                        <td className="py-1.5 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
+                        <td className="py-1.5 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
+                      </tr>
+                    ))}
+                    {patientClassification.feature_ranges?.mri && Object.entries(patientClassification.feature_ranges.mri).map(([key, val]: [string, any]) => (
+                      <tr key={key} className="border-b border-slate-800/50">
+                        <td className="py-1.5 px-3">{FEATURE_LABELS[key] || key}</td>
+                        <td className="py-1.5 px-3 text-emerald-400">{val.normal?.min}-{val.normal?.max}</td>
+                        <td className="py-1.5 px-3 text-rose-400">{val.alzheimer?.min}-{val.alzheimer?.max}</td>
+                        <td className="py-1.5 px-3 text-amber-400">{val.parkinson?.min}-{val.parkinson?.max}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          {/* Patient List with Classification */}
           <div>
-            <h3 className="text-base font-semibold text-white mb-3">Patient List ({patientClassification.total_patients} total)</h3>
-            <div className="overflow-x-auto max-h-80 overflow-y-auto">
+            <h3 className="text-sm font-medium text-slate-300 mb-2">Patients ({patientClassification.total_patients})</h3>
+            <div className="overflow-x-auto max-h-64 overflow-y-auto">
               <table className="w-full text-sm text-left text-slate-300">
                 <thead className="sticky top-0 bg-slate-900 z-10">
                   <tr className="border-b border-slate-700">
@@ -641,46 +608,39 @@ export default function DiseaseTrackingDashboard() {
       )}
 
       {/* Patient Selection */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Select Patient</h2>
-          <div className="flex items-center gap-2">
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <label className="text-sm font-medium text-slate-300 shrink-0">Select Patient</label>
+          <div className="flex-1 flex gap-2">
             <input
               type="text"
-              placeholder="Search patients..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm w-48"
+              className="bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm w-32 sm:w-40"
             />
+            <select
+              value={selectedPatientId || ''}
+              onChange={(e) => setSelectedPatientId(Number(e.target.value))}
+              className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-4 py-2 text-sm"
+            >
+              <option value="">Choose patient...</option>
+              {patientsSummary?.patients
+                .filter((p) => {
+                  if (!searchQuery) return true
+                  const q = searchQuery.toLowerCase()
+                  return p.name.toLowerCase().includes(q) || String(p.patient_id).includes(q)
+                })
+                .map((p) => (
+                  <option key={p.patient_id} value={p.patient_id}>
+                    {p.name} — A:{(p.alzheimer_risk * 100).toFixed(0)}% P:{(p.parkinson_risk * 100).toFixed(0)}%
+                  </option>
+                ))}
+            </select>
           </div>
         </div>
-        {patientsSummary && patientsSummary.patients.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <p>No patients found. Click "Add Patient" to create a new patient.</p>
-          </div>
-        ) : (
-          <select
-            value={selectedPatientId || ''}
-            onChange={(e) => setSelectedPatientId(Number(e.target.value))}
-            className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2"
-          >
-            <option value="">Select a patient...</option>
-            {patientsSummary?.patients
-              .filter((patient) => {
-                if (!searchQuery) return true
-                const query = searchQuery.toLowerCase()
-                return (
-                  patient.name.toLowerCase().includes(query) ||
-                  patient.patient_id.toString().includes(query)
-                )
-              })
-              .map((patient) => (
-                <option key={patient.patient_id} value={patient.patient_id}>
-                  {patient.name} - Alzheimer: {(patient.alzheimer_risk * 100).toFixed(1)}%, Parkinson:{' '}
-                  {(patient.parkinson_risk * 100).toFixed(1)}%
-                </option>
-              ))}
-          </select>
+        {patientsSummary && patientsSummary.patients.length === 0 && (
+          <p className="text-slate-400 text-sm mt-2">No patients. Add one or load sample data.</p>
         )}
       </div>
 

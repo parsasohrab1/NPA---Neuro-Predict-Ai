@@ -1,5 +1,5 @@
 """
-User Model
+User Model with relationships
 """
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
 from sqlalchemy.orm import relationship
@@ -49,6 +49,12 @@ class User(Base):
         foreign_keys="Prediction.created_by",
     )
     audit_logs = relationship("AuditLog", back_populates="user")
+    sessions = relationship("UserSession", back_populates="user")
+    mfa_secret = relationship("MFASecret", back_populates="user", uselist=False)
+    ip_whitelist = relationship("IPWhitelist", back_populates="user")
+    password_history = relationship("PasswordHistory", back_populates="user")
+    security_logs = relationship("SecurityLog", back_populates="user")
+    failed_login_attempts = relationship("FailedLoginAttempt", back_populates="user")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

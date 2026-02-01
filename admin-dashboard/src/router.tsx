@@ -1,5 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 
+const routerFuture = { v7_startTransition: true } as const
+
 import AdminLayout from './layouts/AdminLayout'
 import SystemOverview from './pages/SystemOverview'
 import UsersManagement from './pages/UsersManagement'
@@ -15,7 +17,8 @@ import Analysis3DPage from './pages/Analysis3DPage'
 import DataFusionReportsPage from './pages/DataFusionReportsPage'
 import TestPage from './pages/TestPage'
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
   {
     path: '/',
     element: <AdminLayout />,
@@ -35,6 +38,8 @@ export const router = createBrowserRouter([
       { path: 'test', element: <TestPage /> },
     ],
   },
-])
+],
+  { future: routerFuture }
+)
 
 

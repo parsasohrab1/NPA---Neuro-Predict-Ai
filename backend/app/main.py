@@ -12,7 +12,7 @@ from pathlib import Path
 from .core.config import settings
 from .db.session import init_db, close_db
 from .core.cache import cache_service
-from .api import auth, patients, predictions, reports, models, analytics, users, mock_data, monitoring, websocket, optimization, disease_tracking, data_monitoring
+from .api import auth, patients, predictions, reports, models, model_metrics, analytics, users, mock_data, monitoring, websocket, optimization, disease_tracking, data_monitoring, admin
 
 # Optional integration routers (FHIR etc. may require extra deps / Pydantic compatibility)
 _integration = None
@@ -164,11 +164,12 @@ def _cors_headers(request: Request) -> dict:
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler"""
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
     headers = _cors_headers(request)
+    detail = str(exc) if settings.DEBUG else "Internal server error occurred"
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error occurred"},
+        content={"detail": detail},
         headers=headers,
     )
 
@@ -265,6 +266,7 @@ app.include_router(patients.router, prefix=settings.API_V1_PREFIX)
 app.include_router(predictions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(models.router, prefix=settings.API_V1_PREFIX)
+app.include_router(model_metrics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(monitoring.router, prefix=settings.API_V1_PREFIX)
@@ -273,6 +275,7 @@ app.include_router(mock_data.router, prefix=settings.API_V1_PREFIX)  # Mock data
 app.include_router(optimization.router, prefix=settings.API_V1_PREFIX)
 app.include_router(disease_tracking.router, prefix=settings.API_V1_PREFIX)
 app.include_router(data_monitoring.router, prefix=settings.API_V1_PREFIX)
+app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 
 # Integration routers (optional)
 if _integration:

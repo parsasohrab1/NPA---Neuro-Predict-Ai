@@ -116,7 +116,7 @@ const monitoringApi = {
     return response.data
   },
 
-  // Admin overview (combined data)
+  // Admin overview (combined data) - uses /admin/system/overview
   async getOverview(): Promise<{
     health: HealthStatus
     metrics: SystemMetrics

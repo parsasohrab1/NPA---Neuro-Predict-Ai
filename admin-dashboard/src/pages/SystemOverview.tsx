@@ -42,25 +42,27 @@ export default function SystemOverview() {
       try {
         const response = await monitoringApi.getOverview()
         return response
-      } catch (err) {
+      } catch {
         // Fallback to individual endpoints if overview fails
         const [health, metrics, kpis] = await Promise.all([
           monitoringApi.getHealth().catch(() => null),
           monitoringApi.getMetrics().catch(() => null),
           monitoringApi.getKPIs().catch(() => null),
         ])
-        return { health, metrics, kpis }
+        return { health, metrics, kpis, counts: { users: 0, patients: 0, predictions: 0 }, recent_alerts: [] }
       }
     },
     refetchInterval: refreshInterval,
     refetchOnWindowFocus: true,
+    retry: 2,
   })
 
   // Fetch health status separately for more frequent updates
   const { data: health } = useQuery({
     queryKey: ['system-health'],
     queryFn: () => monitoringApi.getHealth(),
-    refetchInterval: 3000, // Every 3 seconds
+    refetchInterval: 3000,
+    retry: 1,
   })
 
   // Fetch metrics separately
@@ -68,6 +70,7 @@ export default function SystemOverview() {
     queryKey: ['system-metrics'],
     queryFn: () => monitoringApi.getMetrics(),
     refetchInterval: refreshInterval,
+    retry: 1,
   })
 
   // Fetch KPIs
@@ -75,6 +78,7 @@ export default function SystemOverview() {
     queryKey: ['system-kpis'],
     queryFn: () => monitoringApi.getKPIs(),
     refetchInterval: refreshInterval,
+    retry: 1,
   })
 
   // Fetch Activity Feed
@@ -82,14 +86,15 @@ export default function SystemOverview() {
     queryKey: ['activity-feed'],
     queryFn: () => monitoringApi.getActivityFeed(20),
     refetchInterval: refreshInterval,
+    retry: 1,
   })
 
   // Fetch Model Metrics
   const { data: modelMetrics } = useQuery({
     queryKey: ['model-metrics'],
     queryFn: () => monitoringApi.getModelSummary(),
-    refetchInterval: refreshInterval * 2, // Refresh less frequently
-    retry: 2,
+    refetchInterval: refreshInterval * 2,
+    retry: 1,
   })
 
   // Update trend data with real metrics

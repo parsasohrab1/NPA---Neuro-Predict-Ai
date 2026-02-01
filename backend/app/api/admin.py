@@ -37,8 +37,14 @@ async def get_system_overview(
     - Basic counts: users, patients, predictions
     - Recent alerts (security logs errors/warnings)
     """
-    health = await MonitoringService.get_health_status(db)
-    metrics = await MonitoringService.get_metrics(db)
+    try:
+        health = await MonitoringService.get_health_status(db)
+    except Exception:
+        health = {"status": "unknown", "services": {}, "timestamp": datetime.utcnow().isoformat()}
+    try:
+        metrics = await MonitoringService.get_metrics(db)
+    except Exception:
+        metrics = {"metrics": {}, "timestamp": datetime.utcnow().isoformat()}
 
     counts: Dict[str, int] = {"users": 0, "patients": 0, "predictions": 0}
     try:
@@ -97,64 +103,40 @@ async def get_activity_feed(
     Get recent activity feed combining audit logs and system events
     """
     activities: List[Dict[str, Any]] = []
-    
-    # Get recent audit logs
     try:
-        result = await db.execute(
-            select(AuditLog)
-            .order_by(AuditLog.timestamp.desc())
-            .limit(limit)
-        )
-        logs = result.scalars().all()
-        for log in logs:
-            activities.append({
-                "id": f"audit_{log.id}",
-                "type": "info",
-                "message": f"{log.action} - {log.resource_type}",
-                "timestamp": log.timestamp.isoformat(),
-                "details": {
-                    "action": log.action,
-                    "resource_type": log.resource_type,
-                    "user_id": log.user_id,
-                }
-            })
+        try:
+            result = await db.execute(
+                select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(limit)
+            )
+            for log in result.scalars().all():
+                activities.append({
+                    "id": f"audit_{log.id}",
+                    "type": "info",
+                    "message": f"{log.action} - {log.resource_type}",
+                    "timestamp": log.timestamp.isoformat(),
+                    "details": {"action": log.action, "resource_type": log.resource_type, "user_id": log.user_id},
+                })
+        except Exception:
+            pass
+        try:
+            result = await db.execute(
+                select(SecurityLog).order_by(SecurityLog.timestamp.desc()).limit(10)
+            )
+            for log in result.scalars().all():
+                activity_type = "error" if log.severity in ("error", "critical") else "warning" if log.severity == "warning" else "success" if log.success else "info"
+                activities.append({
+                    "id": f"security_{log.id}",
+                    "type": activity_type,
+                    "message": f"{log.event_type}: {log.description}",
+                    "timestamp": log.timestamp.isoformat(),
+                    "details": {"event_type": log.event_type, "severity": log.severity, "success": log.success},
+                })
+        except Exception:
+            pass
+        activities.sort(key=lambda x: x["timestamp"], reverse=True)
+        return activities[:limit]
     except Exception:
-        pass
-    
-    # Get recent security events
-    try:
-        result = await db.execute(
-            select(SecurityLog)
-            .order_by(SecurityLog.timestamp.desc())
-            .limit(10)
-        )
-        logs = result.scalars().all()
-        for log in logs:
-            activity_type = "info"
-            if log.severity == "error" or log.severity == "critical":
-                activity_type = "error"
-            elif log.severity == "warning":
-                activity_type = "warning"
-            elif log.success:
-                activity_type = "success"
-            
-            activities.append({
-                "id": f"security_{log.id}",
-                "type": activity_type,
-                "message": f"{log.event_type}: {log.description}",
-                "timestamp": log.timestamp.isoformat(),
-                "details": {
-                    "event_type": log.event_type,
-                    "severity": log.severity,
-                    "success": log.success,
-                }
-            })
-    except Exception:
-        pass
-    
-    # Sort by timestamp and return most recent
-    activities.sort(key=lambda x: x["timestamp"], reverse=True)
-    return activities[:limit]
+        return []
 
 
 # -------- Users & Roles --------

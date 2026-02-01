@@ -167,11 +167,30 @@ const diseaseTrackingApi = {
       name: string
       alzheimer_risk: number
       parkinson_risk: number
-      last_prediction_date: string
+      last_prediction_date?: string | null
     }>
   }> {
-    const response = await axios.get('/api/v1/disease-tracking/all-patients/summary')
-    return response.data
+    const empty = {
+      total_patients: 0,
+      high_risk_alzheimer: 0,
+      high_risk_parkinson: 0,
+      medium_risk_alzheimer: 0,
+      medium_risk_parkinson: 0,
+      low_risk: 0,
+      patients: [] as Array<{
+        patient_id: number
+        name: string
+        alzheimer_risk: number
+        parkinson_risk: number
+        last_prediction_date?: string | null
+      }>,
+    }
+    try {
+      const response = await axios.get('/api/v1/disease-tracking/all-patients/summary')
+      return response.data ?? empty
+    } catch {
+      return empty
+    }
   },
 
   async createPatient(patientData: {

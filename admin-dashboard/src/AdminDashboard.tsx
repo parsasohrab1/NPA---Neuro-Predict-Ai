@@ -20,134 +20,146 @@ const queryClient = new QueryClient({
   },
 });
 
-type TabType = 'display' | 'gauge' | 'realtime' | 'checklist' | 'alarm' | 'control' | 'graph' | '3d' | 'reporting' | 'clinical' | 'ai_ml' | 'disease' | 'disease_ranges' | 'probability' | 'multimodal' | 'data' | 'databases' | 'system' | 'security';
+type TabType =
+  | 'gauge'
+  | 'disease'
+  | 'disease_ranges'
+  | 'probability'
+  | 'ai_ml'
+  | 'clinical'
+  | 'data'
+  | 'multimodal'
+  | 'system'
+  | 'security'
+  | 'alarm'
+  | 'graph'
+  | '3d'
+  | 'reporting'
+  | 'checklist'
+  | 'control'
+  | 'databases';
 
-const DISPLAY_SUBTABS: { id: 'gauge' | 'realtime' | 'disease'; name: string }[] = [
-  { id: 'gauge', name: 'Gauge' },
-  { id: 'realtime', name: 'SENSOR' },
-  { id: 'disease', name: 'REAL_TIME_M' },
+const NAV_ITEMS: { id: TabType; label: string; group: string }[] = [
+  { id: 'gauge', label: 'Overview', group: 'Main' },
+  { id: 'disease', label: 'Disease Tracking', group: 'Main' },
+  { id: 'disease_ranges', label: 'Risk Ranges', group: 'Disease' },
+  { id: 'probability', label: 'Probability', group: 'Disease' },
+  { id: 'data', label: 'Data', group: 'Data' },
+  { id: 'multimodal', label: 'Multimodal', group: 'Data' },
+  { id: 'system', label: 'System', group: 'System' },
+  { id: 'ai_ml', label: 'AI/ML', group: 'System' },
+  { id: 'clinical', label: 'Clinical', group: 'System' },
+  { id: 'security', label: 'Security', group: 'System' },
 ];
 
+const TAB_LABELS: Record<TabType, string> = {
+  gauge: 'Overview',
+  disease: 'Disease Tracking',
+  disease_ranges: 'Risk Ranges',
+  probability: 'Disease Probability',
+  ai_ml: 'AI/ML Health',
+  clinical: 'Clinical Monitoring',
+  data: 'Data',
+  multimodal: 'Multimodal Analysis',
+  system: 'System Health',
+  security: 'Security',
+  alarm: 'Alarm Systems',
+  graph: 'Graph Analysis',
+  '3d': '3D Analysis',
+  reporting: 'Reporting',
+  checklist: 'Check List',
+  control: 'Control',
+  databases: 'Databases',
+};
+
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<TabType>('display');
-  const [displaySubTab, setDisplaySubTab] = useState<'gauge' | 'realtime' | 'disease'>('gauge');
+  const [activeTab, setActiveTab] = useState<TabType>('gauge');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const groups = Array.from(new Set(NAV_ITEMS.map((i) => i.group)));
+  const renderContent = () => {
+    if (activeTab === 'gauge') return <GaugeDisplayTab />;
+    if (activeTab === 'disease') return <DiseaseTrackingDashboard />;
+    if (activeTab === 'disease_ranges') return <DiseaseRanges />;
+    if (activeTab === 'ai_ml') return <AIMLHealth />;
+    if (activeTab === 'clinical') return <ClinicalMonitoring />;
+    if (activeTab === 'data' || activeTab === 'databases') return <DataTab />;
+    if (activeTab === 'multimodal') return <MultimodalAnalysis />;
+    if (activeTab === 'probability') return <DiseaseProbability />;
+    if (activeTab === 'system') return <SystemHealth />;
+    if (activeTab === 'security') return <SecurityMonitoring />;
+    if (['alarm', 'checklist', 'control'].includes(activeTab)) return <ClinicalMonitoring />;
+    if (activeTab === 'graph') return <MultimodalAnalysis />;
+    if (activeTab === '3d') return <DataTab />;
+    if (activeTab === 'reporting') return <DiseaseProbability />;
+    return <GaugeDisplayTab />;
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-black flex text-white">
-        {/* Left Sidebar - Green panel (turbine style) */}
+      <div className="min-h-screen bg-slate-950 flex">
+        {/* Sidebar */}
         <aside
           className={`
-          flex flex-col bg-lime-500/90 border-r border-lime-400/50
-          transition-all duration-300 ease-out shrink-0
-          ${sidebarOpen ? 'w-52' : 'w-16'}
-        `}
+            flex flex-col bg-slate-900 border-r border-slate-700/80 shrink-0
+            transition-all duration-300
+            ${sidebarOpen ? 'w-56' : 'w-14'}
+          `}
         >
-          <div className="p-3 border-b border-lime-400/50 shrink-0">
-            <div className="font-bold text-lime-900 text-sm">NEUROPREDICT</div>
-            <div className="text-xs text-lime-800 font-medium">Monitoring</div>
+          <div className="h-14 flex items-center px-4 border-b border-slate-700/80 shrink-0">
+            <div className="font-semibold text-slate-100 text-base truncate">
+              {sidebarOpen ? 'NeuroPredict' : 'NP'}
+            </div>
           </div>
-          <nav className="flex-1 py-2 overflow-y-auto">
-            {sidebarOpen && (
-              <>
-                <div className="px-3 py-1 text-[10px] uppercase text-lime-800 font-semibold">Display</div>
-                {DISPLAY_SUBTABS.map((st) => (
-                  <button
-                    key={st.id}
-                    onClick={() => { setActiveTab(st.id); setDisplaySubTab(st.id); }}
-                    className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${
-                      displaySubTab === st.id ? 'bg-lime-600 text-white' : 'text-lime-900 hover:bg-lime-400'
-                    }`}
-                  >
-                    {st.name}
-                  </button>
-                ))}
-                <div className="px-3 py-1 text-[10px] uppercase text-lime-800 font-semibold mt-2">Modules</div>
-                {[
-                  { id: 'checklist', name: 'Check List' },
-                  { id: 'alarm', name: 'Alarm Systems' },
-                  { id: 'control', name: 'Control' },
-                  { id: 'graph', name: 'Graph_Analysis' },
-                  { id: '3d', name: '3D_Analysis_OP' },
-                  { id: 'reporting', name: 'Reporting' },
-                  { id: 'clinical', name: 'Connection' },
-                  { id: 'data', name: 'Data Loggers' },
-                  { id: 'databases', name: 'Databases' },
-                  { id: 'ai_ml', name: 'AI/ML Health' },
-                  { id: 'disease_ranges', name: 'Disease Tracking' },
-                  { id: 'probability', name: 'Disease Probability' },
-                  { id: 'multimodal', name: 'Multimodal' },
-                  { id: 'system', name: 'System' },
-                  { id: 'security', name: 'Security' },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as TabType)}
-                    className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${
-                      activeTab === tab.id ? 'bg-slate-800 text-white border-l-2 border-slate-500' : 'text-lime-900 hover:bg-lime-400'
-                    }`}
-                  >
-                    {tab.name}
-                  </button>
-                ))}
-              </>
-            )}
+          <nav className="flex-1 py-4 overflow-y-auto">
+            {sidebarOpen &&
+              groups.map((group) => (
+                <div key={group} className="mb-4">
+                  <div className="px-4 py-1.5 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    {group}
+                  </div>
+                  {NAV_ITEMS.filter((i) => i.group === group).map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`
+                        w-full text-left px-4 py-2.5 text-sm font-medium transition-colors
+                        ${activeTab === item.id
+                          ? 'bg-emerald-600/20 text-emerald-400 border-l-2 border-emerald-500'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100 border-l-2 border-transparent'}
+                      `}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
           </nav>
           {sidebarOpen && (
-            <div className="p-2 border-t border-lime-400/50 text-[10px] text-lime-800">
-              Admin Dashboard v1
+            <div className="p-3 border-t border-slate-700/80 text-xs text-slate-500">
+              Admin v1
             </div>
           )}
         </aside>
 
-        {/* Main Content - Dark background */}
-        <main className="flex-1 flex flex-col min-w-0 bg-black">
-          <header className="h-12 shrink-0 flex items-center justify-between px-4 border-b border-slate-800 bg-slate-900/50">
-            <h1 className="text-sm font-semibold text-slate-200">
-              {(activeTab === 'gauge' || activeTab === 'realtime' || (activeTab === 'display' && ['gauge','realtime'].includes(displaySubTab))) && 'Gauge / SENSOR Display'}
-              {(activeTab === 'disease' || displaySubTab === 'disease') && 'Disease Tracking — REAL_TIME_M'}
-              {activeTab === 'disease_ranges' && 'Disease Tracking'}
-              {activeTab === 'ai_ml' && 'AI/ML Health'}
-              {activeTab === 'clinical' && 'Connection'}
-              {(activeTab === 'data' || activeTab === 'databases') && 'Data Loggers / Databases'}
-              {activeTab === 'probability' && 'Disease Probability'}
-              {activeTab === 'multimodal' && 'Multimodal Analysis'}
-              {activeTab === 'system' && 'System'}
-              {activeTab === 'security' && 'Security'}
-              {activeTab === 'alarm' && 'Alarm Systems'}
-              {activeTab === 'graph' && 'Graph Analysis'}
-              {activeTab === '3d' && '3D Analysis'}
-              {activeTab === 'reporting' && 'Reporting'}
-              {activeTab === 'checklist' && 'Check List'}
-              {activeTab === 'control' && 'Control'}
+        {/* Main */}
+        <main className="flex-1 flex flex-col min-w-0">
+          <header className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-slate-700/80 bg-slate-900/30">
+            <h1 className="text-lg font-semibold text-slate-100">
+              {TAB_LABELS[activeTab] || 'Overview'}
             </h1>
             <button
               type="button"
               onClick={() => setSidebarOpen((o) => !o)}
-              className="p-1.5 rounded text-slate-400 hover:bg-slate-700 hover:text-white"
+              className="p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
               aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
             >
               {sidebarOpen ? '◀' : '▶'}
             </button>
           </header>
 
-          <div className="flex-1 p-4 lg:p-6 overflow-auto">
-            {(activeTab === 'display' || activeTab === 'gauge' || displaySubTab === 'gauge') && <GaugeDisplayTab />}
-            {(activeTab === 'realtime' || displaySubTab === 'realtime') && <GaugeDisplayTab />}
-            {(activeTab === 'disease' || displaySubTab === 'disease') && <DiseaseTrackingDashboard />}
-            {activeTab === 'disease_ranges' && <DiseaseRanges />}
-            {activeTab === 'ai_ml' && <AIMLHealth />}
-            {activeTab === 'clinical' && <ClinicalMonitoring />}
-            {(activeTab === 'data' || activeTab === 'databases') && <DataTab />}
-            {activeTab === 'multimodal' && <MultimodalAnalysis />}
-            {activeTab === 'probability' && <DiseaseProbability />}
-            {activeTab === 'system' && <SystemHealth />}
-            {activeTab === 'security' && <SecurityMonitoring />}
-            {(activeTab === 'alarm' || activeTab === 'checklist' || activeTab === 'control') && <ClinicalMonitoring />}
-            {activeTab === 'graph' && <MultimodalAnalysis />}
-            {activeTab === '3d' && <DataTab />}
-            {activeTab === 'reporting' && <DiseaseProbability />}
+          <div className="flex-1 p-6 overflow-auto">
+            {renderContent()}
           </div>
         </main>
       </div>

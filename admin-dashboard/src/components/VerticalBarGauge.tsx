@@ -1,5 +1,3 @@
-import React from 'react'
-
 interface VerticalBarGaugeProps {
   label: string
   value: number
@@ -25,15 +23,15 @@ export default function VerticalBarGauge({
   }
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="h-24 w-8 border border-slate-600 rounded bg-slate-900 flex flex-col justify-end overflow-hidden">
+    <div className="flex flex-col items-center min-w-[56px]">
+      <div className="h-28 w-10 border border-slate-600 rounded-lg bg-slate-900 flex flex-col justify-end overflow-hidden">
         <div
-          className={`w-full transition-all duration-300 ${statusColors[status]}`}
-          style={{ height: `${percent}%` }}
+          className={`w-full min-h-[4px] transition-all duration-300 ${statusColors[status]}`}
+          style={{ height: `${Math.max(percent, 2)}%` }}
         />
       </div>
-      <span className="text-[10px] text-slate-300 mt-1 text-center leading-tight">{label}</span>
-      <span className="text-xs font-mono text-white">{value.toFixed(1)}</span>
+      <span className="text-xs font-medium text-slate-300 mt-2 text-center leading-tight">{label}</span>
+      <span className="text-sm font-mono text-slate-100 mt-1">{value.toFixed(1)}</span>
     </div>
   )
 }

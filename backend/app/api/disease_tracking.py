@@ -1,9 +1,13 @@
 """
 Disease Tracking API - Real-time feature monitoring for Alzheimer's and Parkinson's
 """
+import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+logger = logging.getLogger(__name__)
+
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -740,6 +744,17 @@ async def get_patient_classification(
     }
 
 
+EMPTY_SUMMARY = {
+    "total_patients": 0,
+    "high_risk_alzheimer": 0,
+    "high_risk_parkinson": 0,
+    "medium_risk_alzheimer": 0,
+    "medium_risk_parkinson": 0,
+    "low_risk": 0,
+    "patients": [],
+}
+
+
 @router.get("/all-patients/summary")
 async def get_all_patients_summary(
     db: AsyncSession = Depends(get_db),
@@ -749,11 +764,13 @@ async def get_all_patients_summary(
     Get summary of all patients with their risk levels and alerts
     Returns all patients, even if they don't have predictions yet
     """
-    # Get all patients
-    result = await db.execute(select(Patient))
-    all_patients = result.scalars().all()
-    
-    # Get latest prediction for each patient
+    try:
+        result = await db.execute(select(Patient))
+        all_patients = list(result.scalars().unique().all())
+    except Exception as e:
+        logger.exception("get_all_patients_summary select Patient failed: %s", e)
+        return EMPTY_SUMMARY
+
     summary = {
         "total_patients": len(all_patients),
         "high_risk_alzheimer": 0,
@@ -765,43 +782,61 @@ async def get_all_patients_summary(
     }
 
     for patient in all_patients:
-        # Get latest prediction for this patient
-        result = await db.execute(
-            select(Prediction)
-            .where(Prediction.patient_id == patient.id)
-            .order_by(Prediction.created_at.desc())
-            .limit(1)
-        )
-        latest_prediction = result.scalar_one_or_none()
-        
-        alz_risk = latest_prediction.alzheimer_risk_score if latest_prediction else 0.0
-        park_risk = latest_prediction.parkinson_risk_score if latest_prediction else 0.0
-        
-        # Count risk levels
-        if alz_risk > 0.66 or park_risk > 0.66:
-            if alz_risk > 0.66:
-                summary["high_risk_alzheimer"] += 1
-            if park_risk > 0.66:
-                summary["high_risk_parkinson"] += 1
-        elif alz_risk > 0.33 or park_risk > 0.33:
-            if alz_risk > 0.33:
-                summary["medium_risk_alzheimer"] += 1
-            if park_risk > 0.33:
-                summary["medium_risk_parkinson"] += 1
-        else:
-            summary["low_risk"] += 1
-        
-        alz_level = "high" if alz_risk >= 0.66 else "medium" if alz_risk >= 0.33 else "low"
-        park_level = "high" if park_risk >= 0.66 else "medium" if park_risk >= 0.33 else "low"
-        summary["patients"].append({
-            "patient_id": patient.id,
-            "name": f"{patient.first_name} {patient.last_name}",
-            "alzheimer_risk": round(alz_risk, 3),
-            "parkinson_risk": round(park_risk, 3),
-            "alzheimer_level": alz_level,
-            "parkinson_level": park_level,
-            "last_prediction_date": latest_prediction.created_at.isoformat() if latest_prediction else None,
-        })
+        try:
+            result = await db.execute(
+                select(
+                    Prediction.alzheimer_risk_score,
+                    Prediction.parkinson_risk_score,
+                    Prediction.created_at,
+                )
+                .where(Prediction.patient_id == patient.id)
+                .order_by(Prediction.created_at.desc())
+                .limit(1)
+            )
+            latest_prediction = result.scalar_one_or_none()
+
+            alz_risk = 0.0
+            park_risk = 0.0
+            if latest_prediction:
+                alz = latest_prediction.alzheimer_risk_score
+                park = latest_prediction.parkinson_risk_score
+                alz_risk = float(alz) if alz is not None else 0.0
+                park_risk = float(park) if park is not None else 0.0
+
+            if alz_risk > 0.66 or park_risk > 0.66:
+                if alz_risk > 0.66:
+                    summary["high_risk_alzheimer"] += 1
+                if park_risk > 0.66:
+                    summary["high_risk_parkinson"] += 1
+            elif alz_risk > 0.33 or park_risk > 0.33:
+                if alz_risk > 0.33:
+                    summary["medium_risk_alzheimer"] += 1
+                if park_risk > 0.33:
+                    summary["medium_risk_parkinson"] += 1
+            else:
+                summary["low_risk"] += 1
+
+            alz_level = "high" if alz_risk >= 0.66 else "medium" if alz_risk >= 0.33 else "low"
+            park_level = "high" if park_risk >= 0.66 else "medium" if park_risk >= 0.33 else "low"
+            first = str(patient.first_name) if patient.first_name is not None else ""
+            last = str(patient.last_name) if patient.last_name is not None else ""
+            patient_name = f"{first} {last}".strip() or f"Patient #{patient.id}"
+            last_date = None
+            if latest_prediction and latest_prediction.created_at is not None:
+                last_date = latest_prediction.created_at.isoformat()
+
+            summary["patients"].append({
+                "patient_id": patient.id,
+                "name": patient_name,
+                "alzheimer_risk": round(alz_risk, 3),
+                "parkinson_risk": round(park_risk, 3),
+                "alzheimer_level": alz_level,
+                "parkinson_level": park_level,
+                "last_prediction_date": last_date,
+            })
+        except Exception as e:
+            logger.warning("get_all_patients_summary skip patient %s: %s", patient.id, e)
+            continue
 
     return summary
 

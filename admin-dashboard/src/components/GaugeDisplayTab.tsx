@@ -1,14 +1,89 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import diseaseTrackingApi from '../services/diseaseTracking'
-import CircularGauge from './CircularGauge'
-import VerticalBarGauge from './VerticalBarGauge'
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  HeartIcon,
+  BeakerIcon,
+  CpuChipIcon,
+  UserCircleIcon,
+} from '@heroicons/react/24/outline'
+
+function MetricCard({
+  label,
+  value,
+  unit,
+  status,
+  subtitle,
+}: {
+  label: string
+  value: number | string
+  unit?: string
+  status?: 'normal' | 'warning' | 'critical'
+  subtitle?: string
+}) {
+  const statusBg =
+    status === 'critical'
+      ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+      : status === 'warning'
+      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+      : 'bg-slate-800/50 border-slate-700/50 text-slate-200'
+
+  return (
+    <div
+      className={`rounded-lg border p-3 ${statusBg}`}
+      title={subtitle}
+    >
+      <div className="text-xs text-slate-400 truncate">{label}</div>
+      <div className="text-lg font-semibold mt-0.5">
+        {typeof value === 'number' ? value.toFixed(1) : value}
+        {unit && <span className="text-sm font-normal text-slate-400 ml-1">{unit}</span>}
+      </div>
+    </div>
+  )
+}
+
+function CollapsibleSection({
+  title,
+  icon: Icon,
+  open: defaultOpen,
+  children,
+}: {
+  title: string
+  icon: React.ComponentType<{ className?: string }>
+  open?: boolean
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false)
+
+  return (
+    <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-800/40 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-slate-400" />
+          <span className="font-medium text-slate-200">{title}</span>
+        </div>
+        {open ? (
+          <ChevronDownIcon className="h-5 w-5 text-slate-400" />
+        ) : (
+          <ChevronRightIcon className="h-5 w-5 text-slate-400" />
+        )}
+      </button>
+      {open && <div className="px-4 pb-4 pt-1 border-t border-slate-700/40">{children}</div>}
+    </div>
+  )
+}
 
 export default function GaugeDisplayTab() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('')
-  const { data: summary } = useQuery({
+  const { data: summary, isError, error } = useQuery({
     queryKey: ['patients-summary'],
     queryFn: () => diseaseTrackingApi.getAllPatientsSummary(),
+    retry: 1,
   })
 
   const patients = summary?.patients || []
@@ -22,12 +97,8 @@ export default function GaugeDisplayTab() {
   const samplePatient = selectedPatientId
     ? patients.find((p: any) => String(p.patient_id) === selectedPatientId) || patients[0]
     : patients[0]
-  const latestPred = samplePatient
-    ? {
-        alzheimer_risk: (samplePatient.alzheimer_risk ?? 0) * 100,
-        parkinson_risk: (samplePatient.parkinson_risk ?? 0) * 100,
-      }
-    : null
+  const alzRisk = (samplePatient?.alzheimer_risk ?? 0) * 100
+  const parkRisk = (samplePatient?.parkinson_risk ?? 0) * 100
 
   const lv = features?.latest_values || {}
   const getStatus = (val: number, low: number, high: number): 'normal' | 'warning' | 'critical' => {
@@ -36,99 +107,169 @@ export default function GaugeDisplayTab() {
     return 'normal'
   }
 
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-6 max-w-xl">
+        <p className="font-semibold text-amber-200">API Error</p>
+        <p className="text-sm text-slate-300 mt-2">
+          {(error as Error)?.message || 'Check backend (port 8001)'}
+        </p>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Parameter selection (turbine-style) */}
-      <div className="flex gap-4 mb-4 items-center">
-        <div>
-          <label className="text-xs text-slate-400 block mb-1">Patient</label>
-          <select
-            value={selectedPatientId}
-            onChange={(e) => setSelectedPatientId(e.target.value)}
-            className="bg-slate-800 border border-slate-600 text-white text-sm px-3 py-1.5 rounded focus:ring-1 focus:ring-lime-500"
+    <div className="max-w-4xl space-y-5">
+      {/* Patient selector */}
+      <div className="flex items-center gap-3">
+        <UserCircleIcon className="h-5 w-5 text-slate-500" />
+        <select
+          value={selectedPatientId}
+          onChange={(e) => setSelectedPatientId(e.target.value)}
+          className="bg-slate-800 border border-slate-600 text-slate-100 text-sm px-3 py-2 rounded-lg w-64 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+        >
+          <option value="">
+            {patients.length === 0 ? 'No patients' : 'Select patient'}
+          </option>
+          {patients.slice(0, 50).map((p: any) => (
+            <option key={p.patient_id} value={p.patient_id}>
+              {p.name || `Patient #${p.patient_id}`}
+            </option>
+          ))}
+        </select>
+        {patients.length === 0 && (
+          <span className="text-sm text-slate-500">Load sample data to get started</span>
+        )}
+      </div>
+
+      {/* Primary metrics - Risk levels (always visible) */}
+      <div>
+        <h2 className="text-sm font-medium text-slate-400 mb-3">Risk Level</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div
+            className={`rounded-xl border-2 p-5 ${
+              alzRisk > 66
+                ? 'border-rose-500/60 bg-rose-500/10'
+                : alzRisk > 33
+                ? 'border-amber-500/50 bg-amber-500/10'
+                : 'border-emerald-500/40 bg-emerald-500/10'
+            }`}
           >
-            <option value="">All (Sample)</option>
-            {patients.slice(0, 20).map((p: any) => (
-              <option key={p.patient_id} value={p.patient_id}>{p.name || `#${p.patient_id}`}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      {/* Vital Signs — Turbine-style column layout */}
-      <div>
-        <h3 className="text-slate-300 text-xs font-semibold uppercase mb-3">Vital Signs (°C / bpm / mmHg)</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-          <CircularGauge label="Am Temp" value={lv.temperature ?? 37} min={35} max={40} unit="°C" status={getStatus(lv.temperature ?? 37, 36, 37.5)} />
-          <CircularGauge label="In Temp" value={36.5} min={35} max={40} unit="°C" status="normal" />
-          <CircularGauge label="Out Temp" value={36.8} min={35} max={40} unit="°C" status="normal" />
-          <CircularGauge label="Heart Rate" value={lv.heart_rate ?? 72} min={50} max={120} unit="bpm" status={getStatus(lv.heart_rate ?? 72, 60, 100)} />
-          <CircularGauge label="BP Systolic" value={lv.blood_pressure_systolic ?? 120} min={80} max={180} unit="mmHg" status={getStatus(lv.blood_pressure_systolic ?? 120, 90, 140)} />
-          <CircularGauge label="BP Diastolic" value={lv.blood_pressure_diastolic ?? 80} min={50} max={120} unit="mmHg" status={getStatus(lv.blood_pressure_diastolic ?? 80, 60, 90)} />
-        </div>
-      </div>
-
-      {/* Biomarkers — pg/mL / ng/mL */}
-      <div>
-        <h3 className="text-slate-300 text-xs font-semibold uppercase mb-3">Biomarkers (pg/mL / ng/mL)</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <CircularGauge label="Amyloid-Beta" value={lv.amyloid_beta ?? 600} min={100} max={1000} unit="pg/mL" status={getStatus(lv.amyloid_beta ?? 600, 400, 1000)} />
-          <CircularGauge label="Tau Protein" value={lv.tau_protein ?? 200} min={40} max={900} unit="pg/mL" status={getStatus(lv.tau_protein ?? 200, 40, 360)} />
-          <CircularGauge label="Dopamine" value={lv.dopamine_level ?? 100} min={0} max={160} unit="ng/mL" status={getStatus(lv.dopamine_level ?? 100, 80, 160)} />
-          <CircularGauge label="Oxygen Sat" value={lv.oxygen_saturation ?? 98} min={85} max={100} unit="%" status={getStatus(lv.oxygen_saturation ?? 98, 95, 100)} />
-        </div>
-      </div>
-
-      {/* Cognitive & Risk */}
-      <div>
-        <h3 className="text-slate-300 text-xs font-semibold uppercase mb-3">Cognitive & Risk (%)</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <CircularGauge label="MMSE" value={lv.mmse_score ?? 28} min={0} max={30} unit="" status={getStatus(lv.mmse_score ?? 28, 24, 30)} />
-          <CircularGauge label="MoCA" value={lv.moca_score ?? 26} min={0} max={30} unit="" status={getStatus(lv.moca_score ?? 26, 22, 30)} />
-          {latestPred && (
-            <>
-              <CircularGauge
-                label="Alzheimer Risk"
-                value={latestPred.alzheimer_risk}
-                min={0}
-                max={100}
-                unit="%"
-                status={latestPred.alzheimer_risk > 66 ? 'critical' : latestPred.alzheimer_risk > 33 ? 'warning' : 'normal'}
-              />
-              <CircularGauge
-                label="Parkinson Risk"
-                value={latestPred.parkinson_risk}
-                min={0}
-                max={100}
-                unit="%"
-                status={latestPred.parkinson_risk > 66 ? 'critical' : latestPred.parkinson_risk > 33 ? 'warning' : 'normal'}
-              />
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Vertical bar section — TEMP / Viscosity style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="text-slate-300 text-xs font-semibold uppercase mb-3">TEMP — Cognitive Scores</h3>
-          <div className="flex gap-4 justify-around py-4 px-4 rounded bg-slate-900/50 border border-slate-700">
-            <VerticalBarGauge label="Memory" value={lv.memory_score ?? 85} min={0} max={100} status={getStatus(lv.memory_score ?? 85, 60, 100)} />
-            <VerticalBarGauge label="Attention" value={lv.attention_score ?? 78} min={0} max={100} status={getStatus(lv.attention_score ?? 78, 60, 100)} />
-            <VerticalBarGauge label="Executive" value={lv.executive_function_score ?? 72} min={0} max={100} status={getStatus(lv.executive_function_score ?? 72, 60, 100)} />
-            <VerticalBarGauge label="MMSE" value={lv.mmse_score ?? 28} min={0} max={30} status="normal" />
-            <VerticalBarGauge label="MoCA" value={lv.moca_score ?? 26} min={0} max={30} status="normal" />
+            <div className="text-sm text-slate-400 mb-1">Alzheimer Risk</div>
+            <div
+              className={`text-3xl font-bold ${
+                alzRisk > 66 ? 'text-rose-400' : alzRisk > 33 ? 'text-amber-400' : 'text-emerald-400'
+              }`}
+            >
+              {alzRisk.toFixed(0)}%
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {alzRisk > 66 ? 'High' : alzRisk > 33 ? 'Medium' : 'Normal'}
+            </div>
           </div>
-        </div>
-        <div>
-          <h3 className="text-slate-300 text-xs font-semibold uppercase mb-3">MRI Features</h3>
-          <div className="flex gap-4 justify-around py-4 px-4 rounded bg-slate-900/50 border border-slate-700">
-            <VerticalBarGauge label="Hippocampal" value={(lv.hippocampal_volume ?? 3800) / 1000} min={1.5} max={4.6} status={getStatus((lv.hippocampal_volume ?? 3800) / 1000, 3.4, 4.6)} />
-            <VerticalBarGauge label="Cortical" value={lv.cortical_thickness ?? 2.8} min={1.5} max={3.2} status="normal" />
-            <VerticalBarGauge label="Brain Vol" value={(lv.brain_volume_total ?? 1200000) / 1000} min={800} max={1400} status="normal" />
-            <VerticalBarGauge label="Ventricular" value={(lv.ventricular_volume ?? 35000) / 1000} min={20} max={70} status="normal" />
+          <div
+            className={`rounded-xl border-2 p-5 ${
+              parkRisk > 66
+                ? 'border-rose-500/60 bg-rose-500/10'
+                : parkRisk > 33
+                ? 'border-amber-500/50 bg-amber-500/10'
+                : 'border-emerald-500/40 bg-emerald-500/10'
+            }`}
+          >
+            <div className="text-sm text-slate-400 mb-1">Parkinson Risk</div>
+            <div
+              className={`text-3xl font-bold ${
+                parkRisk > 66 ? 'text-rose-400' : parkRisk > 33 ? 'text-amber-400' : 'text-emerald-400'
+              }`}
+            >
+              {parkRisk.toFixed(0)}%
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {parkRisk > 66 ? 'High' : parkRisk > 33 ? 'Medium' : 'Normal'}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Collapsible sections */}
+      <CollapsibleSection title="Vital Signs" icon={HeartIcon} defaultOpen>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+          <MetricCard
+            label="Temperature"
+            value={lv.temperature ?? 37}
+            unit="°C"
+            status={getStatus(lv.temperature ?? 37, 36, 37.5)}
+          />
+          <MetricCard
+            label="Heart Rate"
+            value={lv.heart_rate ?? 72}
+            unit="bpm"
+            status={getStatus(lv.heart_rate ?? 72, 60, 100)}
+          />
+          <MetricCard
+            label="Blood Pressure"
+            value={`${lv.blood_pressure_systolic ?? 120}/${lv.blood_pressure_diastolic ?? 80}`}
+            unit="mmHg"
+            status={getStatus(lv.blood_pressure_systolic ?? 120, 90, 140)}
+          />
+          <MetricCard
+            label="Oxygen"
+            value={lv.oxygen_saturation ?? 98}
+            unit="%"
+            status={getStatus(lv.oxygen_saturation ?? 98, 95, 100)}
+          />
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Biomarkers" icon={BeakerIcon}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+          <MetricCard
+            label="Amyloid-Beta"
+            value={lv.amyloid_beta ?? 600}
+            unit="pg/mL"
+            status={getStatus(lv.amyloid_beta ?? 600, 400, 1000)}
+          />
+          <MetricCard
+            label="Tau Protein"
+            value={lv.tau_protein ?? 200}
+            unit="pg/mL"
+            status={getStatus(lv.tau_protein ?? 200, 40, 360)}
+          />
+          <MetricCard
+            label="Dopamine"
+            value={lv.dopamine_level ?? 100}
+            unit="ng/mL"
+            status={getStatus(lv.dopamine_level ?? 100, 80, 160)}
+          />
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Cognitive & MRI" icon={CpuChipIcon}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+          <MetricCard
+            label="MMSE"
+            value={lv.mmse_score ?? 28}
+            status={getStatus(lv.mmse_score ?? 28, 24, 30)}
+          />
+          <MetricCard
+            label="MoCA"
+            value={lv.moca_score ?? 26}
+            status={getStatus(lv.moca_score ?? 26, 22, 30)}
+          />
+          <MetricCard
+            label="Memory"
+            value={lv.memory_score ?? 85}
+            unit="%"
+            status={getStatus(lv.memory_score ?? 85, 60, 100)}
+          />
+          <MetricCard
+            label="Hippocampal"
+            value={((lv.hippocampal_volume ?? 3800) / 1000).toFixed(1)}
+            unit="cm³"
+            status={getStatus((lv.hippocampal_volume ?? 3800) / 1000, 3.4, 4.6)}
+          />
+        </div>
+      </CollapsibleSection>
     </div>
   )
 }
