@@ -1029,125 +1029,129 @@ async def load_sample_datasets(
         skipped_patients = 0
         errors = []
     
-    # Paths to CSV files
-    project_root = Path(__file__).parent.parent.parent.parent
-    synthetic_csv = project_root / 'data' / 'data' / 'csv' / 'sample_dataset_complete.csv'
-    real_csv = project_root / 'data' / 'real_data' / 'csv' / 'real_dataset_complete.csv'
+        # Paths to CSV files - try multiple locations (generated data paths)
+        project_root = Path(__file__).parent.parent.parent.parent
+        synthetic_csv = project_root / 'data' / 'data' / 'csv' / 'sample_dataset_complete.csv'
+        if not synthetic_csv.exists():
+            synthetic_csv = project_root / 'data' / 'large_dataset' / 'synthetic' / 'synthetic_patients_complete.csv'
+        real_csv = project_root / 'data' / 'real_data' / 'csv' / 'real_dataset_complete.csv'
+        if not real_csv.exists():
+            real_csv = project_root / 'data' / 'large_dataset' / 'real' / 'real_patients_complete.csv'
     
-    # Load CSV files
-    synthetic_df = None
-    real_df = None
-    
-    try:
-        if synthetic_csv.exists():
-            synthetic_df = pd.read_csv(synthetic_csv)
-            logger.info(f"Loaded synthetic data: {len(synthetic_df)} records")
-            logger.info(f"Synthetic CSV columns: {list(synthetic_df.columns)}")
-        else:
-            logger.warning(f"Synthetic CSV not found: {synthetic_csv}")
-    except Exception as e:
-        logger.error(f"Error loading synthetic CSV: {e}", exc_info=True)
+        # Load CSV files
         synthetic_df = None
-    
-    try:
-        if real_csv.exists():
-            real_df = pd.read_csv(real_csv)
-            logger.info(f"Loaded real data: {len(real_df)} records")
-            logger.info(f"Real CSV columns: {list(real_df.columns)}")
-        else:
-            logger.warning(f"Real CSV not found: {real_csv}")
-    except Exception as e:
-        logger.error(f"Error loading real CSV: {e}", exc_info=True)
         real_df = None
     
-    if synthetic_df is None and real_df is None:
-        return {
-            "message": "No CSV data files found. Please ensure data files exist.",
-            "total_patients": 0,
-            "total_records": 0,
-            "total_predictions": 0,
-            "skipped": 0,
-            "errors": ["No CSV files found"],
-            "error_count": 1,
-        }
-    
-    # Categorize and sample from each dataset
-    def categorize_df(df):
         try:
-            # Check if diagnosis column exists
-            if 'diagnosis' not in df.columns:
-                logger.warning(f"CSV file missing 'diagnosis' column. Available columns: {list(df.columns)}")
-                # Return empty dataframes
-                return df.iloc[0:0].copy(), df.iloc[0:0].copy(), df.iloc[0:0].copy()
-            
-            # Convert diagnosis to string and handle NaN values
-            df['diagnosis'] = df['diagnosis'].astype(str).str.upper().str.strip()
-            
-            normal = df[df['diagnosis'] == 'NORMAL']
-            alzheimer = df[df['diagnosis'] == 'ALZHEIMER']
-            parkinson = df[df['diagnosis'] == 'PARKINSON']
-            return normal, alzheimer, parkinson
+            if synthetic_csv.exists():
+                synthetic_df = pd.read_csv(synthetic_csv)
+                logger.info(f"Loaded synthetic data: {len(synthetic_df)} records")
+                logger.info(f"Synthetic CSV columns: {list(synthetic_df.columns)}")
+            else:
+                logger.warning(f"Synthetic CSV not found: {synthetic_csv}")
         except Exception as e:
-            logger.error(f"Error categorizing dataframe: {e}", exc_info=True)
-            # Return empty dataframes on error
-            return df.iloc[0:0].copy(), df.iloc[0:0].copy(), df.iloc[0:0].copy()
+            logger.error(f"Error loading synthetic CSV: {e}", exc_info=True)
+            synthetic_df = None
     
-    selected_rows = []
-    
-    # Sample from synthetic data - take all available
-    # Target: 60 normal, 20 Alzheimer, 20 Parkinson (but take what's available)
-    if synthetic_df is not None:
-        syn_normal, syn_alzheimer, syn_parkinson = categorize_df(synthetic_df)
-        
-        # Take all available, up to target
-        n_syn_normal = min(len(syn_normal), 60)
-        n_syn_alzheimer = min(len(syn_alzheimer), 20)
-        n_syn_parkinson = min(len(syn_parkinson), 20)
-        
-        if n_syn_normal > 0:
-            selected_rows.extend(syn_normal.sample(n=n_syn_normal).to_dict('records'))
-        if n_syn_alzheimer > 0:
-            selected_rows.extend(syn_alzheimer.sample(n=n_syn_alzheimer).to_dict('records'))
-        if n_syn_parkinson > 0:
-            selected_rows.extend(syn_parkinson.sample(n=n_syn_parkinson).to_dict('records'))
-        
-        logger.info(f"Sampled from synthetic: {n_syn_normal} normal, {n_syn_alzheimer} Alzheimer, {n_syn_parkinson} Parkinson")
-    
-    # Sample from real data - take all available to reach 200 total
-    # Calculate how many more we need to reach target of 120 normal, 40 Alzheimer, 40 Parkinson
-    if real_df is not None:
-        real_normal, real_alzheimer, real_parkinson = categorize_df(real_df)
-        
-        # Calculate needed to reach targets (accounting for what we got from synthetic)
-        syn_normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'NORMAL'])
-        syn_alzheimer_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'ALZHEIMER'])
-        syn_parkinson_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'PARKINSON'])
-        
-        needed_normal = max(0, 120 - syn_normal_count)
-        needed_alzheimer = max(0, 40 - syn_alzheimer_count)
-        needed_parkinson = max(0, 40 - syn_parkinson_count)
-        
-        # Take what's available from real data
-        n_real_normal = min(len(real_normal), needed_normal)
-        n_real_alzheimer = min(len(real_alzheimer), needed_alzheimer)
-        n_real_parkinson = min(len(real_parkinson), needed_parkinson)
-        
-        if n_real_normal > 0:
-            selected_rows.extend(real_normal.sample(n=n_real_normal).to_dict('records'))
-        if n_real_alzheimer > 0:
-            selected_rows.extend(real_alzheimer.sample(n=n_real_alzheimer).to_dict('records'))
-        if n_real_parkinson > 0:
-            selected_rows.extend(real_parkinson.sample(n=n_real_parkinson).to_dict('records'))
-        
-        logger.info(f"Sampled from real: {n_real_normal} normal, {n_real_alzheimer} Alzheimer, {n_real_parkinson} Parkinson")
-    
-    logger.info(f"Selected {len(selected_rows)} patients for sample (Target: 200)")
-    
-    # Process each selected patient row from CSV
-    for idx, row in enumerate(selected_rows):
         try:
-            # Validate required fields
-            if 'patient_id' not in row or pd.isna(row.get('patient_id')):
+            if real_csv.exists():
+                real_df = pd.read_csv(real_csv)
+                logger.info(f"Loaded real data: {len(real_df)} records")
+                logger.info(f"Real CSV columns: {list(real_df.columns)}")
+            else:
+                logger.warning(f"Real CSV not found: {real_csv}")
+        except Exception as e:
+            logger.error(f"Error loading real CSV: {e}", exc_info=True)
+            real_df = None
+    
+        if synthetic_df is None and real_df is None:
+            return {
+                "message": "No CSV data files found. Please ensure data files exist.",
+                "total_patients": 0,
+                "total_records": 0,
+                "total_predictions": 0,
+                "skipped": 0,
+                "errors": ["No CSV files found"],
+                "error_count": 1,
+            }
+    
+        # Categorize and sample from each dataset
+        def categorize_df(df):
+            try:
+                # Check if diagnosis column exists
+                if 'diagnosis' not in df.columns:
+                    logger.warning(f"CSV file missing 'diagnosis' column. Available columns: {list(df.columns)}")
+                    # Return empty dataframes
+                    return df.iloc[0:0].copy(), df.iloc[0:0].copy(), df.iloc[0:0].copy()
+                
+                # Convert diagnosis to string and handle NaN values
+                df['diagnosis'] = df['diagnosis'].astype(str).str.upper().str.strip()
+                
+                normal = df[df['diagnosis'] == 'NORMAL']
+                alzheimer = df[df['diagnosis'] == 'ALZHEIMER']
+                parkinson = df[df['diagnosis'] == 'PARKINSON']
+                return normal, alzheimer, parkinson
+            except Exception as e:
+                logger.error(f"Error categorizing dataframe: {e}", exc_info=True)
+                # Return empty dataframes on error
+                return df.iloc[0:0].copy(), df.iloc[0:0].copy(), df.iloc[0:0].copy()
+    
+        selected_rows = []
+    
+        # Sample from synthetic data - take all available
+        # Target: 60 normal, 20 Alzheimer, 20 Parkinson (but take what's available)
+        if synthetic_df is not None:
+            syn_normal, syn_alzheimer, syn_parkinson = categorize_df(synthetic_df)
+            
+            # Take all available, up to target
+            n_syn_normal = min(len(syn_normal), 60)
+            n_syn_alzheimer = min(len(syn_alzheimer), 20)
+            n_syn_parkinson = min(len(syn_parkinson), 20)
+            
+            if n_syn_normal > 0:
+                selected_rows.extend(syn_normal.sample(n=n_syn_normal).to_dict('records'))
+            if n_syn_alzheimer > 0:
+                selected_rows.extend(syn_alzheimer.sample(n=n_syn_alzheimer).to_dict('records'))
+            if n_syn_parkinson > 0:
+                selected_rows.extend(syn_parkinson.sample(n=n_syn_parkinson).to_dict('records'))
+            
+            logger.info(f"Sampled from synthetic: {n_syn_normal} normal, {n_syn_alzheimer} Alzheimer, {n_syn_parkinson} Parkinson")
+    
+        # Sample from real data - take all available to reach 200 total
+        # Calculate how many more we need to reach target of 120 normal, 40 Alzheimer, 40 Parkinson
+        if real_df is not None:
+            real_normal, real_alzheimer, real_parkinson = categorize_df(real_df)
+            
+            # Calculate needed to reach targets (accounting for what we got from synthetic)
+            syn_normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'NORMAL'])
+            syn_alzheimer_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'ALZHEIMER'])
+            syn_parkinson_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper().strip() == 'PARKINSON'])
+            
+            needed_normal = max(0, 120 - syn_normal_count)
+            needed_alzheimer = max(0, 40 - syn_alzheimer_count)
+            needed_parkinson = max(0, 40 - syn_parkinson_count)
+            
+            # Take what's available from real data
+            n_real_normal = min(len(real_normal), needed_normal)
+            n_real_alzheimer = min(len(real_alzheimer), needed_alzheimer)
+            n_real_parkinson = min(len(real_parkinson), needed_parkinson)
+            
+            if n_real_normal > 0:
+                selected_rows.extend(real_normal.sample(n=n_real_normal).to_dict('records'))
+            if n_real_alzheimer > 0:
+                selected_rows.extend(real_alzheimer.sample(n=n_real_alzheimer).to_dict('records'))
+            if n_real_parkinson > 0:
+                selected_rows.extend(real_parkinson.sample(n=n_real_parkinson).to_dict('records'))
+            
+            logger.info(f"Sampled from real: {n_real_normal} normal, {n_real_alzheimer} Alzheimer, {n_real_parkinson} Parkinson")
+    
+        logger.info(f"Selected {len(selected_rows)} patients for sample (Target: 200)")
+    
+        # Process each selected patient row from CSV
+        for idx, row in enumerate(selected_rows):
+            try:
+                # Validate required fields
+                if 'patient_id' not in row or pd.isna(row.get('patient_id')):
                 errors.append(f"Row {idx}: Missing patient_id")
                 continue
                 

@@ -7,6 +7,7 @@ import SecurityMonitoring from './components/SecurityMonitoring';
 import DiseaseRanges from './components/DiseaseRanges';
 import DiseaseProbability from './components/DiseaseProbability';
 import MultimodalAnalysis from './components/MultimodalAnalysis';
+import DataTab from './components/DataTab';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,12 +18,13 @@ const queryClient = new QueryClient({
   },
 });
 
-type TabType = 'overview' | 'ai_ml' | 'clinical' | 'system' | 'security' | 'disease' | 'probability' | 'multimodal';
+type TabType = 'overview' | 'ai_ml' | 'clinical' | 'system' | 'security' | 'disease' | 'probability' | 'multimodal' | 'data';
 
 const TABS: { id: TabType; name: string; icon: string; short: string }[] = [
   { id: 'overview', name: 'نمای کلی', icon: '📊', short: 'Overview' },
   { id: 'ai_ml', name: 'سلامت AI/ML', icon: '🤖', short: 'AI/ML' },
   { id: 'clinical', name: 'کلینیکال', icon: '🏥', short: 'Clinical' },
+  { id: 'data', name: 'داده‌ها', icon: '📁', short: 'Data' },
   { id: 'multimodal', name: 'آنالیز مولتی‌مودال', icon: '🔬', short: 'Multimodal' },
   { id: 'disease', name: 'پارکینسون و آلزایمر', icon: '🧬', short: 'Disease Ranges' },
   { id: 'probability', name: 'احتمال بیماری', icon: '📈', short: 'Disease Probability' },
@@ -109,6 +111,7 @@ export default function AdminDashboard() {
             {activeTab === 'overview' && <OverviewTab />}
             {activeTab === 'ai_ml' && <AIMLHealth />}
             {activeTab === 'clinical' && <ClinicalMonitoring />}
+            {activeTab === 'data' && <DataTab />}
             {activeTab === 'multimodal' && <MultimodalAnalysis />}
             {activeTab === 'disease' && <DiseaseRanges />}
             {activeTab === 'probability' && <DiseaseProbability />}

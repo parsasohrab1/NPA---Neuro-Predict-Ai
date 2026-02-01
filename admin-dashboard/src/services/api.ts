@@ -92,5 +92,19 @@ export const diseaseApi = {
   getPatientsSummary: () => api.get('/disease-tracking/all-patients/summary'),
 };
 
+// Data monitoring: MRI, Biomarkers, Cognitive (synthetic/dataset from data generator)
+export const dataApi = {
+  getOverview: (disease?: string) => {
+    const params = disease && disease !== 'all' ? `?disease=${disease}` : '';
+    return api.get(`/data-monitoring/overview${params}`);
+  },
+  getCategoryData: (category: 'cognitive' | 'biomarker' | 'imaging', timeRange: string = '30d', disease?: string) => {
+    const params = new URLSearchParams({ time_range: timeRange });
+    if (disease && disease !== 'all') params.append('disease', disease);
+    return api.get(`/data-monitoring/category/${category}?${params}`);
+  },
+  loadSampleData: () => api.post('/data-monitoring/load-sample-data'),
+};
+
 export default api;
 

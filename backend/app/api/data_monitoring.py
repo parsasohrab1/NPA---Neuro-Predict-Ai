@@ -199,6 +199,17 @@ async def get_category_data(
         for range_label, min_val, max_val in ranges:
             count = len([r for r in records if r.amyloid_beta and min_val <= r.amyloid_beta <= max_val])
             distribution.append({'range': range_label, 'count': count})
+    elif category == 'imaging':
+        # Hippocampal volume ranges (mm³) for MRI distribution
+        ranges = [
+            ('<2500', 0, 2500),
+            ('2500-3500', 2500, 3500),
+            ('3500-4500', 3500, 4500),
+            ('>4500', 4500, 100000),
+        ]
+        for range_label, min_val, max_val in ranges:
+            count = len([r for r in records if r.hippocampal_volume and min_val <= r.hippocampal_volume <= max_val])
+            distribution.append({'range': range_label, 'count': count})
     
     # Generate metrics summary
     metrics = []

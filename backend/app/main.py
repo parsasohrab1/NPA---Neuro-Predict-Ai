@@ -12,7 +12,7 @@ from pathlib import Path
 from .core.config import settings
 from .db.session import init_db, close_db
 from .core.cache import cache_service
-from .api import auth, patients, predictions, reports, models, analytics, users, mock_data, monitoring, websocket, optimization, disease_tracking
+from .api import auth, patients, predictions, reports, models, analytics, users, mock_data, monitoring, websocket, optimization, disease_tracking, data_monitoring
 
 # Optional integration routers (FHIR etc. may require extra deps / Pydantic compatibility)
 _integration = None
@@ -272,6 +272,7 @@ app.include_router(websocket.router, prefix=settings.API_V1_PREFIX)
 app.include_router(mock_data.router, prefix=settings.API_V1_PREFIX)  # Mock data for development
 app.include_router(optimization.router, prefix=settings.API_V1_PREFIX)
 app.include_router(disease_tracking.router, prefix=settings.API_V1_PREFIX)
+app.include_router(data_monitoring.router, prefix=settings.API_V1_PREFIX)
 
 # Integration routers (optional)
 if _integration:
