@@ -282,6 +282,7 @@ Interactive visualization showing:
 | Report Generation | Template-based | **Adaptive Natural Language** |
 | Evidence Integration | Siloed | **Cross-Modal Evidence Compilation** |
 | Clinical Validation | Single modality | **Multi-Modal Concordance** |
+| Progression Prediction | Point-in-time diagnosis | **Predictive Progression Modeling (rate, MCI -> AD transition, treatment response)** |
 
 ---
 
