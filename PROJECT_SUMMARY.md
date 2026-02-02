@@ -12,6 +12,14 @@ NeuroPredict-AI is an advanced AI-powered clinical decision support system desig
 - **Evidence-Based Recommendations**: Automated clinical guidance based on risk levels
 - **Explainable AI (Clinical)**: Feature importance, similar cohort comparison, and neuro-progression visualization
 
+### 🧩 Use-case Modules (Use-case driven)
+| Module | Target User |
+|---|---|
+| Early Risk Screening | Primary care clinics |
+| Disease Progression Forecast | Neurologists |
+| Research Mode | Universities and R&D |
+| Remote Monitoring | Telemedicine providers |
+
 ### 📊 Data Analysis
 - **Medical Imaging Processing**: DICOM file parsing, MRI preprocessing
 - **Cognitive Assessment**: MMSE, MoCA score integration
