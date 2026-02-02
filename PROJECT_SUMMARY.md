@@ -10,7 +10,7 @@ NeuroPredict-AI is an advanced AI-powered clinical decision support system desig
 - **Multi-Disease Prediction**: Simultaneous assessment for Alzheimer's and Parkinson's
 - **Risk Stratification**: Low, Medium, High risk levels with confidence scores
 - **Evidence-Based Recommendations**: Automated clinical guidance based on risk levels
-- **Explainable AI**: Feature importance analysis for transparency
+- **Explainable AI (Clinical)**: Feature importance, similar cohort comparison, and neuro-progression visualization
 
 ### 📊 Data Analysis
 - **Medical Imaging Processing**: DICOM file parsing, MRI preprocessing
