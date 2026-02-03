@@ -4,6 +4,7 @@ AI Prediction API Endpoints
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import logging
 from typing import List, Optional, Any
 from datetime import date, datetime
 
@@ -17,6 +18,7 @@ from ..schemas.prediction import PredictionRequest, PredictionResponse, Predicti
 from ..core.security import get_current_user, require_role
 from ..core.cache import cache_service
 from ..services.ai_model_service import ai_model_service
+from ..services.clinical_explainability_service import clinical_explainability_service
 
 router = APIRouter(prefix="/predictions", tags=["Predictions"])
 
@@ -110,6 +112,15 @@ async def create_prediction(
             detail=f"Error during prediction: {str(e)}"
         )
     
+    # Build clinical explainability (feature importance with clinical labels, cohort comparison, progression)
+    try:
+        clinical_explanation = await clinical_explainability_service.build_full_explanation(
+            db, request.patient_id, patient_data, prediction_result
+        )
+    except Exception as e:
+        clinical_explanation = None
+        logging.getLogger(__name__).warning("Clinical explanation build failed: %s", e)
+
     # Create prediction record
     new_prediction = Prediction(
         patient_id=request.patient_id,
@@ -126,6 +137,7 @@ async def create_prediction(
         input_features=patient_data,
         feature_importance=prediction_result['feature_importance'],
         attention_scores=prediction_result.get('attention_scores'),
+        clinical_explanation=clinical_explanation,
         recommendations=prediction_result['recommendations']
     )
 

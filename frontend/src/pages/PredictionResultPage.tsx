@@ -150,35 +150,133 @@ export default function PredictionResultPage() {
           </div>
         </div>
 
-        {/* Feature Importance */}
+        {/* Feature Importance (clinical labels when available) */}
         <div className="card">
           <h2 className="text-xl font-bold mb-4">🔍 Top Contributing Factors</h2>
-          {prediction.feature_importance && (
+          {prediction.clinical_explanation?.clinical_feature_importance?.length ? (
+            <div className="space-y-3">
+              {prediction.clinical_explanation.clinical_feature_importance.map((item) => (
+                <div key={item.feature_key}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-700 font-medium" title={item.interpretation_en}>
+                      {item.clinical_label_fa || item.clinical_label_en}
+                    </span>
+                    <span className="font-medium">{(item.importance * 100).toFixed(1)}%</span>
+                  </div>
+                  {item.interpretation_fa && (
+                    <p className="text-xs text-gray-500 mb-1" dir="rtl">{item.interpretation_fa}</p>
+                  )}
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-primary-500 h-2 rounded-full"
+                      style={{ width: `${item.importance * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : prediction.feature_importance ? (
             <div className="space-y-3">
               {Object.entries(prediction.feature_importance)
                 .slice(0, 10)
                 .map(([feature, importance]) => (
                   <div key={feature}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-700 capitalize">
-                        {feature.replace(/_/g, ' ')}
-                      </span>
-                      <span className="font-medium">
-                        {((importance as number) * 100).toFixed(1)}%
-                      </span>
+                      <span className="text-gray-700 capitalize">{feature.replace(/_/g, ' ')}</span>
+                      <span className="font-medium">{((importance as number) * 100).toFixed(1)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-primary-500 h-2 rounded-full"
                         style={{ width: `${(importance as number) * 100}%` }}
-                      ></div>
+                      />
                     </div>
                   </div>
                 ))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
+
+      {/* Clinical Explainability: cohort comparison + progression */}
+      {prediction.clinical_explanation && (
+        <div className="mt-8 space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900 border-b border-gray-200 pb-2">
+            📊 Explainability بالینی
+          </h2>
+
+          {/* Cohort comparison */}
+          {prediction.clinical_explanation.cohort_comparison && prediction.clinical_explanation.cohort_comparison.cohort_size > 0 && (
+            <div className="card">
+              <h3 className="text-lg font-bold mb-3">مقایسه با همگروه مشابه</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                {prediction.clinical_explanation.cohort_comparison.cohort_description_fa} (n={
+                  prediction.clinical_explanation.cohort_comparison.cohort_size
+                })
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {prediction.clinical_explanation.cohort_comparison.alzheimer && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-2">آلزایمر</h4>
+                    {prediction.clinical_explanation.cohort_comparison.alzheimer.patient_percentile != null && (
+                      <p className="text-sm text-gray-700 mb-1">
+                        صدک بیمار: <strong>{prediction.clinical_explanation.cohort_comparison.alzheimer.patient_percentile.toFixed(0)}</strong>
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-600" dir="rtl">
+                      {prediction.clinical_explanation.cohort_comparison.alzheimer.summary_fa}
+                    </p>
+                    {prediction.clinical_explanation.cohort_comparison.alzheimer.cohort_median != null && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        میانه همگروه: {(prediction.clinical_explanation.cohort_comparison.alzheimer.cohort_median * 100).toFixed(1)}%
+                      </p>
+                    )}
+                  </div>
+                )}
+                {prediction.clinical_explanation.cohort_comparison.parkinson && (
+                  <div className="p-3 bg-amber-50 rounded-lg">
+                    <h4 className="font-semibold text-amber-800 mb-2">پارکینسون</h4>
+                    {prediction.clinical_explanation.cohort_comparison.parkinson.patient_percentile != null && (
+                      <p className="text-sm text-gray-700 mb-1">
+                        صدک بیمار: <strong>{prediction.clinical_explanation.cohort_comparison.parkinson.patient_percentile.toFixed(0)}</strong>
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-600" dir="rtl">
+                      {prediction.clinical_explanation.cohort_comparison.parkinson.summary_fa}
+                    </p>
+                    {prediction.clinical_explanation.cohort_comparison.parkinson.cohort_median != null && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        میانه همگروه: {(prediction.clinical_explanation.cohort_comparison.parkinson.cohort_median * 100).toFixed(1)}%
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Progression visualization */}
+          {prediction.clinical_explanation.progression_visualization && (
+            <div className="card">
+              <h3 className="text-lg font-bold mb-3">پیشرفت عصبی و پیگیری</h3>
+              <p className="text-sm text-gray-700 mb-2" dir="rtl">
+                {prediction.clinical_explanation.progression_visualization.trajectory_summary_fa}
+              </p>
+              <p className="text-sm text-gray-600">
+                توصیه پیگیری: هر{' '}
+                <strong>{prediction.clinical_explanation.progression_visualization.recommended_follow_up_months}</strong>{' '}
+                ماه
+              </p>
+              {prediction.clinical_explanation.progression_visualization.has_longitudinal_data &&
+                prediction.clinical_explanation.progression_visualization.trend_data?.visit_dates?.length && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">داده‌های طولی موجود است؛ روند در گزارش longitudinal قابل مشاهده است.</p>
+                  </div>
+                )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

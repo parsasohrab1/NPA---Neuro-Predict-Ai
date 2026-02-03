@@ -278,7 +278,7 @@ async def create_report(
         report = await longitudinal_service.create_report(
             db=db,
             episode_id=episode_id,
-            created_by=getattr(current_user, "id", None),
+            created_by=None,  # Fixed: removed undefined current_user reference
             start_date=payload.start_date,
             end_date=payload.end_date,
             report_format=payload.format,
@@ -395,7 +395,7 @@ async def create_report_schedule(
     payload: ReportScheduleCreate,
     db: AsyncSession = Depends(get_db),
 ) -> ReportScheduleResponse:
-    schedule = await longitudinal_service.create_schedule(db, payload, getattr(current_user, "id", None))
+    schedule = await longitudinal_service.create_schedule(db, payload, None)  # Fixed: removed undefined current_user reference
     return schedule
 
 
@@ -550,7 +550,7 @@ async def get_schedule_monitoring(
 )
 async def load_sample_data(
     db: AsyncSession = Depends(get_db),
-):
+):  # Fixed: scalar_one_or_none -> scalar
     """
     Load sample episodes, visits, and metrics for longitudinal tracking testing.
     Creates data for existing patients in the database.
@@ -587,7 +587,7 @@ async def load_sample_data(
         existing_result = await db.execute(
             select(LongitudinalEpisode).where(LongitudinalEpisode.patient_id == patient.id)
         )
-        if existing_result.scalar_one_or_none():
+        if existing_result.scalar():
             continue
         
         # Create 1-2 episodes per patient

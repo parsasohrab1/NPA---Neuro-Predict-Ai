@@ -2,10 +2,16 @@
 Mock Data API Endpoints for development/demo
 Returns sample data without requiring database
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List
 from datetime import datetime, timedelta, date
 import random
+
+from ..db.session import get_db
+from ..models.patient import Patient
+from ..models.medical_record import MedicalRecord
 
 router = APIRouter(prefix="/mock", tags=["Mock Data"])
 
@@ -374,3 +380,55 @@ async def get_mock_users():
             "is_active": True
         }
     ]
+
+
+@router.post("/load-sample-data")
+async def load_sample_data_to_db(db: AsyncSession = Depends(get_db)):
+    """Load sample patients and medical records to database for development"""
+    try:
+        # Check if patients already exist
+        result = await db.execute(select(Patient))
+        existing_patients = result.scalars().all()
+        
+        if len(existing_patients) > 0:
+            return {
+                "message": "Sample data already loaded",
+                "patients_count": len(existing_patients),
+                "status": "skipped"
+            }
+        
+        # Load patients
+        patients_created = 0
+        for mock_patient in MOCK_PATIENTS:
+            # Convert date string to date object
+            dob_str = mock_patient["date_of_birth"]
+            dob = datetime.fromisoformat(dob_str).date()
+            
+            patient = Patient(
+                patient_id=mock_patient["patient_id"],
+                first_name=mock_patient["first_name"],
+                last_name=mock_patient["last_name"],
+                date_of_birth=dob,
+                gender=mock_patient["gender"],
+                email=mock_patient.get("email"),
+                phone=mock_patient.get("phone"),
+                education_years=mock_patient.get("education_years"),
+                medical_history=mock_patient.get("medical_history"),
+                family_history=mock_patient.get("family_history")
+            )
+            db.add(patient)
+            patients_created += 1
+        
+        await db.commit()
+        
+        return {
+            "message": "Sample data loaded successfully",
+            "patients_count": patients_created,
+            "status": "success"
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load sample data: {str(e)}"
+        )

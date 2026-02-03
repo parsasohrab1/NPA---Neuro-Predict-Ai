@@ -49,6 +49,7 @@ class Patient(Base):
     assigned_doctor = relationship("User", back_populates="patients")
     medical_records = relationship("MedicalRecord", back_populates="patient", cascade="all, delete-orphan")
     predictions = relationship("Prediction", back_populates="patient", cascade="all, delete-orphan")
+    longitudinal_episodes = relationship("LongitudinalEpisode", back_populates="patient", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Patient(id={self.id}, patient_id={self.patient_id}, name={self.first_name} {self.last_name})>"

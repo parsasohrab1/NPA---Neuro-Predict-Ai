@@ -29,6 +29,55 @@ export interface Patient {
   created_at: string
 }
 
+/** Clinical explainability: one feature with labels and interpretation */
+export interface ClinicalFeatureImportanceItem {
+  feature_key: string
+  clinical_label_fa: string
+  clinical_label_en: string
+  importance: number
+  interpretation_fa?: string
+  interpretation_en?: string
+}
+
+/** Cohort distribution summary for one disease */
+export interface CohortDiseaseSummary {
+  patient_percentile?: number
+  cohort_min?: number
+  cohort_p25?: number
+  cohort_median?: number
+  cohort_p75?: number
+  cohort_max?: number
+  cohort_size?: number
+  summary_fa?: string
+  summary_en?: string
+}
+
+/** Comparison to similar cohort */
+export interface CohortComparison {
+  cohort_size: number
+  cohort_description_fa?: string
+  cohort_description_en?: string
+  alzheimer?: CohortDiseaseSummary
+  parkinson?: CohortDiseaseSummary
+}
+
+/** Progression visualization data */
+export interface ProgressionVisualization {
+  has_longitudinal_data: boolean
+  trend_data?: { visit_dates?: string[]; progression_scores?: (number | null)[] }
+  recommended_follow_up_months: number
+  trajectory_summary_fa?: string
+  trajectory_summary_en?: string
+  risk_context?: Record<string, string>
+}
+
+/** Full clinical explainability for physicians */
+export interface ClinicalExplanation {
+  clinical_feature_importance: ClinicalFeatureImportanceItem[]
+  cohort_comparison?: CohortComparison
+  progression_visualization?: ProgressionVisualization
+}
+
 export interface Prediction {
   id: number
   patient_id: number
@@ -45,6 +94,8 @@ export interface Prediction {
   }
   recommendations?: string
   feature_importance?: Record<string, number>
+  attention_scores?: Record<string, number>
+  clinical_explanation?: ClinicalExplanation
   created_at: string
   is_reviewed: boolean
 }
