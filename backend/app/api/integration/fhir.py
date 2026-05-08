@@ -1,265 +1,216 @@
-"""
-HL7 FHIR API Endpoints
-"""
-from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
-from datetime import datetime
+"""HL7 FHIR R4 adapter endpoints (read/search backed by NeuroPredict DB)."""
+from __future__ import annotations
 
-from ...services.integration.fhir_service import FHIRService
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...core.config import settings
 from ...core.security import get_current_user
+from ...db.session import get_db
+from ...models.medical_record import MedicalRecord
+from ...models.patient import Patient
+from ...models.prediction import Prediction
 from ...models.user import User
+from ...services.integration.fhir_mappers import (
+    build_capability_statement,
+    build_searchset_bundle,
+    medical_record_to_observations,
+    patient_to_fhir,
+    prediction_to_diagnostic_report,
+)
 
 router = APIRouter(prefix="/fhir", tags=["FHIR"])
 
-# Initialize FHIR service
-fhir_service = FHIRService()
+
+def _base_url(request: Request) -> str:
+    """Public URL prefix where these FHIR resources are served."""
+    return f"{request.url.scheme}://{request.url.netloc}{settings.API_V1_PREFIX}/fhir"
 
 
-class PatientCreate(BaseModel):
-    """Patient creation request"""
-    name: str
-    birth_date: str
-    gender: str
-    identifiers: Optional[List[Dict]] = None
+def _operation_outcome(severity: str, code: str, diagnostics: str) -> dict[str, Any]:
+    """Build a minimal FHIR ``OperationOutcome`` payload."""
+    return {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": severity,
+                "code": code,
+                "diagnostics": diagnostics,
+            }
+        ],
+    }
 
 
-class ObservationCreate(BaseModel):
-    """Observation creation request"""
-    patient_id: str
-    code: Dict[str, Any]
-    value: Any
-    effective_datetime: str
-    status: str = "final"
+# --- metadata ---------------------------------------------------------------
+
+@router.get("/metadata")
+async def get_capability_statement() -> dict[str, Any]:
+    """FHIR ``CapabilityStatement`` (does not require auth, per FHIR spec)."""
+    return build_capability_statement()
 
 
-class DiagnosticReportCreate(BaseModel):
-    """DiagnosticReport creation request"""
-    patient_id: str
-    status: str
-    category: List[Dict]
-    code: Dict[str, Any]
-    effective_datetime: str
-    conclusion: Optional[str] = None
-    results: Optional[List[Dict]] = None
+# --- Patient ----------------------------------------------------------------
+
+async def _resolve_patient(db: AsyncSession, patient_id: str) -> Optional[Patient]:
+    """Resolve a Patient by numeric internal id or by external ``patient_id``."""
+    stmt = select(Patient)
+    if patient_id.isdigit():
+        stmt = stmt.where(Patient.id == int(patient_id))
+    else:
+        stmt = stmt.where(Patient.patient_id == patient_id)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 @router.get("/Patient/{patient_id}")
-async def get_patient(
+async def read_patient(
     patient_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """
-    دریافت Patient Resource از FHIR
-    
-    Returns:
-        Patient resource در فرمت FHIR
-    """
-    # در اینجا باید از دیتابیس Patient را بخوانیم و به FHIR تبدیل کنیم
-    # برای حالا فقط ساختار را نشان می‌دهیم
-    raise HTTPException(
-        status_code=501,
-        detail="FHIR Patient endpoint not yet fully implemented"
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Read a Patient by id (internal numeric id or external ``patient_id``)."""
+    patient = await _resolve_patient(db, patient_id)
+    if patient is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_operation_outcome("error", "not-found", f"Patient '{patient_id}' not found"),
+        )
+    return patient_to_fhir(patient)
+
+
+@router.get("/Patient")
+async def search_patient(
+    request: Request,
+    identifier: Optional[str] = Query(None, description="External patient identifier"),
+    _id: Optional[str] = Query(None, alias="_id"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Search Patient by ``identifier`` or ``_id`` (returns a searchset Bundle)."""
+    stmt = select(Patient)
+    if _id and _id.isdigit():
+        stmt = stmt.where(Patient.id == int(_id))
+    if identifier:
+        stmt = stmt.where(Patient.patient_id == identifier)
+    result = await db.execute(stmt.limit(50))
+    patients = list(result.scalars().all())
+    return build_searchset_bundle(
+        (patient_to_fhir(p) for p in patients),
+        base_url=_base_url(request),
     )
 
 
-@router.post("/Patient")
-async def create_patient(
-    patient_data: PatientCreate,
-    current_user: User = Depends(get_current_user)
-):
-    """
-    ایجاد Patient Resource در FHIR
-    
-    Returns:
-        Patient resource ایجاد شده
-    """
-    patient_resource = fhir_service.create_patient_resource(
-        patient_id=f"patient-{datetime.now().timestamp()}",
-        name=patient_data.name,
-        birth_date=patient_data.birth_date,
-        gender=patient_data.gender,
-        identifiers=patient_data.identifiers
-    )
-    
-    # در اینجا باید Patient را در دیتابیس ذخیره کنیم
-    # و سپس به FHIR format تبدیل کنیم
-    
-    return patient_resource.dict()
-
+# --- Observation ------------------------------------------------------------
 
 @router.get("/Observation")
-async def search_observations(
-    patient: Optional[str] = Query(None, description="Patient ID"),
-    code: Optional[str] = Query(None, description="Observation code"),
-    date: Optional[str] = Query(None, description="Date range"),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    جستجوی Observation Resources
-    
-    Parameters:
-        patient: شناسه بیمار
-        code: کد observation
-        date: محدوده تاریخ
-    
-    Returns:
-        Bundle حاوی Observation resources
-    """
-    params = {}
-    if patient:
-        params["subject"] = f"Patient/{patient}"
-    if code:
-        params["code"] = code
-    if date:
-        params["date"] = date
-    
-    # در اینجا باید از دیتابیس Observation ها را بخوانیم
-    # و به FHIR format تبدیل کنیم
-    
-    return {
-        "resourceType": "Bundle",
-        "type": "searchset",
-        "total": 0,
-        "entry": []
-    }
+async def search_observation(
+    request: Request,
+    subject: Optional[str] = Query(None, description="Patient/{id} reference"),
+    patient: Optional[str] = Query(None, description="Patient id (shortcut)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Search Observations for a patient (vital signs / labs / cognitive scores)."""
+    pid: Optional[str] = patient
+    if subject and subject.startswith("Patient/"):
+        pid = subject.split("/", 1)[1]
+    if not pid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_operation_outcome(
+                "error",
+                "invalid",
+                "subject=Patient/{id} or patient={id} query parameter is required",
+            ),
+        )
+    target = await _resolve_patient(db, pid)
+    if target is None:
+        return build_searchset_bundle((), base_url=_base_url(request))
 
-
-@router.post("/Observation")
-async def create_observation(
-    observation_data: ObservationCreate,
-    current_user: User = Depends(get_current_user)
-):
-    """
-    ایجاد Observation Resource در FHIR
-    
-    Returns:
-        Observation resource ایجاد شده
-    """
-    observation_resource = fhir_service.create_observation_resource(
-        observation_id=f"obs-{datetime.now().timestamp()}",
-        patient_id=observation_data.patient_id,
-        code=observation_data.code,
-        value=observation_data.value,
-        effective_datetime=observation_data.effective_datetime,
-        status=observation_data.status
+    result = await db.execute(
+        select(MedicalRecord)
+        .where(MedicalRecord.patient_id == target.id)
+        .order_by(MedicalRecord.visit_date.desc())
+        .limit(20)
     )
-    
-    return observation_resource.dict()
+    records = list(result.scalars().all())
+    observations: list[dict[str, Any]] = []
+    for record in records:
+        observations.extend(medical_record_to_observations(record))
+    return build_searchset_bundle(observations, base_url=_base_url(request))
+
+
+# --- DiagnosticReport -------------------------------------------------------
+
+@router.get("/DiagnosticReport/{report_id}")
+async def read_diagnostic_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Read a DiagnosticReport for a stored prediction."""
+    if not report_id.isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_operation_outcome("error", "invalid", "DiagnosticReport id must be numeric"),
+        )
+    result = await db.execute(select(Prediction).where(Prediction.id == int(report_id)))
+    prediction = result.scalar_one_or_none()
+    if prediction is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_operation_outcome("error", "not-found", "DiagnosticReport not found"),
+        )
+    return prediction_to_diagnostic_report(prediction)
 
 
 @router.get("/DiagnosticReport")
-async def search_diagnostic_reports(
-    patient: Optional[str] = Query(None, description="Patient ID"),
-    status: Optional[str] = Query(None, description="Report status"),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    جستجوی DiagnosticReport Resources
-    
-    Returns:
-        Bundle حاوی DiagnosticReport resources
-    """
-    params = {}
-    if patient:
-        params["subject"] = f"Patient/{patient}"
-    if status:
-        params["status"] = status
-    
-    return {
-        "resourceType": "Bundle",
-        "type": "searchset",
-        "total": 0,
-        "entry": []
-    }
+async def search_diagnostic_report(
+    request: Request,
+    subject: Optional[str] = Query(None),
+    patient: Optional[str] = Query(None),
+    status_param: Optional[str] = Query(None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Search DiagnosticReports by patient (status filter is currently no-op)."""
+    pid: Optional[str] = patient
+    if subject and subject.startswith("Patient/"):
+        pid = subject.split("/", 1)[1]
 
+    stmt = select(Prediction)
+    if pid:
+        target = await _resolve_patient(db, pid)
+        if target is None:
+            return build_searchset_bundle((), base_url=_base_url(request))
+        stmt = stmt.where(Prediction.patient_id == target.id)
+    stmt = stmt.order_by(Prediction.created_at.desc()).limit(50)
 
-@router.post("/DiagnosticReport")
-async def create_diagnostic_report(
-    report_data: DiagnosticReportCreate,
-    current_user: User = Depends(get_current_user)
-):
-    """
-    ایجاد DiagnosticReport Resource در FHIR
-    
-    Returns:
-        DiagnosticReport resource ایجاد شده
-    """
-    report_resource = fhir_service.create_diagnostic_report_resource(
-        report_id=f"report-{datetime.now().timestamp()}",
-        patient_id=report_data.patient_id,
-        status=report_data.status,
-        category=report_data.category,
-        code=report_data.code,
-        effective_datetime=report_data.effective_datetime,
-        conclusion=report_data.conclusion,
-        results=report_data.results
+    result = await db.execute(stmt)
+    predictions = list(result.scalars().all())
+    return build_searchset_bundle(
+        (prediction_to_diagnostic_report(p) for p in predictions),
+        base_url=_base_url(request),
     )
-    
-    return report_resource.dict()
 
+
+# --- ImagingStudy (searchset placeholder, returns empty bundle) -------------
 
 @router.get("/ImagingStudy")
-async def search_imaging_studies(
-    patient: Optional[str] = Query(None, description="Patient ID"),
-    modality: Optional[str] = Query(None, description="Imaging modality"),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    جستجوی ImagingStudy Resources
-    
-    Returns:
-        Bundle حاوی ImagingStudy resources
-    """
-    return {
-        "resourceType": "Bundle",
-        "type": "searchset",
-        "total": 0,
-        "entry": []
-    }
+async def search_imaging_study(
+    request: Request,
+    patient: Optional[str] = Query(None),
+    modality: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """ImagingStudy search.
 
-
-@router.get("/metadata")
-async def get_capability_statement():
+    The DICOM index is not yet exposed as FHIR resources; we return an empty
+    searchset bundle so clients can detect "no results" deterministically
+    instead of receiving a 501. ``CapabilityStatement`` advertises this
+    accurately.
     """
-    دریافت CapabilityStatement (FHIR Metadata)
-    
-    Returns:
-        CapabilityStatement resource
-    """
-    return {
-        "resourceType": "CapabilityStatement",
-        "status": "active",
-        "kind": "instance",
-        "fhirVersion": "4.0.1",
-        "format": ["json"],
-        "rest": [
-            {
-                "mode": "server",
-                "resource": [
-                    {
-                        "type": "Patient",
-                        "interaction": [
-                            {"code": "read"},
-                            {"code": "search-type"}
-                        ]
-                    },
-                    {
-                        "type": "Observation",
-                        "interaction": [
-                            {"code": "read"},
-                            {"code": "search-type"}
-                        ]
-                    },
-                    {
-                        "type": "DiagnosticReport",
-                        "interaction": [
-                            {"code": "read"},
-                            {"code": "search-type"}
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
-
+    return build_searchset_bundle((), base_url=_base_url(request))
