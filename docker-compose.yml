@@ -1,5 +1,11 @@
 version: '3.8'
 
+# Core stack (always): postgres, redis, backend, admin-dashboard.
+# Optional profiles:
+#   --profile observability → Prometheus + Grafana
+#   --profile elk           → Elasticsearch + Logstash + Kibana
+# Example: docker compose --profile observability up -d
+
 services:
   # PostgreSQL Database
   postgres:
@@ -19,6 +25,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    security_opt:
+      - no-new-privileges:true
     # Resource limits
     deploy:
       resources:
@@ -43,6 +51,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    security_opt:
+      - no-new-privileges:true
     # Resource limits
     deploy:
       resources:
@@ -85,6 +95,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    security_opt:
+      - no-new-privileges:true
     # Resource limits (development - can be overridden in production)
     deploy:
       resources:
@@ -117,6 +129,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    security_opt:
+      - no-new-privileges:true
     # Resource limits
     deploy:
       resources:
@@ -129,6 +143,7 @@ services:
 
   # Prometheus - Metrics Collection
   prometheus:
+    profiles: ["observability"]
     image: prom/prometheus:latest
     container_name: neuropredict-prometheus
     ports:
@@ -142,15 +157,19 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   # Grafana - Metrics Visualization
   grafana:
+    profiles: ["observability"]
     image: grafana/grafana:latest
     container_name: neuropredict-grafana
     ports:
       - "3002:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
@@ -159,9 +178,12 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   # Elasticsearch - Log Storage
   elasticsearch:
+    profiles: ["elk"]
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: neuropredict-elasticsearch
     environment:
@@ -176,6 +198,7 @@ services:
 
   # Logstash - Log Processing
   logstash:
+    profiles: ["elk"]
     image: docker.elastic.co/logstash/logstash:8.11.0
     container_name: neuropredict-logstash
     volumes:
@@ -190,6 +213,7 @@ services:
 
   # Kibana - Log Visualization
   kibana:
+    profiles: ["elk"]
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: neuropredict-kibana
     ports:

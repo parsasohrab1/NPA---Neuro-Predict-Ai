@@ -19,6 +19,7 @@ from ..models.medical_record import MedicalRecord
 from ..models.audit import AuditLog
 from ..core.security import get_current_user, require_role
 from ..services.ai_model_service import ai_model_service
+from ..core.metrics import get_metrics_response
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
@@ -97,8 +98,8 @@ async def monitoring_health_ready(db: AsyncSession = Depends(get_db)):
 
 @router.get("/metrics/prometheus")
 async def monitoring_metrics_prometheus():
-    """Prometheus-compatible metrics output."""
-    return "# NeuroPredict metrics placeholder"
+    """Prometheus text exposition (same registry as GET /metrics on the app root)."""
+    return get_metrics_response()
 
 
 @router.get("/slo")

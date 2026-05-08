@@ -23,6 +23,12 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p uploads/dicom uploads/mri models logs
 
+RUN groupadd --system app \
+    && useradd --system --gid app --no-create-home --home-dir /app app \
+    && chown -R app:app /app
+
+USER app
+
 # Expose port
 EXPOSE 8000
 

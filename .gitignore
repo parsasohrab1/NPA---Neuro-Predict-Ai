@@ -93,6 +93,9 @@ backend/venv/
 backend/*.db
 backend/backups/
 
+# Scheduled DB dumps (may contain PHI — never commit)
+backups/
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb

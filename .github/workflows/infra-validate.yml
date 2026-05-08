@@ -1,0 +1,38 @@
+name: Infra validate
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
+      - "monitoring/**"
+      - "nginx/**"
+      - "backend/Dockerfile"
+      - ".github/workflows/infra-validate.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
+      - "monitoring/**"
+      - "nginx/**"
+      - "backend/Dockerfile"
+      - ".github/workflows/infra-validate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  compose-config:
+    name: Docker Compose config (syntax)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate core stack compose file
+        run: docker compose -f docker-compose.yml config -q
+
+      - name: Validate monitoring stack compose file
+        run: docker compose -f monitoring/docker-compose.monitoring.yml config -q

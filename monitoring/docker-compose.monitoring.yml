@@ -197,9 +197,9 @@ services:
           cpus: '0.2'
           memory: 128M
 
-  # Loki - Log Aggregation
+  # Loki - Log Aggregation (pin major version for reproducible DR restores)
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.8
     container_name: neuropredict-loki
     hostname: loki
     restart: unless-stopped
@@ -217,9 +217,9 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Promtail - Log Shipper
+  # Promtail - Log Shipper (pin to Loki 2.9 line)
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:2.9.8
     container_name: neuropredict-promtail
     hostname: promtail
     restart: unless-stopped

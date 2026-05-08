@@ -21,9 +21,9 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # NeuroPredict Backend API
+  # NeuroPredict Backend API (prometheus_client registry on app root)
   - job_name: 'neuropredict-backend'
-    metrics_path: '/api/v1/monitoring/metrics/prometheus'
+    metrics_path: '/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s
     static_configs:
