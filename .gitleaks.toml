@@ -1,0 +1,18 @@
+# Gitleaks configuration for NeuroPredict-AI
+# Extends the upstream defaults so all standard secret patterns are detected.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Project-wide allowlist (test fixtures and example values only)"
+paths = [
+  '''(^|/)backend/.env\.example$''',
+  '''(^|/)backend/tests/.*''',
+  '''(^|/)tests/.*''',
+  '''(^|/).github/workflows/.*\.yml$''',
+]
+regexes = [
+  '''ci_test_secret_key_ci_test_secret_key_ci_test_secret''',
+  '''test_secret_key_test_secret_key_test_secret''',
+  '''CHANGE_THIS_TO_A_SECURE_RANDOM_STRING_AT_LEAST_32_CHARACTERS_LONG''',
+]

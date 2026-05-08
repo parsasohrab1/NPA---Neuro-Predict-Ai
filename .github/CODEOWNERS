@@ -1,0 +1,21 @@
+# Default owner for everything in this repo.
+# Adjust to your team handles before enabling branch protection rules.
+*                                   @parsasohrab1
+
+# Backend (FastAPI / SQLAlchemy / ML services)
+/backend/                           @parsasohrab1
+/backend/app/api/                   @parsasohrab1
+/backend/app/services/              @parsasohrab1
+/backend/app/core/                  @parsasohrab1
+
+# Frontend
+/frontend/                          @parsasohrab1
+/admin-dashboard/                   @parsasohrab1
+
+# Infra / DevOps / Security
+/.github/                           @parsasohrab1
+/infra/                             @parsasohrab1
+/k8s/                               @parsasohrab1
+/nginx/                             @parsasohrab1
+/docker-compose*.yml                @parsasohrab1
+SECURITY.md                         @parsasohrab1

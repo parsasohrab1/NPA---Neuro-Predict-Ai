@@ -1,0 +1,43 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = [
+  "alembic/versions",
+  "tests/e2e",
+  "tests/performance",
+  "scripts",
+  "data",
+  "models",
+  "uploads",
+  "backups",
+  "logs",
+  "docs",
+]
+
+[tool.ruff.lint]
+# Conservative starting set; ratchet up over time.
+# E/F = pycodestyle/pyflakes errors, B = bugbear, S = bandit-style, I = isort.
+select = ["E9", "F", "B", "I"]
+ignore = [
+  # Allow long lines for now; we'll tighten in a follow-up sprint.
+  "E501",
+]
+per-file-ignores = { "tests/*" = ["F401", "F811"] }
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.bandit]
+# CI runs `bandit -lll` (HIGH only). This config tunes default scans.
+exclude_dirs = [
+  "tests",
+  "alembic",
+  "scripts",
+  "uploads",
+  "backups",
+  "logs",
+]
+skips = [
+  # B101: assert is used in tests; harmless in non-prod paths.
+  "B101",
+]
