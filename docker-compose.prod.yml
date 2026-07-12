@@ -117,9 +117,21 @@ services:
   admin-dashboard:
     build:
       context: ./admin-dashboard
-      dockerfile: Dockerfile.prod
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Clinician Frontend - Production
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     deploy:
       resources:
         limits:

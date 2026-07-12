@@ -12,7 +12,41 @@ from pathlib import Path
 from .core.config import settings
 from .db.session import init_db, close_db
 from .core.cache import cache_service
-from .api import auth, patients, predictions, reports, models, model_metrics, analytics, users, mock_data, monitoring, websocket, optimization, disease_tracking, data_monitoring, admin, longitudinal
+from .api import (
+    auth,
+    patients,
+    predictions,
+    reports,
+    models,
+    model_metrics,
+    analytics,
+    users,
+    mock_data,
+    monitoring,
+    websocket,
+    optimization,
+    disease_tracking,
+    data_monitoring,
+    admin,
+    longitudinal,
+    data_fusion,
+    imaging,
+    analysis_3d,
+    backup,
+    privacy,
+    security,
+    ops,
+    webhooks,
+    notifications,
+    jobs,
+    maintenance,
+    legal,
+    products,
+    support,
+    rum,
+    comments,
+    system,
+)
 
 # Optional integration routers (FHIR etc. may require extra deps / Pydantic compatibility)
 _integration = None
@@ -33,6 +67,21 @@ try:
 except Exception as e:
     import warnings
     warnings.warn(f"Streaming router not loaded: {e}")
+
+# integration.py conflicts with the integration/ package name — load hub router explicitly
+_integration_hub = None
+try:
+    import importlib.util
+
+    _hub_path = Path(__file__).parent / "api" / "integration.py"
+    _hub_spec = importlib.util.spec_from_file_location("app.api._integration_hub", _hub_path)
+    if _hub_spec and _hub_spec.loader:
+        _hub_mod = importlib.util.module_from_spec(_hub_spec)
+        _hub_spec.loader.exec_module(_hub_mod)
+        _integration_hub = _hub_mod
+except Exception as e:
+    import warnings
+    warnings.warn(f"Integration hub router not loaded: {e}")
 
 # Configure logging
 logging.basicConfig(
@@ -276,12 +325,30 @@ app.include_router(optimization.router, prefix=settings.API_V1_PREFIX)
 app.include_router(disease_tracking.router, prefix=settings.API_V1_PREFIX)
 app.include_router(data_monitoring.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
-logger.info(f"About to include longitudinal router: {longitudinal.router}")
 app.include_router(longitudinal.router, prefix=settings.API_V1_PREFIX)
-logger.info("Longitudinal router included successfully")
+app.include_router(data_fusion.router, prefix=settings.API_V1_PREFIX)
+app.include_router(imaging.router, prefix=settings.API_V1_PREFIX)
+app.include_router(analysis_3d.router, prefix=settings.API_V1_PREFIX)
+app.include_router(backup.router, prefix=settings.API_V1_PREFIX)
+app.include_router(privacy.router, prefix=settings.API_V1_PREFIX)
+app.include_router(security.router, prefix=settings.API_V1_PREFIX)
+app.include_router(ops.router, prefix=settings.API_V1_PREFIX)
+app.include_router(webhooks.router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
+app.include_router(jobs.router, prefix=settings.API_V1_PREFIX)
+app.include_router(maintenance.router, prefix=settings.API_V1_PREFIX)
+app.include_router(legal.router, prefix=settings.API_V1_PREFIX)
+app.include_router(products.router, prefix=settings.API_V1_PREFIX)
+app.include_router(support.router, prefix=settings.API_V1_PREFIX)
+app.include_router(rum.router, prefix=settings.API_V1_PREFIX)
+app.include_router(comments.router, prefix=settings.API_V1_PREFIX)
+app.include_router(system.router, prefix=settings.API_V1_PREFIX)
 logger.info("All routers registered")
 
 # Integration routers (optional)
+if _integration_hub:
+    app.include_router(_integration_hub.router, prefix=settings.API_V1_PREFIX)
+
 if _integration:
     fhir, pacs, ehr, hl7v2, devices = _integration
     app.include_router(fhir.router, prefix=settings.API_V1_PREFIX)

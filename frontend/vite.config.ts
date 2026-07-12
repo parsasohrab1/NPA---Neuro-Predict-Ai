@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const apiProxyTarget = process.env.VITE_PROXY_TARGET ?? 'http://127.0.0.1:8001'
+
 export default defineConfig({
   build: {
     rollupOptions: {
@@ -29,15 +31,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3001,
+    // Local npm dev: 3001 (admin uses 3000). Docker maps host 3000 -> container 3000.
+    port: Number(process.env.VITE_DEV_PORT) || 3001,
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8001',
+        target: apiProxyTarget,
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:8001',
+        target: apiProxyTarget,
         changeOrigin: true,
       },
     },

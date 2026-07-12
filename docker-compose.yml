@@ -1,6 +1,7 @@
 version: '3.8'
 
-# Core stack (always): postgres, redis, backend, admin-dashboard.
+# Core stack (always): postgres, redis, backend, frontend, admin-dashboard.
+# Host ports: Frontend 3000 | Admin 3001 | Backend 8001 (container backend listens on 8000)
 # Optional profiles:
 #   --profile observability → Prometheus + Grafana
 #   --profile elk           → Elasticsearch + Logstash + Kibana
@@ -107,6 +108,41 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  # Clinician Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: neuropredict-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_PROXY_TARGET=http://backend:8000
+      - VITE_USE_MOCK_DATA=false
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
   # Admin Dashboard
   admin-dashboard:
     build:
@@ -116,12 +152,13 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_PROXY_TARGET=http://backend:8000
     volumes:
       - ./admin-dashboard:/app
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]

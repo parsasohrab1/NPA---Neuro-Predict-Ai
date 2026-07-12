@@ -29,9 +29,14 @@ chmod +x setup.sh
 
 ### Step 3: Access Application
 
-- **Frontend**: http://localhost:3000
-- **Admin Dashboard**: http://localhost:3001
-- **API Docs**: http://localhost:8000/api/docs
+| Service | Docker Compose URL | Local `npm run dev` URL |
+|---------|-------------------|-------------------------|
+| Clinician Frontend | http://localhost:3000 | http://localhost:3001 |
+| Admin Dashboard | http://localhost:3001 | http://localhost:3000 |
+| Backend API | http://localhost:8001 | http://localhost:8001 |
+| API Docs | http://localhost:8001/api/docs | http://localhost:8001/api/docs |
+
+Both frontends proxy `/api` to the backend, so you normally do not need to set `VITE_API_URL`.
 
 ### Step 4: Login
 

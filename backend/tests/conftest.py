@@ -69,6 +69,22 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides.clear()
 
 
+# Aliases used by legacy integration-style tests
+@pytest.fixture(scope="function")
+async def test_client(client: AsyncClient) -> AsyncClient:
+    return client
+
+
+@pytest.fixture(scope="function")
+async def test_session(test_db: AsyncSession) -> AsyncSession:
+    return test_db
+
+
+@pytest.fixture
+async def sample_patient(test_patient: Patient) -> Patient:
+    return test_patient
+
+
 @pytest.fixture
 async def test_user(test_db: AsyncSession) -> User:
     """Create test user"""

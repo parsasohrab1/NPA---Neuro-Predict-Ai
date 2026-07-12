@@ -54,8 +54,8 @@ Write-Host ""
 Write-Host "📍 Access URLs:" -ForegroundColor Cyan
 Write-Host "   Frontend:     http://localhost:3000"
 Write-Host "   Admin:        http://localhost:3001"
-Write-Host "   Backend API:  http://localhost:8000"
-Write-Host "   API Docs:     http://localhost:8000/api/docs"
+Write-Host "   Backend API:  http://localhost:8001"
+Write-Host "   API Docs:     http://localhost:8001/api/docs"
 Write-Host ""
 Write-Host "🔐 Default Credentials:" -ForegroundColor Yellow
 Write-Host "   Username: admin"

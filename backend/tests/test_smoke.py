@@ -51,6 +51,9 @@ def test_openapi_schema_is_valid(smoke_client: TestClient) -> None:
         "app.api.auth",
         "app.api.patients",
         "app.api.predictions",
+        "app.api.data_fusion",
+        "app.api.imaging",
+        "app.api.system",
     ],
 )
 def test_critical_modules_importable(module_path: str) -> None:

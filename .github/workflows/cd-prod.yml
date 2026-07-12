@@ -4,28 +4,89 @@ on:
   workflow_dispatch:
     inputs:
       backend_tag:
-        description: "Backend image tag (ghcr.io/<repo>-backend:<tag>)"
+        description: "Backend image (e.g. ghcr.io/owner/neuropredict-backend:sha)"
         required: true
       frontend_tag:
-        description: "Frontend image tag (ghcr.io/<repo>-frontend:<tag>)"
+        description: "Frontend image (e.g. ghcr.io/owner/neuropredict-frontend:sha)"
         required: true
       admin_tag:
-        description: "Admin image tag (ghcr.io/<repo>-admin:<tag>)"
+        description: "Admin image (e.g. ghcr.io/owner/neuropredict-admin-dashboard:sha)"
+        required: true
+      namespace:
+        description: "Kubernetes namespace"
         required: false
+        default: neuropredict
+
+permissions:
+  contents: read
 
 jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://example.com
     steps:
-      - name: Prepare deployment plan
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         run: |
-          echo "Backend: ${{ inputs.backend_tag }}"
-          echo "Frontend: ${{ inputs.frontend_tag }}"
-          echo "Admin   : ${{ inputs.admin_tag }}"
-          echo "This job is a placeholder to integrate with your deployment platform (Kubernetes/VM/PaaS)."
-          echo "Implement Blue-Green/Canary rollout via your chosen tooling (Helm/ArgoCD/GitOps)."
+          if [ -z "${KUBE_CONFIG}" ]; then
+            echo "::error::KUBE_CONFIG secret is required for production deployment."
+            exit 1
+          fi
+          mkdir -p "${HOME}/.kube"
+          echo "${KUBE_CONFIG}" | base64 -d > "${HOME}/.kube/config"
+          kubectl cluster-info
 
+      - name: Apply Kubernetes manifests
+        run: |
+          NS="${{ inputs.namespace }}"
+          kubectl apply -f infra/k8s/namespace.yaml
+          kubectl apply -f infra/k8s/configmaps.yaml
+          kubectl apply -f infra/k8s/persistentvolumes.yaml
+          kubectl apply -f infra/k8s/postgres-statefulset.yaml
+          kubectl apply -f infra/k8s/redis-deployment.yaml
+          kubectl apply -f infra/k8s/backend-deployment.yaml
+          kubectl apply -f infra/k8s/frontend-deployment.yaml
+          kubectl apply -f infra/k8s/network-policies.yaml
+          kubectl apply -f infra/k8s/ingress.yaml
 
+      - name: Rolling update (blue/green via Kubernetes rollout)
+        run: |
+          NS="${{ inputs.namespace }}"
+          kubectl set image deployment/neuropredict-backend \
+            backend="${{ inputs.backend_tag }}" \
+            -n "${NS}" --record
+          kubectl set image deployment/neuropredict-frontend \
+            frontend="${{ inputs.frontend_tag }}" \
+            -n "${NS}" --record
+          kubectl set image deployment/neuropredict-admin \
+            admin="${{ inputs.admin_tag }}" \
+            -n "${NS}" --record
+
+      - name: Wait for rollout
+        run: |
+          NS="${{ inputs.namespace }}"
+          kubectl rollout status deployment/neuropredict-backend -n "${NS}" --timeout=300s
+          kubectl rollout status deployment/neuropredict-frontend -n "${NS}" --timeout=300s
+          kubectl rollout status deployment/neuropredict-admin -n "${NS}" --timeout=300s
+
+      - name: Post-deploy verification
+        run: |
+          NS="${{ inputs.namespace }}"
+          kubectl get pods,svc,ingress -n "${NS}"
+          BACKEND_POD="$(kubectl get pods -n "${NS}" -l app=neuropredict,tier=backend -o jsonpath='{.items[0].metadata.name}')"
+          kubectl exec -n "${NS}" "${BACKEND_POD}" -- curl -sf http://localhost:8000/health
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          NS="${{ inputs.namespace }}"
+          kubectl rollout undo deployment/neuropredict-backend -n "${NS}" || true
+          kubectl rollout undo deployment/neuropredict-frontend -n "${NS}" || true
+          kubectl rollout undo deployment/neuropredict-admin -n "${NS}" || true

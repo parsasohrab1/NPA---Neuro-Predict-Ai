@@ -6,6 +6,8 @@ import asyncio
 import time
 from httpx import AsyncClient
 
+pytestmark = pytest.mark.performance
+
 
 class TestAPIPerformance:
     """Performance tests for API endpoints"""

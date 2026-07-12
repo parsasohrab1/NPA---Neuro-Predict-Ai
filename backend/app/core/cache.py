@@ -240,3 +240,54 @@ class CacheService:
 # Global cache service instance
 cache_service = CacheService()
 
+
+def generate_cache_key(prefix: str, **kwargs) -> str:
+    """Build a deterministic cache key from a prefix and parameters."""
+    key_parts = []
+    for k, v in sorted(kwargs.items()):
+        if v is None:
+            continue
+        if k == "request" and hasattr(v, "url"):
+            key_parts.append(f"path:{v.url.path}")
+        elif k == "current_user" and hasattr(v, "id"):
+            key_parts.append(f"user:{v.id}")
+        else:
+            key_parts.append(f"{k}:{v}")
+    digest = hashlib.md5("|".join(key_parts).encode()).hexdigest()
+    return f"{prefix}:{digest}"
+
+
+def _split_cache_key(key: str) -> tuple[str, str]:
+    if ":" in key:
+        prefix, subkey = key.split(":", 1)
+        return prefix, subkey
+    return "response", key
+
+
+async def get_cached_response(key: str, expire_seconds: Optional[int] = None) -> Any:
+    """Get a cached HTTP response payload by key."""
+    prefix, subkey = _split_cache_key(key)
+    return await cache_service.get(prefix, subkey)
+
+
+async def set_cached_response(key: str, value: Any, expire_seconds: int = 300) -> bool:
+    """Store an HTTP response payload in cache."""
+    prefix, subkey = _split_cache_key(key)
+    return await cache_service.set(prefix, subkey, value, ttl=expire_seconds)
+
+
+async def invalidate_cache_pattern(pattern: str) -> int:
+    """Invalidate cache entries matching a prefix:subpattern glob."""
+    if ":" in pattern:
+        prefix, subpattern = pattern.split(":", 1)
+    else:
+        prefix, subpattern = "response", pattern
+    return await cache_service.delete_pattern(prefix, subpattern)
+
+
+async def invalidate_product_cache(product_id: Optional[int] = None, **kwargs) -> None:
+    """Invalidate product list/detail caches after mutations."""
+    _ = product_id if product_id is not None else kwargs.get("product_id")
+    await cache_service.delete_pattern("products", "*")
+    await cache_service.delete_pattern("product", "*")
+

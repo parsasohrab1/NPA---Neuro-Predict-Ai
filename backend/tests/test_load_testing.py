@@ -9,6 +9,8 @@ import statistics
 from typing import List
 from httpx import AsyncClient
 
+from app.models.user import User
+
 
 pytestmark = pytest.mark.asyncio
 pytestmark = pytest.mark.slow
@@ -29,22 +31,22 @@ class TestLoadTesting:
             return duration, 500
     
     @pytest.fixture
-    async def auth_token(self, test_client: AsyncClient):
+    async def auth_token(self, client: AsyncClient, test_admin: User):
         """Get authentication token"""
-        response = await test_client.post(
+        response = await client.post(
             "/api/v1/auth/login",
-            data={"username": "admin", "password": "admin123"}
+            data={"username": "admin", "password": "admin123"},
         )
         if response.status_code == 200:
             return response.json().get("access_token")
         return None
     
     @pytest.mark.load_test
-    async def test_concurrent_login_requests(self, test_client: AsyncClient):
+    async def test_concurrent_login_requests(self, client: AsyncClient, test_admin: User):
         """Test handling of 50 concurrent login requests"""
         async def login():
             return await self.make_request(
-                test_client,
+                client,
                 "POST",
                 "/api/v1/auth/login",
                 data={"username": "admin", "password": "admin123"}
@@ -76,7 +78,7 @@ class TestLoadTesting:
         print(f"  Total time: {total_time:.2f}ms")
     
     @pytest.mark.load_test
-    async def test_burst_load(self, test_client: AsyncClient, auth_token: str):
+    async def test_burst_load(self, client: AsyncClient, auth_token: str):
         """Test handling of burst load (100 requests in quick succession)"""
         if not auth_token:
             pytest.skip("Authentication required")
@@ -85,7 +87,7 @@ class TestLoadTesting:
         
         async def get_patients():
             return await self.make_request(
-                test_client,
+                client,
                 "GET",
                 "/api/v1/patients?limit=10",
                 headers=headers
@@ -113,7 +115,7 @@ class TestLoadTesting:
         print(f"  Total time: {total_time:.2f}ms")
     
     @pytest.mark.load_test
-    async def test_sustained_load(self, test_client: AsyncClient, auth_token: str):
+    async def test_sustained_load(self, client: AsyncClient, auth_token: str):
         """Test sustained load over extended period (200 requests over 10 seconds)"""
         if not auth_token:
             pytest.skip("Authentication required")
@@ -132,7 +134,7 @@ class TestLoadTesting:
         async def make_request_with_delay(index: int):
             await asyncio.sleep(index * delay_between_requests)
             duration, status = await self.make_request(
-                test_client,
+                client,
                 "GET",
                 "/api/v1/patients?limit=10",
                 headers=headers
@@ -164,7 +166,7 @@ class TestLoadTesting:
         print(f"  Throughput: {len(results)/total_time:.1f} req/s")
     
     @pytest.mark.load_test
-    async def test_mixed_workload(self, test_client: AsyncClient, auth_token: str):
+    async def test_mixed_workload(self, client: AsyncClient, auth_token: str):
         """Test mixed workload with different endpoint types"""
         if not auth_token:
             pytest.skip("Authentication required")
@@ -173,17 +175,17 @@ class TestLoadTesting:
         
         async def get_patients():
             return await self.make_request(
-                test_client, "GET", "/api/v1/patients?limit=10", headers=headers
+                client, "GET", "/api/v1/patients?limit=10", headers=headers
             )
         
         async def get_predictions():
             return await self.make_request(
-                test_client, "GET", "/api/v1/predictions?limit=10", headers=headers
+                client, "GET", "/api/v1/predictions?limit=10", headers=headers
             )
         
         async def get_reports():
             return await self.make_request(
-                test_client, "GET", "/api/v1/reports/summary", headers=headers
+                client, "GET", "/api/v1/reports/summary", headers=headers
             )
         
         # Mix of different endpoints
@@ -211,7 +213,7 @@ class TestLoadTesting:
         print(f"  Total time: {total_time:.2f}ms")
     
     @pytest.mark.load_test
-    async def test_prediction_load(self, test_client: AsyncClient, auth_token: str, sample_patient):
+    async def test_prediction_load(self, client: AsyncClient, auth_token: str, sample_patient):
         """Test prediction endpoint under load (limited due to resource intensity)"""
         if not auth_token:
             pytest.skip("Authentication required")
@@ -220,7 +222,7 @@ class TestLoadTesting:
         
         async def make_prediction():
             return await self.make_request(
-                test_client,
+                client,
                 "POST",
                 "/api/v1/predictions",
                 headers=headers,
@@ -258,10 +260,10 @@ class TestStressTesting:
     """Stress testing - push system to limits"""
     
     @pytest.mark.stress_test
-    async def test_extreme_concurrency(self, test_client: AsyncClient):
+    async def test_extreme_concurrency(self, client: AsyncClient):
         """Test extreme concurrency (1000 concurrent requests)"""
         async def health_check():
-            return await test_client.get("/health")
+            return await client.get("/health")
         
         # Create 1000 concurrent tasks
         tasks = [health_check() for _ in range(1000)]
