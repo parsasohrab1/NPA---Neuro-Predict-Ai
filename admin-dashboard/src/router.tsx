@@ -1,8 +1,8 @@
 import { createBrowserRouter } from 'react-router-dom'
 
-const routerFuture = { v7_startTransition: true } as const
-
 import AdminLayout from './layouts/AdminLayout'
+import ProtectedRoute from './components/ProtectedRoute'
+import LoginPage from './pages/LoginPage'
 import SystemOverview from './pages/SystemOverview'
 import UsersManagement from './pages/UsersManagement'
 import RolesPermissions from './pages/RolesPermissions'
@@ -17,29 +17,35 @@ import Analysis3DPage from './pages/Analysis3DPage'
 import DataFusionReportsPage from './pages/DataFusionReportsPage'
 import TestPage from './pages/TestPage'
 
-export const router = createBrowserRouter(
-  [
+const protectedChildren = [
+  { index: true, element: <SystemOverview /> },
+  { path: 'reports', element: <ReportsPage /> },
+  { path: 'longitudinal', element: <LongitudinalTrackingPage /> },
+  { path: 'disease-tracking', element: <DiseaseTrackingDashboard /> },
+  { path: 'data-monitoring', element: <DataMonitoringPage /> },
+  { path: '3d-analysis', element: <Analysis3DPage /> },
+  { path: 'data-fusion', element: <DataFusionReportsPage /> },
+  { path: 'users', element: <UsersManagement /> },
+  { path: 'roles', element: <RolesPermissions /> },
+  { path: 'models', element: <ModelManagement /> },
+  { path: 'audit', element: <AuditLogs /> },
+  { path: 'settings', element: <SystemSettings /> },
+  ...(import.meta.env.DEV ? [{ path: 'test', element: <TestPage /> }] : []),
+]
+
+export const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <LoginPage />,
+  },
   {
     path: '/',
-    element: <AdminLayout />,
+    element: <ProtectedRoute />,
     children: [
-      { index: true, element: <SystemOverview /> },
-      { path: 'reports', element: <ReportsPage /> },
-      { path: 'longitudinal', element: <LongitudinalTrackingPage /> },
-      { path: 'disease-tracking', element: <DiseaseTrackingDashboard /> },
-      { path: 'data-monitoring', element: <DataMonitoringPage /> },
-      { path: '3d-analysis', element: <Analysis3DPage /> },
-      { path: 'data-fusion', element: <DataFusionReportsPage /> },
-      { path: 'users', element: <UsersManagement /> },
-      { path: 'roles', element: <RolesPermissions /> },
-      { path: 'models', element: <ModelManagement /> },
-      { path: 'audit', element: <AuditLogs /> },
-      { path: 'settings', element: <SystemSettings /> },
-      { path: 'test', element: <TestPage /> },
+      {
+        element: <AdminLayout />,
+        children: protectedChildren,
+      },
     ],
   },
-],
-  { future: routerFuture }
-)
-
-
+])

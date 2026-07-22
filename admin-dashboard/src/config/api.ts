@@ -31,11 +31,11 @@ axios.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized - redirect to login
     if (error.response?.status === 401) {
-      // Clear auth tokens
       localStorage.removeItem('auth_token')
       sessionStorage.removeItem('auth_token')
-      // Optionally redirect to login page
-      // window.location.href = '/login'
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
     }
     console.error('[API Response Error]', error.response?.data || error.message)
     return Promise.reject(error)

@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
+import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import PatientsPage from './pages/PatientsPage'
@@ -30,17 +31,19 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 
-        <Route path="/" element={<Layout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="patients" element={<PatientsPage />} />
-          <Route path="patients/:id" element={<PatientDetailPage />} />
-          <Route path="predictions/new" element={<PredictionPage />} />
-          <Route path="predictions/:id" element={<PredictionResultPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="longitudinal" element={<LongitudinalPage />} />
-          <Route path="population" element={<PopulationAnalysisPage />} />
-          <Route path="models" element={<ModelManagementPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="patients" element={<PatientsPage />} />
+            <Route path="patients/:id" element={<PatientDetailPage />} />
+            <Route path="predictions/new" element={<PredictionPage />} />
+            <Route path="predictions/:id" element={<PredictionResultPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="longitudinal" element={<LongitudinalPage />} />
+            <Route path="population" element={<PopulationAnalysisPage />} />
+            <Route path="models" element={<ModelManagementPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />

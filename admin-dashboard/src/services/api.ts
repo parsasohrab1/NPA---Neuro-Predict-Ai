@@ -87,6 +87,24 @@ export const monitoringApi = {
 };
 
 // Disease tracking: Parkinson's & Alzheimer's ranges and patient classification
+export const usersApi = {
+  getAll: (skip = 0, limit = 100) =>
+    api.get('/users/', { params: { skip, limit } }),
+  create: (data: Record<string, unknown>) =>
+    api.post('/users/', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/users/${id}`, data),
+  delete: (id: number) =>
+    api.delete(`/users/${id}`),
+};
+
+export const adminSettingsApi = {
+  getPasswordPolicy: () =>
+    api.get('/admin/settings/security/password-policy'),
+  updatePasswordPolicy: (data: Record<string, unknown>) =>
+    api.put('/admin/settings/security/password-policy', data),
+};
+
 export const diseaseApi = {
   getFeatureRanges: () => api.get('/disease-tracking/feature-ranges'),
   getPatientsSummary: () => api.get('/disease-tracking/all-patients/summary'),

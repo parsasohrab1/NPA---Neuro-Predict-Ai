@@ -1,17 +1,32 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { patientsApi } from '../services/api'
+import { patientsApi, type Patient } from '../services/api'
 
 const SEARCH_DEBOUNCE_MS = 300
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const DEFAULT_PAGE_SIZE = 20
+
+const emptyForm = {
+  patient_id: '',
+  first_name: '',
+  last_name: '',
+  date_of_birth: '',
+  gender: 'male' as Patient['gender'],
+  email: '',
+  phone: '',
+  education_years: '',
+}
 
 export default function PatientsPage() {
   const [searchInput, setSearchInput] = useState('')
   const [searchDebounced, setSearchDebounced] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState(emptyForm)
+  const [formError, setFormError] = useState('')
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -30,8 +45,49 @@ export default function PatientsPage() {
     queryFn: () => patientsApi.getAll(skip, pageSize, searchDebounced || undefined),
   })
 
+  const createMutation = useMutation({
+    mutationFn: () =>
+      patientsApi.create({
+        patient_id: form.patient_id.trim(),
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        date_of_birth: form.date_of_birth,
+        gender: form.gender,
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        education_years: form.education_years ? Number(form.education_years) : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] })
+      setShowModal(false)
+      setForm(emptyForm)
+      setFormError('')
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { detail?: string } }; message?: string }
+      const detail = ax.response?.data?.detail
+      setFormError(
+        typeof detail === 'string'
+          ? detail
+          : ax.message || 'Failed to create patient'
+      )
+    },
+  })
+
   const hasNextPage = patients.length >= pageSize
   const hasPrevPage = page > 0
+
+  const openModal = () => {
+    setForm(emptyForm)
+    setFormError('')
+    setShowModal(true)
+  }
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError('')
+    createMutation.mutate()
+  }
 
   return (
     <div>
@@ -64,7 +120,7 @@ export default function PatientsPage() {
               ))}
             </select>
           </div>
-          <button className="btn btn-primary">
+          <button type="button" className="btn btn-primary" onClick={openModal}>
             + Add Patient
           </button>
         </div>
@@ -156,7 +212,122 @@ export default function PatientsPage() {
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-patient-title"
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <h2 id="add-patient-title" className="text-xl font-bold text-gray-900 mb-4">
+              Add Patient
+            </h2>
+            <form onSubmit={handleCreate} className="space-y-3">
+              <div>
+                <label className="label" htmlFor="patient_id">Patient ID</label>
+                <input
+                  id="patient_id"
+                  className="input"
+                  required
+                  value={form.patient_id}
+                  onChange={(e) => setForm((f) => ({ ...f, patient_id: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="first_name">First name</label>
+                  <input
+                    id="first_name"
+                    className="input"
+                    required
+                    value={form.first_name}
+                    onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="last_name">Last name</label>
+                  <input
+                    id="last_name"
+                    className="input"
+                    required
+                    value={form.last_name}
+                    onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="date_of_birth">Date of birth</label>
+                  <input
+                    id="date_of_birth"
+                    type="date"
+                    className="input"
+                    required
+                    value={form.date_of_birth}
+                    onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="gender">Gender</label>
+                  <select
+                    id="gender"
+                    className="input"
+                    value={form.gender}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, gender: e.target.value as Patient['gender'] }))
+                    }
+                  >
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label" htmlFor="email">Email (optional)</label>
+                <input
+                  id="email"
+                  type="email"
+                  className="input"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="phone">Phone (optional)</label>
+                <input
+                  id="phone"
+                  className="input"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                />
+              </div>
+              {formError && (
+                <p className="text-sm text-red-700">{formError}</p>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowModal(false)}
+                  disabled={createMutation.isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={createMutation.isPending}
+                >
+                  {createMutation.isPending ? 'Saving...' : 'Create Patient'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-

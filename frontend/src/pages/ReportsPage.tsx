@@ -51,16 +51,59 @@ export default function ReportsPage() {
 
   const COLORS = ['#4ade80', '#fbbf24', '#ef4444']
 
-  const handleExportPDF = () => {
-    alert('PDF export functionality will be implemented')
+  const downloadCsv = (filename: string, rows: string[][]) => {
+    const escape = (cell: string | number | undefined | null) => {
+      const s = cell == null ? '' : String(cell)
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+      return s
+    }
+    const csv = rows.map((row) => row.map(escape).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
-  const handleExportExcel = () => {
-    alert('Excel export functionality will be implemented')
+  const handleExportPDF = () => {
+    // Print the report section (browser print → Save as PDF)
+    window.print()
+  }
+
+  const handleExportCsv = () => {
+    const summaryRows: string[][] = [
+      ['Metric', 'Value'],
+      ['Report Type', reportType],
+      ['Total Patients', String(reportSummary?.statistics?.total_patients ?? patients.length)],
+      ['Total Predictions', String(reportSummary?.statistics?.total_predictions ?? predictions.length)],
+      ['High Risk Cases', String(reportSummary?.statistics?.high_risk_cases ?? riskDistribution[2]?.value ?? 0)],
+      ['Low Risk', String(riskDistribution[0]?.value ?? 0)],
+      ['Medium Risk', String(riskDistribution[1]?.value ?? 0)],
+      ['High Risk', String(riskDistribution[2]?.value ?? 0)],
+    ]
+    downloadCsv(`neuropredict-report-${reportType}-summary.csv`, summaryRows)
+
+    if (predictions.length > 0) {
+      const predRows: string[][] = [
+        ['id', 'patient_id', 'disease_type', 'alzheimer_risk', 'parkinson_risk', 'created_at', 'is_reviewed'],
+        ...predictions.map((p) => [
+          String(p.id),
+          String(p.patient_id),
+          p.disease_type ?? '',
+          p.alzheimer_prediction?.risk_score != null ? String(p.alzheimer_prediction.risk_score) : '',
+          p.parkinson_prediction?.risk_score != null ? String(p.parkinson_prediction.risk_score) : '',
+          p.created_at ?? '',
+          String(p.is_reviewed ?? false),
+        ]),
+      ]
+      downloadCsv(`neuropredict-report-${reportType}-predictions.csv`, predRows)
+    }
   }
 
   return (
-    <div>
+    <div id="report-print-section">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">📑 Reports & Visualization</h1>
         <p className="text-gray-600">Generate and view comprehensive reports</p>
@@ -111,16 +154,18 @@ export default function ReportsPage() {
           <h2 className="text-xl font-semibold">Export Options</h2>
           <div className="flex space-x-3">
             <button
+              type="button"
               onClick={handleExportPDF}
               className="btn btn-primary"
             >
-              📄 Export PDF
+              📄 Export PDF (Print)
             </button>
             <button
-              onClick={handleExportExcel}
+              type="button"
+              onClick={handleExportCsv}
               className="btn btn-secondary"
             >
-              📊 Export Excel
+              📊 Export CSV
             </button>
           </div>
         </div>
@@ -173,7 +218,7 @@ export default function ReportsPage() {
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {riskDistribution.map((entry, index) => (
+                      {riskDistribution.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -198,7 +243,7 @@ export default function ReportsPage() {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {riskDistribution.map((entry, index) => (
+                {riskDistribution.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
