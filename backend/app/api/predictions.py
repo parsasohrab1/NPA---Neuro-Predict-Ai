@@ -17,7 +17,7 @@ from ..models.audit import AuditLog
 from ..schemas.prediction import PredictionRequest, PredictionResponse, PredictionReview
 from ..core.security import get_current_user, require_role
 from ..core.cache import cache_service
-from ..services.ai_model_service import ai_model_service
+from ..services.ai_model_service import ai_model_service, ModelNotReadyError
 from ..services.clinical_explainability_service import clinical_explainability_service
 
 router = APIRouter(prefix="/predictions", tags=["Predictions"])
