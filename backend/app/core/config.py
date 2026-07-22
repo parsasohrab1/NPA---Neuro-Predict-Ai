@@ -111,6 +111,13 @@ class Settings(BaseSettings):
     ALZHEIMER_MODEL_PATH: str = "models/alzheimer_model.pth"
     PARKINSON_MODEL_PATH: str = "models/parkinson_model.pth"
     ENSEMBLE_MODEL_PATH: str = "models/ensemble_model.pth"
+
+    # Only allow mock/untrained predictions when DEBUG and this flag are both True.
+    # Default False so production never silently falls back to random mock scores.
+    ALLOW_MOCK_PREDICTIONS: bool = Field(
+        default=False,
+        description="Allow mock predictions when model weights are missing. Requires DEBUG=True.",
+    )
     
     # Model Configuration
     MODEL_CONFIDENCE_THRESHOLD: float = 0.75
@@ -151,10 +158,33 @@ class Settings(BaseSettings):
         default=None,
         description="HL7 v2 server URL for medical devices"
     )
+    HL7_MLLP_HOST: Optional[str] = Field(
+        default=None,
+        description="HL7 v2 MLLP TCP host. When set, send_message attempts a real MLLP send.",
+    )
+    HL7_MLLP_PORT: int = Field(
+        default=2575,
+        description="HL7 v2 MLLP TCP port (default 2575).",
+    )
     HL7_AE_TITLE: str = Field(
         default="NEUROPREDICT",
         description="Application Entity Title for HL7 v2"
     )
+
+    # Optional notification providers (unset = not configured)
+    SMTP_HOST: Optional[str] = Field(
+        default=None,
+        description="SMTP host for outbound email. Unset → email notifications not configured.",
+    )
+    SMTP_PORT: int = Field(default=587, description="SMTP port")
+    SMTP_USER: Optional[str] = Field(default=None, description="SMTP username")
+    SMTP_PASSWORD: Optional[str] = Field(default=None, description="SMTP password")
+    SMTP_FROM: Optional[str] = Field(default=None, description="From address for outbound email")
+    SMS_PROVIDER_URL: Optional[str] = Field(
+        default=None,
+        description="SMS provider API URL. Unset → SMS notifications not configured.",
+    )
+    SMS_API_KEY: Optional[str] = Field(default=None, description="SMS provider API key")
     
     # Logging
     LOG_LEVEL: str = "INFO"

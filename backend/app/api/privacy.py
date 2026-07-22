@@ -76,3 +76,30 @@ async def export_dsr(
     return {"id": dsr.id, "status": dsr.status, "result_location": dsr.result_location}
 
 
+@router.post("/dsr/{dsr_id}/erase")
+async def erase_dsr(
+    dsr_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Admin endpoint: fulfill erasure DSR by anonymizing PHI for the subject."""
+    result = await db.execute(select(DSRRequest).where(DSRRequest.id == dsr_id))
+    dsr = result.scalar_one_or_none()
+    if not dsr:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="DSR not found")
+
+    erase_result = await PrivacyService.erase_subject_data(db, dsr.subject_identifier)
+    note = json_dumps_safe(erase_result)
+    dsr = await PrivacyService.update_dsr_status(
+        db, dsr, DSRStatus.COMPLETED, result_location=note
+    )
+    return {
+        "id": dsr.id,
+        "status": dsr.status,
+        "erase_result": erase_result,
+    }
+
+
+def json_dumps_safe(obj) -> str:
+    import json
+    return json.dumps(obj, default=str)

@@ -108,6 +108,8 @@ backups/
 models/*.pth
 models/*.ckpt
 models/*.h5
+# Keep unvalidated bootstrap weights for Honest MVP fail-closed loading
+!models/ensemble_model.pth
 
 # Uploads & Models
 uploads/

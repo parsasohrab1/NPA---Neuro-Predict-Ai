@@ -259,18 +259,20 @@ class ImageProcessingService:
             Dictionary of quality metrics
         """
         # Calculate Signal-to-Noise Ratio (SNR)
-        signal = np.mean(image)
-        noise = np.std(image[image < np.percentile(image, 10)])  # Background noise
-        snr = signal / noise if noise > 0 else 0
+        signal = float(np.mean(image))
+        low_band = image[image < np.percentile(image, 10)]
+        noise = float(np.std(low_band)) if low_band.size > 1 else float(np.std(image) or 0.0)
+        snr = signal / noise if noise > 0 else 0.0
         
         # Calculate Contrast-to-Noise Ratio (CNR)
         foreground = image[image > np.percentile(image, 50)]
         background = image[image < np.percentile(image, 50)]
-        cnr = (np.mean(foreground) - np.mean(background)) / np.std(background) if np.std(background) > 0 else 0
+        bg_std = float(np.std(background)) if background.size > 1 else 0.0
+        cnr = (float(np.mean(foreground)) - float(np.mean(background))) / bg_std if bg_std > 0 and foreground.size and background.size else 0.0
         
         # Sharpness (using Laplacian variance)
         laplacian = cv2.Laplacian((image * 255).astype(np.uint8), cv2.CV_64F)
-        sharpness = laplacian.var()
+        sharpness = float(laplacian.var())
         
         quality_metrics = {
             'snr': float(snr),
@@ -280,6 +282,79 @@ class ImageProcessingService:
         }
         
         return quality_metrics
+
+    def build_deterministic_imaging_features(
+        self,
+        image: np.ndarray,
+        texture_features: Optional[Dict[str, float]] = None,
+        quality_metrics: Optional[Dict[str, float]] = None,
+        length: int = 32,
+    ) -> np.ndarray:
+        """
+        Build a fixed-length deterministic feature vector from texture/quality/stats.
+        Same input image always yields the same 32 floats (no randomness).
+        """
+        flat = np.asarray(image, dtype=np.float64).ravel()
+        if flat.size == 0:
+            return np.zeros(length, dtype=np.float32)
+
+        if texture_features is None:
+            texture_features = self.extract_texture_features(
+                image if image.ndim >= 2 else image.reshape(1, -1)
+            )
+        if quality_metrics is None:
+            quality_metrics = self.assess_image_quality(
+                image if image.ndim >= 2 else image.reshape(1, -1)
+            )
+
+        mean = float(np.mean(flat))
+        std = float(np.std(flat))
+        percentiles = np.percentile(flat, [5, 10, 25, 50, 75, 90, 95]).astype(np.float64)
+
+        if image.ndim >= 2:
+            gy, gx = np.gradient(np.asarray(image, dtype=np.float64))
+            grad_mean = float(np.mean(np.abs(gx)) + np.mean(np.abs(gy)))
+            grad_std = float(np.std(gx) + np.std(gy))
+        else:
+            g = np.gradient(flat)
+            grad_mean = float(np.mean(np.abs(g)))
+            grad_std = float(np.std(g))
+
+        hist_min = float(flat.min())
+        hist_max = float(flat.max())
+        if hist_max <= hist_min:
+            hist_max = hist_min + 1.0
+        hist, _ = np.histogram(flat, bins=16, range=(hist_min, hist_max))
+        hist = hist.astype(np.float64)
+        hist = hist / hist.sum() if hist.sum() > 0 else hist
+
+        texture_vals = [
+            float(texture_features.get("mean_intensity", mean)),
+            float(texture_features.get("std_intensity", std)),
+            float(texture_features.get("skewness", 0.0)),
+            float(texture_features.get("kurtosis", 0.0)),
+            float(texture_features.get("entropy", 0.0)),
+        ]
+        quality_vals = [
+            float(quality_metrics.get("snr", 0.0)),
+            float(quality_metrics.get("cnr", 0.0)),
+            float(quality_metrics.get("sharpness", 0.0)),
+            float(quality_metrics.get("quality_score", 0.0)),
+        ]
+
+        vec = np.concatenate([
+            np.array([mean, std, grad_mean, grad_std], dtype=np.float64),
+            percentiles,
+            texture_vals,
+            quality_vals,
+            hist,
+        ])
+        # Pad or truncate to exactly `length`
+        if vec.size < length:
+            vec = np.pad(vec, (0, length - vec.size), mode="constant")
+        else:
+            vec = vec[:length]
+        return vec.astype(np.float32)
     
     async def process_dicom_study(self, dicom_dir: str) -> Dict:
         """
@@ -309,8 +384,13 @@ class ImageProcessingService:
             texture_features = self.extract_texture_features(processed_image)
             quality_metrics = self.assess_image_quality(processed_image)
             
-            # Generate deep features (placeholder - in production use CNN)
-            deep_features = np.random.randn(32).tolist()  # 32-dimensional feature vector
+            # Deterministic 32-d features from texture + quality + image statistics
+            deep_features = self.build_deterministic_imaging_features(
+                processed_image,
+                texture_features=texture_features,
+                quality_metrics=quality_metrics,
+                length=32,
+            ).tolist()
             
             result = {
                 'metadata': metadata,

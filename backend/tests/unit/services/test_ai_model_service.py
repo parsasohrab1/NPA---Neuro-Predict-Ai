@@ -47,7 +47,7 @@ class TestAIModelService:
         assert all(isinstance(f, (int, float, np.floating)) for f in features)
     
     def test_prediction_with_valid_data(self):
-        """Test prediction with valid patient data"""
+        """Test prediction with valid patient data (requires ready model or mock)."""
         service = AIModelService()
         
         patient_data = {
@@ -71,6 +71,12 @@ class TestAIModelService:
         }
         
         import asyncio
+        from app.services.ai_model_service import ModelNotReadyError
+        if not service.model_ready and not service.use_mock:
+            with pytest.raises(ModelNotReadyError):
+                asyncio.run(service.predict(patient_data))
+            return
+
         result = asyncio.run(service.predict(patient_data))
         
         assert result is not None
@@ -96,6 +102,12 @@ class TestAIModelService:
         }
         
         import asyncio
+        from app.services.ai_model_service import ModelNotReadyError
+        if not service.model_ready and not service.use_mock:
+            with pytest.raises(ModelNotReadyError):
+                asyncio.run(service.predict(patient_data))
+            return
+
         result = asyncio.run(service.predict(patient_data))
         
         assert result is not None

@@ -22,7 +22,8 @@
             "specificity": 0.8445,
             "auc_roc": 0.8934
           }
-        }
+        },
+        "honesty_note": "Legacy metrics may be synthetic placeholders \u2014 not clinically validated"
       },
       "description": "Baseline model with standard CNN architecture",
       "is_active": false
@@ -49,7 +50,8 @@
             "specificity": 0.8734,
             "auc_roc": 0.9123
           }
-        }
+        },
+        "honesty_note": "Legacy metrics may be synthetic placeholders \u2014 not clinically validated"
       },
       "description": "Improved architecture with attention mechanism and data augmentation",
       "is_active": false
@@ -76,10 +78,11 @@
             "specificity": 0.8923,
             "auc_roc": 0.9267
           }
-        }
+        },
+        "honesty_note": "Legacy metrics may be synthetic placeholders \u2014 not clinically validated"
       },
       "description": "Optimized hyperparameters with ensemble learning and transfer learning from ImageNet",
-      "is_active": true
+      "is_active": false
     },
     {
       "version": "v2.0.0_multimodal",
@@ -103,7 +106,8 @@
             "specificity": 0.9145,
             "auc_roc": 0.9445
           }
-        }
+        },
+        "honesty_note": "Legacy metrics may be synthetic placeholders \u2014 not clinically validated"
       },
       "description": "Multi-modal fusion model combining MRI, cognitive scores, and biomarkers with transformer architecture",
       "is_active": false
@@ -130,12 +134,43 @@
             "specificity": 0.9234,
             "auc_roc": 0.9534
           }
-        }
+        },
+        "honesty_note": "Legacy metrics may be synthetic placeholders \u2014 not clinically validated"
       },
       "description": "Production-ready model with enhanced robustness, extensive validation on external datasets, and clinical deployment optimizations",
       "is_active": false
+    },
+    {
+      "version": "v0.0.1_unvalidated_baseline",
+      "model_path": "models/ensemble_model.pth",
+      "created_at": "2026-07-22T10:37:07.537291+00:00",
+      "metrics": {
+        "note": "unvalidated baseline weights for bootstrapping \u2014 not clinically validated",
+        "validated": false,
+        "clinical_validation": false,
+        "training": {
+          "best_val_loss": null,
+          "epochs_trained": 0
+        },
+        "test": {
+          "alzheimer": {
+            "accuracy": null,
+            "sensitivity": null,
+            "specificity": null,
+            "auc_roc": null
+          },
+          "parkinson": {
+            "accuracy": null,
+            "sensitivity": null,
+            "specificity": null,
+            "auc_roc": null
+          }
+        }
+      },
+      "description": "unvalidated baseline weights for bootstrapping \u2014 not clinically validated",
+      "is_active": true,
+      "weights_created": true
     }
   ],
-  "current_model": "v1.2.0_optimized"
+  "current_model": "v0.0.1_unvalidated_baseline"
 }
-

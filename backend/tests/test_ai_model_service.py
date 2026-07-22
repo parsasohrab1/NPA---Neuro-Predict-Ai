@@ -243,11 +243,11 @@ class TestModelPrediction:
     @pytest.mark.asyncio
     async def test_predict_complete(self, ai_service, sample_patient_data):
         """Test prediction with complete patient data"""
-        if not hasattr(ai_service, '_available') or not ai_service._available:
-            pytest.skip("PyTorch not available")
-        
-        if ai_service.model is None:
-            pytest.skip("Model not initialized")
+        from app.services.ai_model_service import ModelNotReadyError
+        if not ai_service.model_ready and not ai_service.use_mock:
+            with pytest.raises(ModelNotReadyError):
+                await ai_service.predict(sample_patient_data)
+            return
         
         result = await ai_service.predict(sample_patient_data)
         
@@ -278,13 +278,12 @@ class TestModelPrediction:
     @pytest.mark.asyncio
     async def test_predict_missing_values(self, ai_service):
         """Test prediction with missing values (should use defaults)"""
-        if not hasattr(ai_service, '_available') or not ai_service._available:
-            pytest.skip("PyTorch not available")
-        
-        if ai_service.model is None:
-            pytest.skip("Model not initialized")
-        
+        from app.services.ai_model_service import ModelNotReadyError
         minimal_data = {'age': 70, 'gender': 'male'}
+        if not ai_service.model_ready and not ai_service.use_mock:
+            with pytest.raises(ModelNotReadyError):
+                await ai_service.predict(minimal_data)
+            return
         
         result = await ai_service.predict(minimal_data)
         
@@ -295,9 +294,9 @@ class TestModelPrediction:
     @pytest.mark.asyncio
     async def test_predict_error_handling(self, ai_service):
         """Test error handling in prediction"""
-        if not hasattr(ai_service, '_available') or not ai_service._available:
-            # If PyTorch not available, service should raise RuntimeError
-            with pytest.raises(RuntimeError, match="pytorch_not_available"):
+        from app.services.ai_model_service import ModelNotReadyError
+        if not ai_service.model_ready and not ai_service.use_mock:
+            with pytest.raises(ModelNotReadyError):
                 await ai_service.predict({'age': 70})
             return
         
@@ -312,7 +311,7 @@ class TestModelPrediction:
             result = await ai_service.predict(invalid_data)
             # If it succeeds, result should still be valid
             assert isinstance(result, dict)
-        except (ValueError, TypeError, RuntimeError):
+        except (ValueError, TypeError, RuntimeError, ModelNotReadyError):
             # Acceptable to raise error for invalid data
             pass
 
@@ -382,15 +381,15 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_full_prediction_pipeline(self, ai_service, sample_patient_data):
         """Test complete prediction pipeline from patient data to result"""
-        if not hasattr(ai_service, '_available') or not ai_service._available:
-            pytest.skip("PyTorch not available")
-        
-        if ai_service.model is None:
-            pytest.skip("Model not initialized")
-        
-        # Extract features
+        from app.services.ai_model_service import ModelNotReadyError
+        # Extract features always works
         features = ai_service.extract_features(sample_patient_data)
         assert features.shape == (50,)
+
+        if not ai_service.model_ready and not ai_service.use_mock:
+            with pytest.raises(ModelNotReadyError):
+                await ai_service.predict(sample_patient_data)
+            return
         
         # Make prediction
         result = await ai_service.predict(sample_patient_data)

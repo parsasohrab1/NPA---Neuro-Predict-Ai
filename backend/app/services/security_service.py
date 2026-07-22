@@ -26,6 +26,39 @@ import jwt as pyjwt
 from jose import jwt as jose_jwt
 import redis.asyncio as redis
 import time
+import json
+
+
+def _encrypt_backup_codes(codes: List[str]) -> str:
+    """Encrypt backup codes as a Fernet ciphertext of JSON list."""
+    return encrypt_text(json.dumps(codes))
+
+
+def _decrypt_backup_codes(stored) -> List[str]:
+    """Decrypt backup codes; supports legacy plaintext list for migration."""
+    if stored is None:
+        return []
+    if isinstance(stored, list):
+        # Legacy unencrypted storage
+        return [str(c).upper() for c in stored]
+    if isinstance(stored, str):
+        plain = decrypt_text(stored)
+        if plain is None:
+            # Might already be a JSON string without encryption (unlikely)
+            try:
+                parsed = json.loads(stored)
+                if isinstance(parsed, list):
+                    return [str(c).upper() for c in parsed]
+            except Exception:
+                return []
+            return []
+        try:
+            parsed = json.loads(plain)
+            if isinstance(parsed, list):
+                return [str(c).upper() for c in parsed]
+        except Exception:
+            return []
+    return []
 
 
 class SecurityService:
@@ -116,7 +149,7 @@ class SecurityService:
             # Generate backup codes
             backup_codes = [secrets.token_hex(4).upper() for _ in range(10)]
             # store encrypted JSON string to avoid leaking individual codes
-            mfa_secret.backup_codes = backup_codes
+            mfa_secret.backup_codes = _encrypt_backup_codes(backup_codes)
             
             await db.commit()
             await db.refresh(mfa_secret)
@@ -171,10 +204,12 @@ class SecurityService:
                 await db.commit()
                 return True
         
-        # Check backup codes
-        if mfa_secret.backup_codes and code.upper() in mfa_secret.backup_codes:
-            # Remove used backup code
-            mfa_secret.backup_codes.remove(code.upper())
+        # Check backup codes (decrypt at verify time)
+        codes = _decrypt_backup_codes(mfa_secret.backup_codes)
+        code_upper = code.upper()
+        if codes and code_upper in codes:
+            codes.remove(code_upper)
+            mfa_secret.backup_codes = _encrypt_backup_codes(codes)
             mfa_secret.last_used = datetime.utcnow()
             await db.commit()
             return True
