@@ -106,6 +106,11 @@ async def create_prediction(
     # Run AI prediction
     try:
         prediction_result = await ai_model_service.predict(patient_data)
+    except ModelNotReadyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
