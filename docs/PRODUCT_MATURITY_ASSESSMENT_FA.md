@@ -1,46 +1,57 @@
 # ارزیابی بلوغ محصول NeuroPredict-AI
 
 **تاریخ:** ۲۲ ژوئیه ۲۰۲۶  
-**شاخه مرجع:** `main`  
-**روش:** مقایسه مستندات با کد اجرایی (نه ادعاهای گزارش‌های داخلی)  
-**سطح بلوغ کلی:** **نمونه‌نمای پیشرفته / MVP دمو** — آماده دمو و توسعه؛ **نامناسب برای استفاده بالینی واقعی**
+**شاخه مرجع:** `cursor/maturity-p0-p4-implementation-892d`  
+**روش:** مقایسه مستندات با کد اجرایی (نه ادعای گزارش‌های داخلی)  
+**سطح بلوغ کلی:** **Honest MVP در حال تثبیت** — هنوز **نامناسب برای استفاده بالینی واقعی / SaMD**
+
+---
+
+## ۰) وضعیت پیاده‌سازی نقشه راه (این شاخه)
+
+| مرحله | وضعیت | شواهد در کد |
+|------|--------|-------------|
+| **A — Honest MVP** | ✅ عمدتاً انجام شد | fail-closed مدل + `models/ensemble_model.pth` baseline غیر clinically-validated؛ imaging deterministic؛ mock فرانت پیش‌فرض off؛ ProtectedRoute؛ MFA روی login؛ PHI erase API |
+| **B — Clinical Pilot** | 🟡 جزئی | IFU disclaimer + clinician override؛ Users/Audit/Settings ادمین به API؛ CRUD/export؛ consent محصول هنوز ناقص |
+| **C — Integration** | 🟡 scaffolding صادق | PACS/HL7/FHIR دیگر success جعلی نمی‌دهند؛ MLLP/httpx وقتی env ست باشد؛ contract tests |
+| **D — Regulatory** | ⚪ صداقت evidence | FDA/IRB همچنان **۰٪ اجرا**؛ `docs/EVIDENCE_PACK_INDEX_FA.md` فهرست EXISTS vs MISSING |
+| **E — Multi-site Production** | ⚪ آماده‌سازی | CD gated (بدون fake deploy)؛ `infra/k8s` canonical + admin deploy؛ Playwright در CI |
 
 ---
 
 ## ۱) حکم خلاصه
 
-NeuroPredict-AI از نظر **سطح سطح (surface area)** غنی است: FastAPI، React، داشبورد ادمین، اسکیماهای FHIR/HL7، مانیتورینگ، CI، و مستندات بسیار زیاد. اما در مسیرهای حیاتی محصول پزشکی، هنوز **شِلِ MVP** است:
+NeuroPredict-AI سطح API/UI غنی دارد. این شاخه **شکاف صداقت مستند↔کد** را می‌بندد؛ اعتبارسنجی بالینی و evidence نظارتی هنوز غایب است.
 
-| حوزه | سطح بلوغ | توضیح یک‌خطی |
-|------|----------|---------------|
-| دامنه API و مدل داده | MVP | CRUD بیمار/پیش‌بینی واقعی؛ سطح پوشش خوب |
-| موتور AI بالینی | Prototype | بدون وزن مدل واقعی؛ fallback به random/heuristic |
-| یکپارچگی بیمارستانی | Prototype | سازنده پیام/منبع؛ ارسال/دریافت واقعی ناقص |
-| فرانت کلینیکال | Low–Medium | mock پیش‌فرض؛ گارد احراز هویت ضعیف |
-| داشبورد ادمین | Medium | صفحات بالینی عمیق‌تر؛ Users/Audit/Settings نمونه |
-| امنیت عملیاتی | Early MVP | JWT/RBAC هست؛ MFA در login اعمال نشده |
-| انطباق (FDA/IRB/HIPAA) | Very Low | چک‌لیست‌ها ۰٪؛ مستندات اغلب بیش‌ادعا |
-| Ops / CD | Low–Medium | CI قابل قبول؛ CD و k8s ناقص/دوگانه |
-| کیفیت تست | Early MVP | تست‌ها زیاد اما اغلب mock/skip؛ E2E در CI نیست |
+| حوزه | قبل | بعد از این شاخه |
+|------|-----|------------------|
+| موتور AI | random fallback | fail-closed؛ baseline weights غیرvalidated |
+| فرانت | mock پیش‌فرض ON | mock فقط با `VITE_USE_MOCK_DATA=true` + auth guard |
+| MFA login | توکن بدون MFA | challenge + `/auth/login/mfa` |
+| یکپارچگی | 200 خالی سبز | 503/501 `not_configured`/`not_implemented` |
+| FDA/IRB | ادعاهای مبهم | صراحت ۰٪ + evidence index |
+| Ops | CD echo | workflow_dispatch gated validators |
 
-**نتیجه:** محصول برای **دمو، جذب سرمایه، و توسعه مشترک** مناسب است. برای **مراقبت بیمار، PHI واقعی، یا ادعای SaMD** هنوز فاصله معنادار دارد.
+**نتیجه:** برای دمو/توسعه صادق‌تر است. برای مراقبت بیمار واقعی هنوز Clinical Pilot کامل + IRB/داده واقعی لازم است.
 
 ---
 
 ## ۲) شکاف صداقت مستند ↔ کد
 
-این بزرگ‌ترین ریسک بلوغ سازمانی است: گزارش‌های داخلی (`STATUS.md`، `خلاصه_بررسی_به_روزرسانی.md`، `docs/COMPLIANCE_DOCUMENTATION.md`، `INTEGRATION_SUMMARY.md`) اغلب «کامل» یا «آماده» نشان می‌دهند، در حالی که:
+قبلاً بزرگ‌ترین ریسک سازمانی بود. **این شاخه بسیاری از ادعاهای نادرست را با رفتار کد هم‌تراز کرد**؛ موارد باقی‌مانده:
 
-| ادعا | واقعیت کد |
-|------|-----------|
-| مدل production با AUC بالا در registry | فقط `models/registry.json`؛ فایل `.pth` وجود ندارد |
-| پیش‌بینی AI کامل | `ai_model_service.py`: در نبود وزن → random initialization |
-| FHIR/PACS پیاده‌سازی‌شده | ساختار/stub؛ جستجوی خالی، بدون DIMSE واقعی |
-| MFA پیاده‌سازی‌شده | API وجود دارد؛ **login توکن بدون چک MFA** صادر می‌کند |
-| HIPAA/رمزنگاری در سکون کامل | فیلدهای PHI بیمار plaintext؛ رمزنگاری عمدتاً برای MFA secret |
-| FDA 510(k) / IRB در مسیر | چک‌لیست FDA و tracker IRB هر دو **۰٪** |
-| Vite 7 / E2E کامل | هنوز Vite 5؛ E2E در CI اجرا نمی‌شود |
-| `VITE_USE_MOCK_DATA` کنترل‌شده | پیش‌فرض روشن وقتی env خالی است |
+| ادعا / موضوع | وضعیت پس از این شاخه |
+|--------------|----------------------|
+| وزن مدل / registry AUC | baseline `.pth` چک‌این شد با برچسب **unvalidated**؛ fail-closed اگر وزن نباشد |
+| random inference | حذف‌شده مگر `DEBUG`+`ALLOW_MOCK_PREDICTIONS` |
+| FHIR/PACS «کامل» | scaffolding صادق؛ 503/501 وقتی unconfigured |
+| MFA روی login | ✅ challenge + `/auth/login/mfa` |
+| HIPAA encryption کامل | همچنان **partial** — erase واقعی؛ encryption-at-rest تأیید نشده |
+| FDA / IRB | صراحتاً **۰٪** + evidence index (جعل پیشرفت نشده) |
+| mock فرانت پیش‌فرض | ✅ فقط با env صریح `true` |
+| CD deploy جعلی | ✅ gated validators؛ بدون echo success |
+
+گزارش‌های قدیمی (`خلاصه_بررسی_به_روزرسانی.md` و مشابه) ممکن است هنوز بیش‌ازحد مثبت باشند — منبع حقیقت: این سند + `STATUS.md` + evidence index.
 
 ---
 

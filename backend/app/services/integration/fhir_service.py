@@ -7,21 +7,41 @@ otherwise operations return ``not_configured`` rather than silent stubs.
 """
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 import logging
 
 import httpx
-from fhir.resources.patient import Patient
-from fhir.resources.observation import Observation
-from fhir.resources.diagnosticreport import DiagnosticReport
-from fhir.resources.imagingstudy import ImagingStudy
-from fhir.resources.bundle import Bundle, BundleEntry
-from fhir.resources.resource import Resource
 
 from .errors import IntegrationNotConfiguredError
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from fhir.resources.patient import Patient
+    from fhir.resources.observation import Observation
+    from fhir.resources.diagnosticreport import DiagnosticReport
+    from fhir.resources.imagingstudy import ImagingStudy
+    from fhir.resources.bundle import Bundle
+    from fhir.resources.resource import Resource
+
+
+def _require_fhir_resources():
+    """Lazy-import fhir.resources so remote client paths work without builders."""
+    try:
+        from fhir.resources.patient import Patient
+        from fhir.resources.observation import Observation
+        from fhir.resources.diagnosticreport import DiagnosticReport
+        from fhir.resources.imagingstudy import ImagingStudy
+        from fhir.resources.bundle import Bundle, BundleEntry
+        from fhir.resources.resource import Resource
+    except ImportError as exc:
+        raise ImportError(
+            "fhir.resources is unavailable or incompatible with the installed pydantic. "
+            "Remote FHIR search/read still work; local builders require a compatible "
+            "fhir.resources package."
+        ) from exc
+    return Patient, Observation, DiagnosticReport, ImagingStudy, Bundle, BundleEntry, Resource
 
 
 class FHIRService:
@@ -58,8 +78,9 @@ class FHIRService:
         birth_date: str,
         gender: str,
         identifiers: Optional[List[Dict]] = None,
-    ) -> Patient:
+    ) -> "Patient":
         """Create a Patient Resource (local builder, no remote call)."""
+        Patient, *_ = _require_fhir_resources()
         patient_data = {
             "resourceType": "Patient",
             "id": patient_id,
@@ -78,8 +99,9 @@ class FHIRService:
         value: Any,
         effective_datetime: str,
         status: str = "final",
-    ) -> Observation:
+    ) -> "Observation":
         """Create an Observation Resource (local builder)."""
+        _, Observation, *_ = _require_fhir_resources()
         observation_data = {
             "resourceType": "Observation",
             "id": observation_id,
@@ -106,8 +128,9 @@ class FHIRService:
         effective_datetime: str,
         conclusion: Optional[str] = None,
         results: Optional[List[Dict]] = None,
-    ) -> DiagnosticReport:
+    ) -> "DiagnosticReport":
         """Create a DiagnosticReport Resource (local builder)."""
+        _, _, DiagnosticReport, *_ = _require_fhir_resources()
         report_data: Dict[str, Any] = {
             "resourceType": "DiagnosticReport",
             "id": report_id,
@@ -132,8 +155,9 @@ class FHIRService:
         started: str,
         series: List[Dict],
         status: str = "available",
-    ) -> ImagingStudy:
+    ) -> "ImagingStudy":
         """Create an ImagingStudy Resource (local builder)."""
+        _, _, _, ImagingStudy, *_ = _require_fhir_resources()
         study_data = {
             "resourceType": "ImagingStudy",
             "id": study_id,
@@ -152,10 +176,11 @@ class FHIRService:
 
     def create_bundle(
         self,
-        resources: List[Resource],
+        resources: List["Resource"],
         bundle_type: str = "collection",
-    ) -> Bundle:
+    ) -> "Bundle":
         """Create a Bundle from FHIR resources (local builder)."""
+        _Patient, _Obs, _DR, _IS, Bundle, BundleEntry, _Resource = _require_fhir_resources()
         entries = []
         for resource in resources:
             entry = BundleEntry(
@@ -218,7 +243,7 @@ class FHIRService:
             response.raise_for_status()
             return response.json()
 
-    def validate_resource(self, resource: Resource) -> Dict[str, Any]:
+    def validate_resource(self, resource: "Resource") -> Dict[str, Any]:
         """Basic local validation of a FHIR resource object."""
         validation_result: Dict[str, Any] = {
             "valid": True,
