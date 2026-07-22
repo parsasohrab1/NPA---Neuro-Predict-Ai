@@ -45,8 +45,10 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Username</label>
+              <label className="label" htmlFor="username">Username</label>
               <input
+                id="username"
+                name="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -57,8 +59,10 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="label">Password</label>
+              <label className="label" htmlFor="password">Password</label>
               <input
+                id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

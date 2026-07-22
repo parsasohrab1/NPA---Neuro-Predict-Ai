@@ -1,0 +1,90 @@
+name: Release - Load Tests
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      run_stress:
+        description: 'Include stress tests (1000 concurrent requests)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    name: Load & performance tests (pre-release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: neuropredict_load
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/neuropredict_load
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@localhost:5432/neuropredict_load
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      SECRET_KEY: load_test_secret_key_load_test_secret_key_load_test
+      ENVIRONMENT: test
+      DEBUG: "false"
+      PYTHONPATH: ${{ github.workspace }}/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Initialize database
+        working-directory: backend
+        run: |
+          python scripts/init_db.py
+          python scripts/create_admin.py
+
+      - name: Run API performance tests
+        working-directory: backend
+        run: pytest tests/performance/ -q --no-cov
+
+      - name: Run load tests
+        working-directory: backend
+        run: pytest tests/test_load_testing.py -m "load_test" -q --no-cov
+
+      - name: Run stress tests (optional)
+        if: inputs.run_stress == true
+        working-directory: backend
+        run: pytest tests/test_load_testing.py -m "stress_test" -q --no-cov
+
+      - name: Load test summary
+        if: always()
+        run: |
+          echo "Load test stage completed."
+          echo "Tag: ${{ github.ref_name }}"
+          echo "Stress tests: ${{ inputs.run_stress }}"

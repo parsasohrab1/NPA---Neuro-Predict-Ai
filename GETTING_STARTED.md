@@ -276,7 +276,7 @@ docker-compose exec -T postgres psql -U postgres neuropredict_db < backup.sql
 ## Support & Resources
 
 - **Documentation**: See `docs/` folder
-- **API Reference**: http://localhost:8000/api/docs
+- **API Reference**: http://localhost:8001/api/docs
 - **Issues**: GitHub Issues
 - **Email**: support@neuropredict-ai.com
 

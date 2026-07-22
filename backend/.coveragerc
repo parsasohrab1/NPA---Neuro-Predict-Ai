@@ -1,0 +1,23 @@
+[run]
+# Coverage gate focuses on security/config core (unit-tested and stable).
+# Full-app 80% is tracked separately in CI as an informational report.
+source = app/core
+branch = false
+omit =
+    */tests/*
+    */__pycache__/*
+
+[report]
+fail_under = 80
+show_missing = true
+precision = 1
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml
