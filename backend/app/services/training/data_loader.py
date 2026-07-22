@@ -62,6 +62,52 @@ class DataLoader:
         self.data_dir = Path(data_dir)
         self.scaler = StandardScaler()
         self.feature_names = []
+
+    @staticmethod
+    def _derive_imaging_proxy_features(df: pd.DataFrame, n: int = 32) -> np.ndarray:
+        """
+        Derive deterministic 32-d proxy imaging features from available MRI numeric fields
+        when dedicated imaging_feature_* columns are missing or all zeros.
+        """
+        n_samples = len(df)
+        # Prefer explicit imaging_feature columns when present and non-zero
+        has_explicit = all(f"imaging_feature_{i}" in df.columns for i in range(n))
+        if has_explicit:
+            mat = np.column_stack([df[f"imaging_feature_{i}"].astype(float).values for i in range(n)])
+            if not np.allclose(mat, 0.0):
+                return mat.astype(np.float64)
+
+        hipp = df["hippocampal_volume"].astype(float).fillna(3500).values / 5000.0 if "hippocampal_volume" in df.columns else np.full(n_samples, 0.7)
+        cort = df["cortical_thickness"].astype(float).fillna(2.3).values / 3.0 if "cortical_thickness" in df.columns else np.full(n_samples, 0.77)
+        vent = df["ventricular_volume"].astype(float).fillna(30000).values / 70000.0 if "ventricular_volume" in df.columns else np.full(n_samples, 0.43)
+        wmh = (
+            df["white_matter_hyperintensities"].astype(float).fillna(2).values / 10.0
+            if "white_matter_hyperintensities" in df.columns
+            else np.full(n_samples, 0.2)
+        )
+        brain = (
+            df["brain_volume_total"].astype(float).fillna(1100000).values / 1500000.0
+            if "brain_volume_total" in df.columns
+            else np.full(n_samples, 0.73)
+        )
+        # Expand deterministically to n dims via products / ratios / polynomials
+        cols = [
+            hipp, cort, vent, wmh, brain,
+            hipp * cort, hipp * vent, cort * brain, vent * wmh, brain * hipp,
+            hipp ** 2, cort ** 2, vent ** 2, wmh ** 2, brain ** 2,
+            np.abs(hipp - vent), np.abs(cort - wmh), np.abs(brain - hipp),
+            hipp / (cort + 1e-6), vent / (brain + 1e-6), wmh / (hipp + 1e-6),
+            (hipp + cort + brain) / 3.0, (vent + wmh) / 2.0,
+            np.sqrt(np.clip(hipp, 0, None)), np.sqrt(np.clip(brain, 0, None)),
+            np.clip(hipp - 0.5, -1, 1), np.clip(vent - 0.5, -1, 1),
+            np.sin(hipp * np.pi), np.cos(vent * np.pi),
+            hipp * cort * brain, vent * wmh * hipp, (hipp + brain) - (vent + wmh),
+        ]
+        mat = np.column_stack(cols)
+        if mat.shape[1] < n:
+            pad = np.zeros((n_samples, n - mat.shape[1]))
+            mat = np.column_stack([mat, pad])
+        return mat[:, :n].astype(np.float64)
         
     def load_from_csv(self, csv_path: Optional[str] = None) -> pd.DataFrame:
         """
@@ -129,16 +175,22 @@ class DataLoader:
         features_list.append((df['apoe_e4_status'].astype(float)).values)
         
         # MRI Features
-        features_list.append((df['hippocampal_volume'] / 5000.0).values)
-        features_list.append((df['cortical_thickness'] / 3.0).values)
-        features_list.append((df['ventricular_volume'] / 70000.0).values)
-        features_list.append((df.get('white_matter_hyperintensities', pd.Series([2] * len(df))) / 10.0).values)
-        features_list.append((df.get('brain_volume_total', pd.Series([1100000] * len(df))) / 1500000.0).values)
+        hipp = (df['hippocampal_volume'] / 5000.0).values
+        cort = (df['cortical_thickness'] / 3.0).values
+        vent = (df['ventricular_volume'] / 70000.0).values
+        wmh = (df.get('white_matter_hyperintensities', pd.Series([2] * len(df))) / 10.0).values
+        brain = (df.get('brain_volume_total', pd.Series([1100000] * len(df))) / 1500000.0).values
+        features_list.append(hipp)
+        features_list.append(cort)
+        features_list.append(vent)
+        features_list.append(wmh)
+        features_list.append(brain)
         
-        # Imaging features (placeholder - 32 features)
-        # Add each imaging feature as a separate column
+        # Imaging features: use real columns if present, else deterministic MRI proxies
+        # (never leave as silent all-zeros when MRI numerics are available)
+        imaging_proxy = self._derive_imaging_proxy_features(df, n=32)
         for i in range(32):
-            features_list.append(np.zeros(len(df)))
+            features_list.append(imaging_proxy[:, i])
         
         # Stack all features
         features = np.column_stack(features_list)

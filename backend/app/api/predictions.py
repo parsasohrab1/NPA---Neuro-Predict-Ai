@@ -17,7 +17,7 @@ from ..models.audit import AuditLog
 from ..schemas.prediction import PredictionRequest, PredictionResponse, PredictionReview
 from ..core.security import get_current_user, require_role
 from ..core.cache import cache_service
-from ..services.ai_model_service import ai_model_service
+from ..services.ai_model_service import ai_model_service, ModelNotReadyError
 from ..services.clinical_explainability_service import clinical_explainability_service
 
 router = APIRouter(prefix="/predictions", tags=["Predictions"])
@@ -106,6 +106,11 @@ async def create_prediction(
     # Run AI prediction
     try:
         prediction_result = await ai_model_service.predict(patient_data)
+    except ModelNotReadyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

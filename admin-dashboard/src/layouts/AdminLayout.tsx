@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   HomeModernIcon,
   UsersIcon,
@@ -80,6 +80,13 @@ const navigation = [
 
 export default function AdminLayout() {
   useKeyboardNavigation()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token')
+    sessionStorage.removeItem('auth_token')
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -134,12 +141,20 @@ export default function AdminLayout() {
             <div className="flex items-center gap-4">
               <div className="flex flex-col items-end text-xs text-slate-300">
                 <span>Admin Dashboard</span>
-                <span className="font-medium text-slate-100">Development Mode</span>
+                <span className="font-medium text-slate-100">
+                  {import.meta.env.PROD ? 'Authenticated' : 'Development Mode'}
+                </span>
               </div>
               <div className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
                 Admin
               </div>
-              {/* Logout button hidden - authentication disabled */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+              >
+                Logout
+              </button>
             </div>
           </header>
 

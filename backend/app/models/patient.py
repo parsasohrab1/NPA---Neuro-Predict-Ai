@@ -31,6 +31,9 @@ class Patient(Base):
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     address = Column(Text, nullable=True)
+
+    # Privacy / erasure
+    erased_at = Column(DateTime(timezone=True), nullable=True)
     
     # Medical Information
     education_years = Column(Integer, nullable=True)

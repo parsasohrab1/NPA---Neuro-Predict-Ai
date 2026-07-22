@@ -1,8 +1,14 @@
-"""HL7 FHIR R4 adapter endpoints (read/search backed by NeuroPredict DB)."""
+"""HL7 FHIR R4 adapter endpoints (read/search backed by NeuroPredict DB).
+
+Local Patient/Observation/DiagnosticReport adapters query the NeuroPredict DB.
+Remote FHIR proxy endpoints (``/fhir/remote/...``) call ``HL7_FHIR_ENDPOINT``
+via httpx and return 503 ``not_configured`` when that env var is unset.
+"""
 from __future__ import annotations
 
 from typing import Any, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +20,7 @@ from ...models.medical_record import MedicalRecord
 from ...models.patient import Patient
 from ...models.prediction import Prediction
 from ...models.user import User
+from ...services.integration.errors import IntegrationError
 from ...services.integration.fhir_mappers import (
     build_capability_statement,
     build_searchset_bundle,
@@ -21,8 +28,18 @@ from ...services.integration.fhir_mappers import (
     patient_to_fhir,
     prediction_to_diagnostic_report,
 )
+from ...services.integration.fhir_service import FHIRService
 
 router = APIRouter(prefix="/fhir", tags=["FHIR"])
+
+fhir_remote = FHIRService(
+    base_url=settings.HL7_FHIR_BASE_URL,
+    remote_endpoint=settings.HL7_FHIR_ENDPOINT,
+)
+
+
+def _raise_integration(exc: IntegrationError) -> None:
+    raise HTTPException(status_code=exc.http_status, detail=exc.to_dict())
 
 
 def _base_url(request: Request) -> str:
@@ -197,7 +214,7 @@ async def search_diagnostic_report(
     )
 
 
-# --- ImagingStudy (searchset placeholder, returns empty bundle) -------------
+# --- ImagingStudy (local index not implemented) -----------------------------
 
 @router.get("/ImagingStudy")
 async def search_imaging_study(
@@ -206,11 +223,74 @@ async def search_imaging_study(
     modality: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """ImagingStudy search.
+    """ImagingStudy search — local DICOM index is not exposed as FHIR yet.
 
-    The DICOM index is not yet exposed as FHIR resources; we return an empty
-    searchset bundle so clients can detect "no results" deterministically
-    instead of receiving a 501. ``CapabilityStatement`` advertises this
-    accurately.
+    Returns HTTP 501 with an explicit ``not_implemented`` payload rather than
+    an empty 200 searchset that looks like a successful green path.
     """
-    return build_searchset_bundle((), base_url=_base_url(request))
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail={
+            "status": "not_implemented",
+            "detail": (
+                "Local ImagingStudy FHIR search is not implemented. "
+                "Use /fhir/remote/ImagingStudy when HL7_FHIR_ENDPOINT is configured, "
+                "or PACS DICOM APIs for imaging retrieval."
+            ),
+        },
+    )
+
+
+# --- Remote FHIR proxy (requires HL7_FHIR_ENDPOINT) -------------------------
+
+@router.get("/remote/status")
+async def remote_fhir_status(
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Report whether a remote FHIR base URL is configured."""
+    configured = fhir_remote.is_remote_configured()
+    return {
+        "status": "configured" if configured else "not_configured",
+        "detail": (
+            f"Remote FHIR endpoint: {fhir_remote.remote_endpoint}"
+            if configured
+            else "HL7_FHIR_ENDPOINT is not set; remote search/read return 503."
+        ),
+    }
+
+
+@router.get("/remote/{resource_type}")
+async def remote_search_resources(
+    resource_type: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Proxy FHIR search to ``HL7_FHIR_ENDPOINT`` (503 if not configured)."""
+    params = dict(request.query_params)
+    try:
+        return fhir_remote.search_resources(resource_type, params)
+    except IntegrationError as e:
+        _raise_integration(e)
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"status": "upstream_error", "detail": str(e)},
+        )
+
+
+@router.get("/remote/{resource_type}/{resource_id}")
+async def remote_read_resource(
+    resource_type: str,
+    resource_id: str,
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Proxy FHIR read to ``HL7_FHIR_ENDPOINT`` (503 if not configured)."""
+    try:
+        return fhir_remote.read_resource(resource_type, resource_id)
+    except IntegrationError as e:
+        _raise_integration(e)
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"status": "upstream_error", "detail": str(e)},
+        )

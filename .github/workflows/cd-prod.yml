@@ -1,31 +1,125 @@
 name: CD - Prod
 
+# Gated production CD — does NOT deploy automatically.
+# Requires workflow_dispatch with image tags. Validates that images exist and
+# that infra/k8s manifests are syntactically apply-able (client dry-run).
+# TODO: wire cluster credentials (KUBE_CONFIG / cloud IAM) before real rollout.
+
 on:
   workflow_dispatch:
     inputs:
       backend_tag:
-        description: "Backend image tag (ghcr.io/<repo>-backend:<tag>)"
+        description: "Backend image (e.g. ghcr.io/org/neuropredict-backend:sha)"
         required: true
       frontend_tag:
-        description: "Frontend image tag (ghcr.io/<repo>-frontend:<tag>)"
+        description: "Frontend image (e.g. ghcr.io/org/neuropredict-frontend:sha)"
         required: true
       admin_tag:
-        description: "Admin image tag (ghcr.io/<repo>-admin:<tag>)"
+        description: "Admin image (optional)"
         required: false
+        default: ""
+      confirm_production:
+        description: "Type 'deploy-production' to acknowledge gated prod intent"
+        required: true
+
+concurrency:
+  group: cd-prod
+  cancel-in-progress: false
 
 jobs:
-  deploy-prod:
+  gate:
+    name: Confirm production intent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit confirmation
+        run: |
+          if [ "${{ inputs.confirm_production }}" != "deploy-production" ]; then
+            echo "::error::Refusing gated CD. Set confirm_production=deploy-production"
+            exit 1
+          fi
+          echo "Confirmation accepted. This workflow still will NOT apply to a live cluster without credentials."
+
+  validate-images:
+    name: Validate container images exist
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check backend image manifest
+        run: |
+          set -euo pipefail
+          IMG="${{ inputs.backend_tag }}"
+          echo "Inspecting: $IMG"
+          if ! docker buildx imagetools inspect "$IMG"; then
+            echo "::error::Backend image not found or registry inaccessible: $IMG"
+            echo "TODO: ensure GHCR/Docker Hub login secrets are configured for private images."
+            exit 1
+          fi
+
+      - name: Check frontend image manifest
+        run: |
+          set -euo pipefail
+          IMG="${{ inputs.frontend_tag }}"
+          echo "Inspecting: $IMG"
+          if ! docker buildx imagetools inspect "$IMG"; then
+            echo "::error::Frontend image not found or registry inaccessible: $IMG"
+            exit 1
+          fi
+
+      - name: Check admin image manifest (optional)
+        if: ${{ inputs.admin_tag != '' }}
+        run: |
+          set -euo pipefail
+          IMG="${{ inputs.admin_tag }}"
+          echo "Inspecting: $IMG"
+          if ! docker buildx imagetools inspect "$IMG"; then
+            echo "::error::Admin image not found or registry inaccessible: $IMG"
+            exit 1
+          fi
+
+  k8s-dry-check:
+    name: infra/k8s client dry-run
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.29.0"
+
+      - name: Dry-run apply canonical manifests
+        working-directory: infra/k8s
+        run: |
+          set -euo pipefail
+          echo "Canonical k8s tree: infra/k8s (root k8s/ is legacy)"
+          for f in namespace.yaml configmaps.yaml secrets-template.yaml \
+                   postgres-statefulset.yaml redis-deployment.yaml \
+                   backend-deployment.yaml frontend-deployment.yaml \
+                   admin-dashboard-deployment.yaml \
+                   ingress.yaml network-policies.yaml persistentvolumes.yaml; do
+            if [ -f "$f" ]; then
+              echo "==> kubectl apply --dry-run=client -f $f"
+              kubectl apply --dry-run=client -f "$f"
+            else
+              echo "::warning::Missing manifest: $f"
+            fi
+          done
+
+  deploy-blocked:
+    name: Live deploy blocked (credentials TODO)
+    needs: [validate-images, k8s-dry-check]
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://example.com
     steps:
-      - name: Prepare deployment plan
+      - name: Do not fake success
         run: |
-          echo "Backend: ${{ inputs.backend_tag }}"
+          echo "::notice::Image validation and k8s dry-run passed."
+          echo "::warning::Live cluster deploy is intentionally NOT executed."
+          echo "TODO: configure KUBECONFIG / cloud credentials secret, then replace this job with a real kubectl/helm/ArgoCD rollout."
+          echo "Backend : ${{ inputs.backend_tag }}"
           echo "Frontend: ${{ inputs.frontend_tag }}"
           echo "Admin   : ${{ inputs.admin_tag }}"
-          echo "This job is a placeholder to integrate with your deployment platform (Kubernetes/VM/PaaS)."
-          echo "Implement Blue-Green/Canary rollout via your chosen tooling (Helm/ArgoCD/GitOps)."
-
-
+          # Fail closed so this workflow never appears as a successful production deploy.
+          exit 1

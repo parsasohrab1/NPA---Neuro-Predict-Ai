@@ -1,232 +1,193 @@
 """
 PACS Integration Service
-سرویس برای یکپارچه‌سازی با PACS (DICOM)
+
+Local DICOM parse/validate work without a remote PACS.
+DIMSE network operations (C-FIND / C-MOVE / C-GET / C-STORE / MWL) require:
+  - ``PACS_SERVER_URL`` (or host/AE configuration), and
+  - the optional ``pynetdicom`` package for DICOM network protocol.
+
+Until both are present, remote operations raise ``IntegrationNotConfiguredError``
+instead of returning empty success lists that look "green".
 """
+from __future__ import annotations
+
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+import logging
+
 import pydicom
 from pydicom.dataset import Dataset
 from pydicom.uid import generate_uid
-import logging
+
+from .errors import IntegrationNotConfiguredError, IntegrationNotImplementedError
 
 logger = logging.getLogger(__name__)
 
+try:
+    import pynetdicom  # noqa: F401
+
+    _HAS_PYNETDICOM = True
+except ImportError:
+    _HAS_PYNETDICOM = False
+
 
 class PACSService:
-    """Service for PACS/DICOM operations"""
-    
-    def __init__(self, pacs_server_url: Optional[str] = None):
-        self.pacs_server_url = pacs_server_url
-        self.ae_title = "NEUROPREDICT"
-    
+    """Service for PACS/DICOM operations."""
+
+    def __init__(
+        self,
+        pacs_server_url: Optional[str] = None,
+        ae_title: str = "NEUROPREDICT",
+    ):
+        self.pacs_server_url = (pacs_server_url or "").strip() or None
+        self.ae_title = ae_title
+
+    def is_configured(self) -> bool:
+        return bool(self.pacs_server_url)
+
+    def _require_dimse(self, operation: str) -> None:
+        """Ensure DIMSE peer is configured and pynetdicom is available."""
+        if not self.is_configured():
+            raise IntegrationNotConfiguredError(
+                f"PACS DIMSE '{operation}' is not configured. "
+                "Set PACS_SERVER_URL (and AE title) to enable remote PACS. "
+                "DIMSE C-FIND/C-MOVE/C-STORE requires the optional pynetdicom package."
+            )
+        if not _HAS_PYNETDICOM:
+            raise IntegrationNotImplementedError(
+                f"PACS DIMSE '{operation}' requires pynetdicom, which is not installed. "
+                "Install pynetdicom and configure PACS_SERVER_URL / PACS_AE_TITLE."
+            )
+        # Peer configured and library present, but full DIMSE client not wired yet.
+        raise IntegrationNotImplementedError(
+            f"PACS DIMSE '{operation}' scaffolding is present but not fully implemented. "
+            f"Configured peer: {self.pacs_server_url} (AE={self.ae_title})."
+        )
+
     def query_patient_studies(
         self,
         patient_id: Optional[str] = None,
         patient_name: Optional[str] = None,
-        study_date: Optional[str] = None
+        study_date: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        جستجوی مطالعات بیمار در PACS
-        
-        Args:
-            patient_id: شناسه بیمار
-            patient_name: نام بیمار
-            study_date: تاریخ مطالعه
-        
-        Returns:
-            لیست مطالعات پیدا شده
-        """
-        # این متد باید با PACS server ارتباط برقرار کند
-        # برای حالا فقط ساختار را نشان می‌دهیم
-        
-        studies = []
-        
-        # در production، اینجا باید C-FIND request به PACS بفرستیم
-        # از طریق DICOM network protocol
-        
-        return studies
-    
-    def retrieve_study(
-        self,
-        study_instance_uid: str
-    ) -> List[Dataset]:
-        """
-        دریافت مطالعه از PACS
-        
-        Args:
-            study_instance_uid: UID مطالعه
-        
-        Returns:
-            لیست DICOM datasets
-        """
-        # این متد باید C-MOVE یا C-GET request به PACS بفرستد
-        # و تصاویر را دریافت کند
-        
-        datasets = []
-        
-        return datasets
-    
+        """Query patient studies via C-FIND (requires configured PACS + pynetdicom)."""
+        self._require_dimse("C-FIND study query")
+        return []  # unreachable; keeps type checkers happy
+
+    def retrieve_study(self, study_instance_uid: str) -> List[Dataset]:
+        """Retrieve a study via C-MOVE/C-GET (requires configured PACS + pynetdicom)."""
+        self._require_dimse(f"C-MOVE/C-GET retrieve ({study_instance_uid})")
+        return []
+
     def store_dicom(
         self,
         dicom_file_path: str,
         patient_id: str,
-        study_description: str
+        study_description: str,
     ) -> bool:
         """
-        ذخیره DICOM در PACS
-        
-        Args:
-            dicom_file_path: مسیر فایل DICOM
-            patient_id: شناسه بیمار
-            study_description: توضیحات مطالعه
-        
-        Returns:
-            True اگر موفق بود
+        Prepare DICOM metadata locally, then attempt C-STORE to PACS.
+
+        Raises IntegrationNotConfiguredError / IntegrationNotImplementedError
+        when remote store cannot proceed (does not pretend success).
         """
         try:
-            # خواندن فایل DICOM
             ds = pydicom.dcmread(dicom_file_path)
-            
-            # تنظیم metadata
-            if not hasattr(ds, 'PatientID') or not ds.PatientID:
+
+            if not hasattr(ds, "PatientID") or not ds.PatientID:
                 ds.PatientID = patient_id
-            
-            if not hasattr(ds, 'StudyDescription') or not ds.StudyDescription:
+
+            if not hasattr(ds, "StudyDescription") or not ds.StudyDescription:
                 ds.StudyDescription = study_description
-            
-            # تولید UID ها اگر وجود ندارند
-            if not hasattr(ds, 'StudyInstanceUID') or not ds.StudyInstanceUID:
+
+            if not hasattr(ds, "StudyInstanceUID") or not ds.StudyInstanceUID:
                 ds.StudyInstanceUID = generate_uid()
-            
-            if not hasattr(ds, 'SeriesInstanceUID') or not ds.SeriesInstanceUID:
+
+            if not hasattr(ds, "SeriesInstanceUID") or not ds.SeriesInstanceUID:
                 ds.SeriesInstanceUID = generate_uid()
-            
-            if not hasattr(ds, 'SOPInstanceUID') or not ds.SOPInstanceUID:
+
+            if not hasattr(ds, "SOPInstanceUID") or not ds.SOPInstanceUID:
                 ds.SOPInstanceUID = generate_uid()
-            
-            # در production، اینجا باید C-STORE request به PACS بفرستیم
-            
-            logger.info(f"DICOM stored successfully for patient {patient_id}")
-            return True
-        
+
+            # Persist local metadata updates before remote C-STORE
+            ds.save_as(dicom_file_path)
         except Exception as e:
-            logger.error(f"Error storing DICOM: {e}")
-            return False
-    
+            logger.error("Error preparing DICOM for PACS store: %s", e)
+            raise
+
+        self._require_dimse("C-STORE")
+        return False
+
     def get_modality_worklist(
         self,
         patient_id: Optional[str] = None,
-        scheduled_date: Optional[str] = None
+        scheduled_date: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        دریافت Modality Worklist از PACS
-        
-        Args:
-            patient_id: شناسه بیمار
-            scheduled_date: تاریخ برنامه‌ریزی شده
-        
-        Returns:
-            لیست کارهای برنامه‌ریزی شده
-        """
-        # این متد باید C-FIND request برای Modality Worklist بفرستد
-        
-        worklist_items = []
-        
-        return worklist_items
-    
-    def parse_dicom_metadata(
-        self,
-        dicom_file_path: str
-    ) -> Dict[str, Any]:
-        """
-        استخراج metadata از فایل DICOM
-        
-        Args:
-            dicom_file_path: مسیر فایل DICOM
-        
-        Returns:
-            Dictionary حاوی metadata
-        """
+        """Modality Worklist C-FIND (requires configured PACS + pynetdicom)."""
+        self._require_dimse("C-FIND modality worklist")
+        return []
+
+    def parse_dicom_metadata(self, dicom_file_path: str) -> Dict[str, Any]:
+        """Extract metadata from a local DICOM file (no remote PACS required)."""
         try:
             ds = pydicom.dcmread(dicom_file_path)
-            
-            metadata = {
-                "patient_id": getattr(ds, 'PatientID', ''),
-                "patient_name": getattr(ds, 'PatientName', ''),
-                "patient_birth_date": getattr(ds, 'PatientBirthDate', ''),
-                "patient_sex": getattr(ds, 'PatientSex', ''),
-                "study_instance_uid": getattr(ds, 'StudyInstanceUID', ''),
-                "study_date": getattr(ds, 'StudyDate', ''),
-                "study_time": getattr(ds, 'StudyTime', ''),
-                "study_description": getattr(ds, 'StudyDescription', ''),
-                "modality": getattr(ds, 'Modality', ''),
-                "series_instance_uid": getattr(ds, 'SeriesInstanceUID', ''),
-                "series_description": getattr(ds, 'SeriesDescription', ''),
-                "series_number": getattr(ds, 'SeriesNumber', ''),
-                "sop_instance_uid": getattr(ds, 'SOPInstanceUID', ''),
-                "instance_number": getattr(ds, 'InstanceNumber', ''),
-                "rows": getattr(ds, 'Rows', 0),
-                "columns": getattr(ds, 'Columns', 0),
-                "slice_thickness": getattr(ds, 'SliceThickness', 0),
-                "pixel_spacing": getattr(ds, 'PixelSpacing', []),
-                "manufacturer": getattr(ds, 'Manufacturer', ''),
-                "manufacturer_model_name": getattr(ds, 'ManufacturerModelName', ''),
+
+            return {
+                "patient_id": getattr(ds, "PatientID", ""),
+                "patient_name": str(getattr(ds, "PatientName", "")),
+                "patient_birth_date": getattr(ds, "PatientBirthDate", ""),
+                "patient_sex": getattr(ds, "PatientSex", ""),
+                "study_instance_uid": getattr(ds, "StudyInstanceUID", ""),
+                "study_date": getattr(ds, "StudyDate", ""),
+                "study_time": getattr(ds, "StudyTime", ""),
+                "study_description": getattr(ds, "StudyDescription", ""),
+                "modality": getattr(ds, "Modality", ""),
+                "series_instance_uid": getattr(ds, "SeriesInstanceUID", ""),
+                "series_description": getattr(ds, "SeriesDescription", ""),
+                "series_number": getattr(ds, "SeriesNumber", ""),
+                "sop_instance_uid": getattr(ds, "SOPInstanceUID", ""),
+                "instance_number": getattr(ds, "InstanceNumber", ""),
+                "rows": getattr(ds, "Rows", 0),
+                "columns": getattr(ds, "Columns", 0),
+                "slice_thickness": getattr(ds, "SliceThickness", 0),
+                "pixel_spacing": list(getattr(ds, "PixelSpacing", []) or []),
+                "manufacturer": getattr(ds, "Manufacturer", ""),
+                "manufacturer_model_name": getattr(ds, "ManufacturerModelName", ""),
             }
-            
-            return metadata
-        
         except Exception as e:
-            logger.error(f"Error parsing DICOM metadata: {e}")
+            logger.error("Error parsing DICOM metadata: %s", e)
             return {}
-    
-    def validate_dicom_file(
-        self,
-        dicom_file_path: str
-    ) -> Dict[str, Any]:
-        """
-        اعتبارسنجی فایل DICOM
-        
-        Args:
-            dicom_file_path: مسیر فایل DICOM
-        
-        Returns:
-            نتیجه اعتبارسنجی
-        """
-        validation_result = {
+
+    def validate_dicom_file(self, dicom_file_path: str) -> Dict[str, Any]:
+        """Validate a local DICOM file (no remote PACS required)."""
+        validation_result: Dict[str, Any] = {
             "valid": False,
             "errors": [],
-            "warnings": []
+            "warnings": [],
         }
-        
+
         try:
             ds = pydicom.dcmread(dicom_file_path)
-            
-            # بررسی فیلدهای ضروری
+
             required_fields = [
-                'PatientID',
-                'StudyInstanceUID',
-                'SeriesInstanceUID',
-                'SOPInstanceUID',
-                'Modality'
+                "PatientID",
+                "StudyInstanceUID",
+                "SeriesInstanceUID",
+                "SOPInstanceUID",
+                "Modality",
             ]
-            
+
             for field in required_fields:
                 if not hasattr(ds, field) or not getattr(ds, field):
                     validation_result["errors"].append(f"Missing required field: {field}")
-            
-            # بررسی Modality
-            valid_modalities = ['MR', 'CT', 'PT', 'PET', 'NM']
-            if hasattr(ds, 'Modality'):
-                if ds.Modality not in valid_modalities:
-                    validation_result["warnings"].append(
-                        f"Unusual modality: {ds.Modality}"
-                    )
-            
+
+            valid_modalities = ["MR", "CT", "PT", "PET", "NM"]
+            if hasattr(ds, "Modality") and ds.Modality not in valid_modalities:
+                validation_result["warnings"].append(f"Unusual modality: {ds.Modality}")
+
             if not validation_result["errors"]:
                 validation_result["valid"] = True
-            
+
         except Exception as e:
             validation_result["errors"].append(f"Invalid DICOM file: {str(e)}")
-        
-        return validation_result
 
+        return validation_result

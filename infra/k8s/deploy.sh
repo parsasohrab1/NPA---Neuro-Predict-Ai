@@ -243,8 +243,10 @@ deploy_frontend() {
     
     if [ "$DRY_RUN" = "true" ]; then
         kubectl apply -f frontend-deployment.yaml --dry-run=client
+        kubectl apply -f admin-dashboard-deployment.yaml --dry-run=client
     else
         kubectl apply -f frontend-deployment.yaml
+        kubectl apply -f admin-dashboard-deployment.yaml
         
         # Wait for frontend to be ready
         info "Waiting for frontend to be ready..."

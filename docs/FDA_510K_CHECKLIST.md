@@ -1,6 +1,16 @@
 # چک‌لیست کامل آماده‌سازی FDA 510(k) Submission
 # Complete FDA 510(k) Submission Checklist
 
+> ## Evidence status (honesty banner)
+>
+> **Current execution / evidence completion: 0%.**  
+> This checklist is a planning scaffold. No FDA forms have been filed, no
+> predicate analysis package is attached, and no clinical validation artifacts
+> are checked in under `forms/` (directory absent). A draft device description
+> exists at `docs/FDA_510K_Device_Description.md` — that is **documentation
+> scaffolding**, not submission evidence. Do **not** raise completion
+> percentages without citing real artifacts (see `docs/EVIDENCE_PACK_INDEX_FA.md`).
+
 ## 📋 وضعیت کلی
 
 | بخش | وضعیت | درصد تکمیل | مسئول | تاریخ هدف |
@@ -13,6 +23,8 @@
 | سیستم کیفیت | ⬜ | 0% | Quality Assurance | |
 | اطلاعات شرکت | ⬜ | 0% | Regulatory Affairs | |
 | **جمع کل** | ⬜ | **0%** | | |
+
+**آخرین بازبینی صداقت:** ژوئیه ۲۰۲۶ — بدون تغییر صعودی درصد بدون شاهد.
 
 ---
 

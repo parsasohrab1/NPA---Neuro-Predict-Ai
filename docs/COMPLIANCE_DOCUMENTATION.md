@@ -1,5 +1,10 @@
 # Compliance Documentation - NeuroPredict-AI
 
+> **Honesty note (July 2026):** Many items below were historically marked "✅ complete"
+> as *design intent*. Where code still stores PHI in plaintext or signed BAAs are
+> absent from the repo, status is now **designed / partial / not verified**.
+> See `docs/EVIDENCE_PACK_INDEX_FA.md`.
+
 ## 📋 فهرست مطالب
 
 1. [HIPAA Compliance](#hipaa-compliance)
@@ -14,92 +19,92 @@
 ### Administrative Safeguards
 
 #### Security Management Process
-- ✅ Risk assessment procedures
-- ✅ Risk management policies
-- ✅ Sanction policy
-- ✅ Information system activity review
+- 🔶 Risk assessment procedures — designed / documented; execution not verified
+- 🔶 Risk management policies — designed
+- 🔶 Sanction policy — designed
+- 🔶 Information system activity review — partial (audit code exists)
 
 #### Assigned Security Responsibility
-- ✅ Security officer designated
-- ✅ Security responsibilities documented
+- 🔶 Security officer designated — organizational; not evidenced in repo
+- 🔶 Security responsibilities documented — designed
 
 #### Workforce Security
-- ✅ Authorization and/or supervision
-- ✅ Workforce clearance procedure
-- ✅ Termination procedures
+- 🔶 Authorization and/or supervision — designed
+- 🔶 Workforce clearance procedure — designed
+- 🔶 Termination procedures — designed
 
 #### Information Access Management
-- ✅ Access authorization
-- ✅ Access establishment and modification
-- ✅ Access controls
+- 🔶 Access authorization — partial (RBAC in code)
+- 🔶 Access establishment and modification — partial
+- 🔶 Access controls — partial
 
 #### Security Awareness and Training
-- ✅ Security reminders
-- ✅ Protection from malicious software
-- ✅ Log-in monitoring
-- ✅ Password management
+- 🔶 Security reminders — designed
+- 🔶 Protection from malicious software — designed
+- 🔶 Log-in monitoring — partial
+- 🔶 Password management — partial (hashing present)
 
 #### Contingency Plan
-- ✅ Data backup plan
-- ✅ Disaster recovery plan
-- ✅ Emergency mode operation plan
-- ✅ Testing and revision procedures
+- 🔶 Data backup plan — designed / scripts partial
+- 🔶 Disaster recovery plan — designed; restore drills not evidenced
+- 🔶 Emergency mode operation plan — designed
+- 🔶 Testing and revision procedures — not verified
 
 #### Business Associate Contracts
-- ✅ Business associate agreements in place
-- ✅ Written contracts or other arrangements
+- ⚠️ Business associate agreements in place — **not verified** (no signed BAA artifacts in repo)
+- ⚠️ Written contracts or other arrangements — **missing as evidence**
 
 ### Physical Safeguards
 
 #### Facility Access Controls
-- ✅ Contingency operations
-- ✅ Facility security plan
-- ✅ Access control and validation procedures
-- ✅ Maintenance records
+- 🔶 Contingency operations — designed (deployment-dependent)
+- 🔶 Facility security plan — designed
+- 🔶 Access control and validation procedures — designed
+- 🔶 Maintenance records — not evidenced in repo
 
 #### Workstation Use
-- ✅ Workstation security policies
-- ✅ Workstation use restrictions
+- 🔶 Workstation security policies — designed
+- 🔶 Workstation use restrictions — designed
 
 #### Device and Media Controls
-- ✅ Disposal
-- ✅ Media re-use
-- ✅ Accountability
-- ✅ Data backup and storage
+- 🔶 Disposal — designed
+- 🔶 Media re-use — designed
+- 🔶 Accountability — designed
+- 🔶 Data backup and storage — partial
 
 ### Technical Safeguards
 
 #### Access Control
-- ✅ Unique user identification
-- ✅ Emergency access procedure
-- ✅ Automatic logoff
-- ✅ Encryption and decryption
+- 🔶 Unique user identification — partial (JWT users)
+- 🔶 Emergency access procedure — designed
+- 🔶 Automatic logoff — designed / partial
+- ⚠️ Encryption and decryption — **partial / not verified for PHI at rest** (patient fields largely plaintext; crypto used for secrets such as MFA)
 
 #### Audit Controls
-- ✅ Audit logging implemented
-- ✅ Log review procedures
-- ✅ Log retention policy
+- 🔶 Audit logging implemented — partial
+- 🔶 Log review procedures — designed
+- 🔶 Log retention policy — designed
 
 #### Integrity
-- ✅ Data integrity controls
-- ✅ Person or entity authentication
+- 🔶 Data integrity controls — partial
+- 🔶 Person or entity authentication — partial (MFA historically not enforced on login)
 
 #### Transmission Security
-- ✅ Integrity controls
-- ✅ Encryption
+- 🔶 Integrity controls — designed
+- 🔶 Encryption in transit — designed (TLS via reverse proxy / ingress; not proven by evidence pack)
 
 ### Implementation Checklist
 
-- [x] Encryption at rest (AES-256)
-- [x] Encryption in transit (TLS 1.3)
-- [x] Access controls (RBAC)
-- [x] Audit logging
-- [x] Data backup
-- [x] Disaster recovery plan
-- [x] Business associate agreements
-- [x] Security policies documented
-- [x] Workforce training
-- [x] Incident response plan
+- [ ] Encryption at rest for PHI (AES-256) — **designed / partial / not verified** (do not claim complete while PHI columns remain plaintext)
+- [ ] Encryption in transit (TLS 1.3) — designed; verify in deployment
+- [x] Access controls (RBAC) — code present; harden MFA/session further
+- [x] Audit logging — code present; retention/review ops incomplete
+- [ ] Data backup — scripts/docs partial; offsite restore not verified
+- [ ] Disaster recovery plan — designed; drills not evidenced
+- [ ] Business associate agreements — **missing signed artifacts**
+- [x] Security policies documented — docs exist; treat as design intent
+- [ ] Workforce training — not evidenced in repo
+- [ ] Incident response plan — designed; exercises not evidenced
 
 ---
 

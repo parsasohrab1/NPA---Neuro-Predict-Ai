@@ -30,6 +30,7 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 @router.get("/system/overview")
 async def get_system_overview(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
 ) -> Dict[str, Any]:
     """
     Overview data for dashboard summary cards and charts.

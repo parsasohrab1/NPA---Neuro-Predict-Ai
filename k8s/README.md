@@ -1,178 +1,72 @@
 # Kubernetes Deployment - NeuroPredict-AI
 
-## ساختار فایل‌ها
+> **Canonical manifests live in [`infra/k8s/`](../infra/k8s/).**  
+> This root `k8s/` directory is **legacy / deprecated**. Prefer `infra/k8s` for
+> all new work, CD dry-runs, and production planning.
+>
+> Frontend and admin-dashboard Deployments/Services are defined under
+> `infra/k8s/frontend-deployment.yaml` and
+> `infra/k8s/admin-dashboard-deployment.yaml`.
+
+## Legacy tree (this folder)
 
 ```
-k8s/
-├── namespace.yaml              # Namespace definition
-├── configmap.yaml              # Application configuration
-├── secrets.yaml.example        # Secrets template
-├── deployment-backend.yaml    # Backend deployment
-├── deployment-database.yaml   # Database StatefulSet
-├── ingress.yaml                # Ingress configuration
-└── pdb.yaml                    # Pod Disruption Budget
+k8s/   ← DEPRECATED
+├── namespace.yaml
+├── configmap.yaml
+├── secrets.yaml.example
+├── deployment-backend.yaml
+├── deployment-database.yaml
+├── ingress.yaml
+└── pdb.yaml
 ```
 
-## استقرار
+## Canonical tree
 
-### 1. ایجاد Namespace
+```
+infra/k8s/
+├── namespace.yaml
+├── configmaps.yaml
+├── secrets-template.yaml
+├── postgres-statefulset.yaml
+├── redis-deployment.yaml
+├── backend-deployment.yaml
+├── frontend-deployment.yaml      # clinical UI
+├── admin-dashboard-deployment.yaml
+├── ingress.yaml
+├── network-policies.yaml
+├── persistentvolumes.yaml
+└── deploy.sh
+```
+
+## استقرار (canonical)
 
 ```bash
+cd infra/k8s
 kubectl apply -f namespace.yaml
-```
-
-### 2. ایجاد Secrets
-
-```bash
-# از فایل .env
-kubectl create secret generic neuropredict-secrets \
-  --from-env-file=.env.production \
-  --namespace=neuropredict-ai
-
-# یا دستی
-kubectl create secret generic neuropredict-secrets \
-  --from-literal=SECRET_KEY='your-key' \
-  --from-literal=POSTGRES_PASSWORD='your-password' \
-  --namespace=neuropredict-ai
-```
-
-### 3. استقرار سرویس‌ها
-
-```bash
-# ConfigMap
-kubectl apply -f configmap.yaml
-
-# Database
-kubectl apply -f deployment-database.yaml
-
-# Backend
-kubectl apply -f deployment-backend.yaml
-
-# Ingress
+# create secrets from secrets-template.yaml / sealed-secrets / external secrets
+kubectl apply -f configmaps.yaml
+kubectl apply -f postgres-statefulset.yaml
+kubectl apply -f redis-deployment.yaml
+kubectl apply -f backend-deployment.yaml
+kubectl apply -f frontend-deployment.yaml
+kubectl apply -f admin-dashboard-deployment.yaml
 kubectl apply -f ingress.yaml
-
-# Pod Disruption Budget
-kubectl apply -f pdb.yaml
 ```
 
-### 4. بررسی وضعیت
+Client dry-run (used by gated CD):
 
 ```bash
-# Pods
-kubectl get pods -n neuropredict-ai
-
-# Services
-kubectl get svc -n neuropredict-ai
-
-# Ingress
-kubectl get ingress -n neuropredict-ai
-
-# HPA
-kubectl get hpa -n neuropredict-ai
+kubectl apply --dry-run=client -f infra/k8s/
 ```
 
-## Scaling
+## Migration note
 
-### Manual Scaling
-
-```bash
-kubectl scale deployment neuropredict-backend --replicas=5 -n neuropredict-ai
-```
-
-### Auto Scaling
-
-HPA به صورت خودکار بر اساس CPU و Memory scaling می‌کند:
-
-```bash
-# مشاهده HPA
-kubectl get hpa -n neuropredict-ai
-
-# مشاهده metrics
-kubectl top pods -n neuropredict-ai
-```
-
-## Monitoring
-
-### دسترسی به Metrics
-
-```bash
-# Port forward برای Prometheus
-kubectl port-forward -n monitoring svc/prometheus 9090:9090
-
-# Port forward برای Grafana
-kubectl port-forward -n monitoring svc/grafana 3001:3000
-```
-
-## Troubleshooting
-
-### بررسی Logs
-
-```bash
-# Pod logs
-kubectl logs <pod-name> -n neuropredict-ai
-
-# Previous logs (if pod crashed)
-kubectl logs <pod-name> -n neuropredict-ai --previous
-```
-
-### بررسی Events
-
-```bash
-kubectl get events -n neuropredict-ai --sort-by='.lastTimestamp'
-```
-
-### Debug Pod
-
-```bash
-# Exec into pod
-kubectl exec -it <pod-name> -n neuropredict-ai -- /bin/bash
-```
-
-## Backup & Restore
-
-برای backup و restore، از scripts در `backend/scripts/` استفاده کنید:
-
-```bash
-# Backup
-python scripts/backup_database.py backup
-
-# Restore
-python scripts/backup_database.py restore --backup-file <file>
-```
-
-## Security
-
-### Network Policies
-
-برای محدود کردن ترافیک شبکه:
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: neuropredict-network-policy
-  namespace: neuropredict-ai
-spec:
-  podSelector:
-    matchLabels:
-      app: neuropredict-backend
-  policyTypes:
-  - Ingress
-  - Egress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: neuropredict-ai
-  egress:
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          name: neuropredict-ai
-```
+Do not add new manifests here. If something only exists under `k8s/`, port it
+to `infra/k8s/` and update CD workflows.
 
 ## منابع بیشتر
 
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [Production Deployment Guide](../docs/PRODUCTION_DEPLOYMENT.md)
-
+- [Product maturity assessment](../docs/PRODUCT_MATURITY_ASSESSMENT_FA.md)

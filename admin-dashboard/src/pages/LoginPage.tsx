@@ -16,9 +16,11 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // OAuth2 expects form data with 'username' field
+      // OAuth2 password flow uses "username"; map demo email to admin username
       const formData = new URLSearchParams()
-      formData.append('username', email)
+      const username =
+        email === 'admin@neuropredict.ai' ? 'admin' : email
+      formData.append('username', username)
       formData.append('password', password)
 
       const response = await axios.post('/api/v1/auth/login', formData, {

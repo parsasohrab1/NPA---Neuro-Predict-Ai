@@ -1,5 +1,13 @@
 # IRB Implementation Tracker - NeuroPredict-AI
 
+> ## Evidence status (honesty banner)
+>
+> **Current execution / evidence completion: 0% (0/8 phases).**  
+> This tracker is a planning scaffold only. No IRB has been contacted, no
+> protocol has been submitted, and no consent forms or CITI certificates are
+> stored in this repository. Do **not** mark phases complete or raise the
+> progress bar without filing real artifacts (see `docs/EVIDENCE_PACK_INDEX_FA.md`).
+
 ## 📊 وضعیت کلی پروژه
 
 **تاریخ شروع**: [تاریخ را وارد کنید]  
@@ -7,11 +15,13 @@
 **IRB تأیید هدف**: [تاریخ را وارد کنید]  
 **شروع مطالعه هدف**: [تاریخ را وارد کنید]
 
-**پیشرفت کلی**: 0% (0/8 فاز تکمیل شده)
+**پیشرفت کلی**: 0% (0/8 فاز تکمیل شده) — **بدون شاهد اجرایی در repo**
 
 ```
 █░░░░░░░░░░░░░░░░░░░ 0%
 ```
+
+**آخرین بازبینی صداقت:** ژوئیه ۲۰۲۶ — درصدها بدون evidence افزایش داده نشده‌اند.
 
 ---
 

@@ -1,10 +1,15 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { predictionsApi, patientsApi } from '../services/api'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { predictionsApi, patientsApi, USE_MOCK_DATA } from '../services/api'
 
 export default function PredictionResultPage() {
   const { id } = useParams<{ id: string }>()
-  
+  const queryClient = useQueryClient()
+  const [reviewNotes, setReviewNotes] = useState('')
+  const [riskAdjustment, setRiskAdjustment] = useState('')
+  const [reviewMessage, setReviewMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   const { data: prediction, isLoading } = useQuery({
     queryKey: ['prediction', id],
     queryFn: () => predictionsApi.getById(Number(id)),
@@ -15,6 +20,26 @@ export default function PredictionResultPage() {
     queryKey: ['patient', prediction?.patient_id],
     queryFn: () => patientsApi.getById(prediction!.patient_id),
     enabled: !!prediction?.patient_id,
+  })
+
+  const reviewMutation = useMutation({
+    mutationFn: (approved: boolean) =>
+      predictionsApi.review(Number(id), {
+        review_notes: reviewNotes || (approved ? 'Approved' : 'Override / not approved'),
+        approved,
+        risk_adjustment: riskAdjustment || undefined,
+      }),
+    onSuccess: () => {
+      setReviewMessage({ type: 'success', text: 'Review submitted and audited.' })
+      queryClient.invalidateQueries({ queryKey: ['prediction', id] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { detail?: string } }; message?: string }
+      setReviewMessage({
+        type: 'error',
+        text: ax.response?.data?.detail || ax.message || 'Failed to submit review',
+      })
+    },
   })
 
   if (isLoading) {
@@ -41,6 +66,37 @@ export default function PredictionResultPage() {
 
   return (
     <div>
+      {/* IFU / Clinical decision support disclaimer */}
+      <div
+        className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+        role="note"
+        aria-label="Clinical decision support disclaimer"
+      >
+        <p className="font-semibold mb-1">Clinical Decision Support — Important Notice</p>
+        <p>
+          NeuroPredict-AI is a clinical decision support system (CDSS) intended to assist qualified
+          clinicians. It is <strong>not</strong> a standalone diagnostic device and does not replace
+          clinical judgment, examination, or established diagnostic criteria. Always interpret
+          outputs in the full clinical context.
+        </p>
+        <p className="mt-2 text-amber-900/90">
+          Model version:{' '}
+          <span className="font-mono">
+            {prediction.model_version || prediction.model_name || 'unknown'}
+          </span>
+          {USE_MOCK_DATA && (
+            <span className="ml-2 inline-block rounded bg-amber-200 px-2 py-0.5 text-xs font-medium">
+              Mock / unvalidated data
+            </span>
+          )}
+          {!USE_MOCK_DATA && !prediction.model_version && !prediction.model_name && (
+            <span className="ml-2 inline-block rounded bg-amber-200 px-2 py-0.5 text-xs font-medium">
+              Version not reported — treat as unvalidated for clinical use
+            </span>
+          )}
+        </p>
+      </div>
+
       <div className="mb-8">
         <Link to={patient ? `/patients/${patient.id}` : '/patients'} className="text-primary-600 hover:text-primary-700 text-sm font-medium mb-4 inline-block">
           ← Back to Patient
@@ -49,6 +105,9 @@ export default function PredictionResultPage() {
         <p className="text-gray-600">
           {patient && `${patient.first_name} ${patient.last_name} • `}
           {new Date(prediction.created_at).toLocaleString()}
+          {prediction.is_reviewed && (
+            <span className="ml-2 text-success-700 font-medium">• Reviewed</span>
+          )}
         </p>
       </div>
 
@@ -63,7 +122,7 @@ export default function PredictionResultPage() {
                 {prediction.alzheimer_prediction.risk_level} Risk
               </span>
             </div>
-            
+
             <div className="mb-4">
               <div className="flex justify-between items-end mb-2">
                 <span className="text-sm text-gray-600">Risk Score</span>
@@ -105,7 +164,7 @@ export default function PredictionResultPage() {
                 {prediction.parkinson_prediction.risk_level} Risk
               </span>
             </div>
-            
+
             <div className="mb-4">
               <div className="flex justify-between items-end mb-2">
                 <span className="text-sm text-gray-600">Risk Score</span>
@@ -137,6 +196,69 @@ export default function PredictionResultPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Clinician review / override */}
+      <div className="card mb-6">
+        <h2 className="text-xl font-bold mb-2">Clinician Review</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Approve the model output or document an override. Submissions are sent to the prediction
+          review API and recorded for audit.
+        </p>
+
+        {prediction.is_reviewed && prediction.review_notes && (
+          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+            <p className="font-medium text-gray-900 mb-1">Previous review notes</p>
+            <pre className="whitespace-pre-wrap font-sans">{prediction.review_notes}</pre>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="label" htmlFor="review-notes">Approve / override notes</label>
+            <textarea
+              id="review-notes"
+              className="input min-h-[80px]"
+              value={reviewNotes}
+              onChange={(e) => setReviewNotes(e.target.value)}
+              placeholder="Clinical rationale for approval or override..."
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="risk-adjustment">Risk adjustment (optional)</label>
+            <input
+              id="risk-adjustment"
+              type="text"
+              className="input"
+              value={riskAdjustment}
+              onChange={(e) => setRiskAdjustment(e.target.value)}
+              placeholder="e.g. Clinician adjusts high → medium due to comorbidity profile"
+            />
+          </div>
+          {reviewMessage && (
+            <p className={`text-sm ${reviewMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+              {reviewMessage.text}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={reviewMutation.isPending}
+              onClick={() => reviewMutation.mutate(true)}
+            >
+              {reviewMutation.isPending ? 'Submitting...' : 'Approve'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={reviewMutation.isPending}
+              onClick={() => reviewMutation.mutate(false)}
+            >
+              Override / Do not approve
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -280,4 +402,3 @@ export default function PredictionResultPage() {
     </div>
   )
 }
-

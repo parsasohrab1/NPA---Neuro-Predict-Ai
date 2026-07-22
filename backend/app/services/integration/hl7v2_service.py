@@ -4,10 +4,16 @@ HL7 v2 Integration Service
 """
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
-import re
 import logging
+import socket
+
+from .errors import IntegrationNotConfiguredError
 
 logger = logging.getLogger(__name__)
+
+# MLLP framing: <VT> message <FS><CR>
+_MLLP_START = b"\x0b"
+_MLLP_END = b"\x1c\x0d"
 
 
 class HL7v2Message:
@@ -146,8 +152,17 @@ class HL7v2Message:
 class HL7v2Service:
     """Service for HL7 v2 operations"""
     
-    def __init__(self, hl7_server_url: Optional[str] = None):
+    def __init__(
+        self,
+        hl7_server_url: Optional[str] = None,
+        mllp_host: Optional[str] = None,
+        mllp_port: int = 2575,
+        timeout_seconds: float = 10.0,
+    ):
         self.hl7_server_url = hl7_server_url
+        self.mllp_host = (mllp_host or "").strip() or None
+        self.mllp_port = mllp_port
+        self.timeout_seconds = timeout_seconds
     
     def create_admit_message(
         self,
@@ -424,41 +439,59 @@ class HL7v2Service:
     def send_message(
         self,
         message: HL7v2Message,
-        destination: Optional[str] = None
-    ) -> bool:
+        destination: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        Send HL7 v2 message to destination
-        
-        Args:
-            message: HL7v2Message object
-            destination: Destination URL (optional, uses default if not provided)
-        
+        Send HL7 v2 message via TCP MLLP.
+
+        Requires ``HL7_MLLP_HOST`` (or ``destination`` as ``host:port``).
+        Does **not** pretend success when unconfigured.
+
         Returns:
-            True if successful
+            Dict with status/detail on success.
+
+        Raises:
+            IntegrationNotConfiguredError: when no MLLP host is configured.
+            OSError / socket errors: on transport failure after connect attempt.
         """
-        # در production، اینجا باید message را به HL7 server بفرستیم
-        # از طریق MLLP (Minimal Lower Layer Protocol) یا HTTP
-        
-        destination = destination or self.hl7_server_url
-        
-        if not destination:
-            logger.warning("No HL7 server URL configured")
-            return False
-        
-        try:
-            # اینجا باید MLLP یا HTTP connection برقرار کنیم
-            # و message را بفرستیم
-            
-            message_str = message.to_string()
-            logger.info(f"Sending HL7 v2 message to {destination}")
-            logger.debug(f"Message: {message_str[:200]}...")
-            
-            # در production، اینجا باید actual sending logic باشد
-            # برای حالا فقط log می‌کنیم
-            
-            return True
-        
-        except Exception as e:
-            logger.error(f"Error sending HL7 v2 message: {e}")
-            return False
+        host = self.mllp_host
+        port = self.mllp_port
+
+        # Optional override: "host:port" or bare host
+        dest = destination or self.hl7_server_url
+        if dest and "://" not in dest:
+            if ":" in dest:
+                host_part, _, port_part = dest.rpartition(":")
+                if host_part and port_part.isdigit():
+                    host = host_part
+                    port = int(port_part)
+            elif not host:
+                host = dest
+
+        if not host:
+            raise IntegrationNotConfiguredError(
+                "HL7 MLLP send is not configured. Set HL7_MLLP_HOST "
+                "(and optionally HL7_MLLP_PORT, default 2575)."
+            )
+
+        message_str = message.to_string()
+        payload = _MLLP_START + message_str.encode("utf-8") + _MLLP_END
+
+        logger.info("Sending HL7 v2 MLLP message to %s:%s", host, port)
+        logger.debug("Message preview: %s...", message_str[:200])
+
+        with socket.create_connection((host, port), timeout=self.timeout_seconds) as sock:
+            sock.settimeout(self.timeout_seconds)
+            sock.sendall(payload)
+            # Best-effort ACK read (may be empty on some peers)
+            try:
+                ack = sock.recv(4096)
+            except socket.timeout:
+                ack = b""
+
+        return {
+            "status": "success",
+            "detail": f"MLLP message sent to {host}:{port}",
+            "ack_bytes": len(ack),
+        }
 
