@@ -2,11 +2,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: neuropredict-frontend
+  name: neuropredict-admin
   namespace: neuropredict
   labels:
     app: neuropredict
-    tier: frontend
+    tier: admin
 spec:
   replicas: 2
   strategy:
@@ -17,16 +17,16 @@ spec:
   selector:
     matchLabels:
       app: neuropredict
-      tier: frontend
+      tier: admin
   template:
     metadata:
       labels:
         app: neuropredict
-        tier: frontend
+        tier: admin
     spec:
       containers:
-        - name: frontend
-          image: neuropredict/frontend:latest
+        - name: admin
+          image: neuropredict/admin-dashboard:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -58,16 +58,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend
+  name: admin-dashboard
   namespace: neuropredict
   labels:
     app: neuropredict
-    tier: frontend
+    tier: admin
 spec:
   type: ClusterIP
   selector:
     app: neuropredict
-    tier: frontend
+    tier: admin
   ports:
     - name: http
       protocol: TCP

@@ -13,22 +13,21 @@ from app.services.integration.pacs_service import PACSService
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_query_studies(client: AsyncClient, auth_headers: dict):
-    """Test querying studies from PACS"""
+    """Remote PACS query must not pretend success when unconfigured."""
     response = await client.get(
         "/api/v1/pacs/studies?patient_id=PATIENT123",
         headers=auth_headers
     )
     
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "studies" in data
+    assert response.status_code in (501, 503)
+    detail = response.json().get("detail", response.json())
+    assert detail.get("status") in ("not_configured", "not_implemented")
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_study(client: AsyncClient, auth_headers: dict):
-    """Test retrieving a study from PACS"""
+    """Remote PACS retrieve must not pretend success when unconfigured."""
     study_uid = "1.2.840.113619.2.55.3.123456"
     
     response = await client.get(
@@ -36,10 +35,9 @@ async def test_get_study(client: AsyncClient, auth_headers: dict):
         headers=auth_headers
     )
     
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert data["study_instance_uid"] == study_uid
+    assert response.status_code in (501, 503)
+    detail = response.json().get("detail", response.json())
+    assert detail.get("status") in ("not_configured", "not_implemented")
 
 
 @pytest.mark.asyncio
@@ -74,16 +72,15 @@ async def test_validate_dicom_file(client: AsyncClient, auth_headers: dict):
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_worklist(client: AsyncClient, auth_headers: dict):
-    """Test getting Modality Worklist from PACS"""
+    """Remote MWL must not pretend success when unconfigured."""
     response = await client.get(
         "/api/v1/pacs/worklist?patient_id=PATIENT123",
         headers=auth_headers
     )
     
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "worklist" in data
+    assert response.status_code in (501, 503)
+    detail = response.json().get("detail", response.json())
+    assert detail.get("status") in ("not_configured", "not_implemented")
 
 
 @pytest.mark.asyncio

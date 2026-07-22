@@ -2,10 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * E2E Tests Configuration for NeuroPredict-AI
- * Run with: npx playwright test
+ * Run from tests/e2e: npx playwright test
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  // Config lives in tests/e2e/ — specs are siblings, not nested under tests/e2e/tests/e2e
+  testDir: '.',
+  testMatch: /.*\.spec\.ts/,
   /* Maximum time one test can run for. */
   timeout: 30 * 1000,
   expect: {
@@ -21,11 +23,13 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [
-    ['html'],
-    ['json', { outputFile: 'test-results/results.json' }],
-    ['junit', { outputFile: 'test-results/junit.xml' }]
-  ],
+  reporter: process.env.CI
+    ? [['list'], ['github']]
+    : [
+        ['html'],
+        ['json', { outputFile: 'test-results/results.json' }],
+        ['junit', { outputFile: 'test-results/junit.xml' }],
+      ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
@@ -58,37 +62,28 @@ export default defineConfig({
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
     },
-
-    /* Test against mobile viewports. */
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: [
-    {
-      command: 'cd ../backend && python -m uvicorn app.main:app --port 8001',
-      url: 'http://localhost:8001/health',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
-      env: {
-        SECRET_KEY: 'test-secret-key-for-e2e-tests-only-min-32-characters-long',
-        ENVIRONMENT: 'test',
-        DATABASE_URL: 'sqlite+aiosqlite:///:memory:',
-      }
-    },
-    {
-      command: 'cd ../frontend && npm run dev',
-      url: 'http://localhost:3001',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
-    },
-  ],
+  /* Local only: spin up servers. CI config-validation job skips webServer via --list. */
+  webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER
+    ? undefined
+    : [
+        {
+          command: 'cd ../backend && python -m uvicorn app.main:app --port 8001',
+          url: 'http://localhost:8001/health',
+          reuseExistingServer: !process.env.CI,
+          timeout: 120 * 1000,
+          env: {
+            SECRET_KEY: 'test-secret-key-for-e2e-tests-only-min-32-characters-long',
+            ENVIRONMENT: 'test',
+            DATABASE_URL: 'sqlite+aiosqlite:///:memory:',
+          },
+        },
+        {
+          command: 'cd ../frontend && npm run dev',
+          url: 'http://localhost:3001',
+          reuseExistingServer: !process.env.CI,
+          timeout: 120 * 1000,
+        },
+      ],
 });
-

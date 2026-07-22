@@ -100,35 +100,44 @@
 ## ⚠️ Known Limitations
 
 ### AI Models
-- **Model Weights**: Using random initialization (no pre-trained weights yet)
+- **Model Weights**: Historically random initialization / no checked-in `.pth` weights (fail-closed work may land on sibling branches)
 - **Training Data**: Needs real medical data for training
 - **Validation**: Requires clinical validation studies
 - **Performance**: Accuracy not yet validated on real data
 
 ### Frontend
-- **Admin Dashboard**: Basic implementation, needs enhancement
+- **Mock defaults**: Frontend has historically defaulted to mock data when env unset — not production-safe
+- **Admin Dashboard**: Partial; some pages still sample/local mock
 - **Mobile App**: Not yet implemented
-- **Visualization**: Advanced charts need implementation
-- **Real-time Updates**: WebSocket not yet implemented
+- **Auth gates**: Clinical routes historically weak without forced redirect
 
-### Integration
-- **PACS Integration**: Interface defined but not connected
-- **EHR/HIS**: API endpoints ready but not integrated
-- **HL7 FHIR**: Support planned but not implemented
-- **Medical Devices**: No direct integration yet
+### Integration (honesty)
+- **PACS**: Local DICOM parse/validate works; DIMSE remote needs `PACS_SERVER_URL` + `pynetdicom` — unconfigured calls return **503/501**, not empty 200 success
+- **HL7 v2**: Message build/parse works; MLLP send only when `HL7_MLLP_HOST` set — else **503 not_configured**
+- **FHIR**: Local DB adapters partial; remote client needs `HL7_FHIR_ENDPOINT`; ImagingStudy local → **501**
+- **EHR/HIS**: REST client scaffolding; needs `EHR_API_URL`
+- **Notifications**: Email/SMS return False in non-DEBUG when SMTP/SMS not configured (DEBUG may stub True)
+
+### Regulatory / compliance evidence
+- **FDA 510(k) checklist**: **0%** execution — draft device description only (`docs/EVIDENCE_PACK_INDEX_FA.md`)
+- **IRB tracker**: **0%** — no consent/protocol artifacts in repo
+- **HIPAA encryption-at-rest / BAA**: designed/partial/not verified — do not treat docs ✅ as verified controls
 
 ### Testing
-- **Unit Tests**: Minimal coverage
-- **Integration Tests**: Not implemented
-- **E2E Tests**: Not implemented
-- **Performance Tests**: Not conducted
+- **Unit / API tests**: Present but coverage uneven; many integration paths historically mocked
+- **Contract tests**: Added for integration honesty (`backend/tests/integration/test_integration_contracts.py`)
+- **E2E / Playwright**: Specs under `tests/e2e`; CI validates config (`--list`); full smoke optional
+- **Performance Tests**: Limited
 
-### Production Readiness
-- **Security Audit**: Not performed
-- **Load Testing**: Not conducted
-- **Monitoring**: Basic health checks only
-- **Backup Strategy**: Not configured
-- **Disaster Recovery**: Not planned
+### Production / Ops
+- **CD**: `cd-prod.yml` / `deploy-production.yml` are **gated workflow_dispatch** validators — no fake echo deploy success; cluster credentials still TODO
+- **k8s**: Canonical manifests under `infra/k8s/`; root `k8s/` legacy
+- **Security Audit / Load / DR**: Not completed as evidence packs
+
+### What this branch (`cursor/maturity-p0-p4-implementation-892d`) is fixing
+- P2: Integration honesty (no fake green remote success) + contract tests + doc de-overclaim
+- P3: Regulatory evidence honesty banners + evidence pack index + softened HIPAA claims + maturity assessment on branch
+- P4: Realistic gated CD workflows, k8s canonical pointer + admin deploy yaml, Playwright CI job, notification stub honesty
 
 ## 🎯 Next Steps for Production
 

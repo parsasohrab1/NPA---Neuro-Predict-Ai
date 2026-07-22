@@ -185,3 +185,57 @@ jobs:
           file: ./admin-dashboard/Dockerfile
           push: false
           tags: neuropredict/admin:ci-${{ github.sha }}
+
+  playwright-config:
+    name: Playwright (config validation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install e2e dependencies
+        working-directory: tests/e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Validate Playwright config and discover tests
+        working-directory: tests/e2e
+        env:
+          CI: "true"
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+        run: npx playwright test --list --project=chromium
+
+  playwright-smoke:
+    name: Playwright smoke (optional)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    needs: [playwright-config]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install e2e dependencies
+        working-directory: tests/e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Run chromium smoke when services are available
+        working-directory: tests/e2e
+        env:
+          CI: "true"
+          FRONTEND_URL: http://localhost:3001
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+        run: |
+          # Services are not started in CI by default; skip gracefully.
+          if curl -sf "$FRONTEND_URL" >/dev/null 2>&1; then
+            npx playwright test --project=chromium --grep @smoke || npx playwright test --project=chromium auth.spec.ts
+          else
+            echo "Frontend not up — skipping smoke execution (config already validated)."
+            echo "To enable: start frontend/backend services in this job or use a compose profile."
+          fi

@@ -1,178 +1,95 @@
 # خلاصه یکپارچه‌سازی - NeuroPredict-AI
 
-## ✅ پیاده‌سازی شده
+> **وضعیت کلی:** scaffolding / partial — سازنده‌های پیام و منبع محلی کار می‌کنند؛
+> ارسال/دریافت remote بدون پیکربندی صریح، دیگر «موفقیت جعلی» برنمی‌گرداند
+> (HTTP 501/503 با `not_configured` / `not_implemented`).
 
-### 1. HL7 FHIR Integration
+## وضعیت پیاده‌سازی (صادقانه)
 
-**Services:**
-- ✅ `backend/app/services/integration/fhir_service.py`
-  - Patient Resource creation
-  - Observation Resource creation
-  - DiagnosticReport Resource creation
-  - ImagingStudy Resource creation
-  - Bundle creation
-  - Resource validation
+### 1. HL7 FHIR Integration — partial
 
-**API Endpoints:**
-- ✅ `GET /api/v1/fhir/Patient/{patient_id}` - دریافت Patient
-- ✅ `POST /api/v1/fhir/Patient` - ایجاد Patient
-- ✅ `GET /api/v1/fhir/Observation` - جستجوی Observations
-- ✅ `POST /api/v1/fhir/Observation` - ایجاد Observation
-- ✅ `GET /api/v1/fhir/DiagnosticReport` - جستجوی DiagnosticReports
-- ✅ `POST /api/v1/fhir/DiagnosticReport` - ایجاد DiagnosticReport
-- ✅ `GET /api/v1/fhir/ImagingStudy` - جستجوی ImagingStudies
-- ✅ `GET /api/v1/fhir/metadata` - CapabilityStatement
+**Local (DB-backed) adapters:**
+- `GET /api/v1/fhir/Patient`, `Observation`, `DiagnosticReport` — از دیتابیس NeuroPredict
+- `GET /api/v1/fhir/metadata` — CapabilityStatement
+- سازنده‌های منبع در `fhir_service.py` (Patient / Observation / …)
 
-**Supported Resources:**
-- Patient
-- Observation
-- DiagnosticReport
-- ImagingStudy
-- Bundle
+**Remote FHIR client:**
+- نیازمند `HL7_FHIR_ENDPOINT`
+- `GET /api/v1/fhir/remote/{type}` و `.../{id}` با httpx
+- بدون env → HTTP 503 `not_configured`
+- `GET /api/v1/fhir/ImagingStudy` محلی → HTTP 501 `not_implemented` (ایندکس DICOM هنوز FHIR نیست)
 
-### 2. PACS Integration (DICOM)
+### 2. PACS Integration (DICOM) — partial / scaffolding
 
-**Services:**
-- ✅ `backend/app/services/integration/pacs_service.py`
-  - Query patient studies
-  - Retrieve studies
-  - Store DICOM files
-  - Parse DICOM metadata
-  - Validate DICOM files
-  - Modality Worklist
+**Local (بدون PACS):**
+- Parse metadata و validate فایل DICOM (`pydicom`) — کار می‌کند
 
-**API Endpoints:**
-- ✅ `GET /api/v1/pacs/studies` - جستجوی مطالعات
-- ✅ `GET /api/v1/pacs/studies/{study_instance_uid}` - دریافت مطالعه
-- ✅ `POST /api/v1/pacs/upload` - آپلود DICOM
-- ✅ `POST /api/v1/pacs/validate` - اعتبارسنجی DICOM
-- ✅ `GET /api/v1/pacs/worklist` - Modality Worklist
+**Remote DIMSE (C-FIND / C-MOVE / C-STORE / MWL):**
+- نیازمند `PACS_SERVER_URL` + بسته اختیاری `pynetdicom`
+- بدون پیکربندی → HTTP 503 `not_configured` (نه لیست خالی 200)
+- با پیکربندی ولی بدون پیاده‌سازی کامل DIMSE → HTTP 501 `not_implemented`
 
-**Features:**
-- DICOM file parsing
-- Metadata extraction
-- File validation
-- PACS query/retrieve
-- C-STORE support
+### 3. HL7 v2 — partial
 
-### 3. EHR/HIS Integration
+**Local builders/parsers:** ADT/ORU ساخت و parse — کار می‌کند
 
-**Services:**
-- ✅ `backend/app/services/integration/ehr_service.py`
-  - Get patient data
-  - Get lab results
-  - Get medications
-  - Get vital signs
-  - Send prediction results
-  - Sync patient data
+**Send (MLLP):**
+- اگر `HL7_MLLP_HOST` تنظیم شده باشد → TCP MLLP send حداقلی
+- در غیر این صورت → HTTP 503 `not_configured` (دیگر `return True` جعلی نیست)
 
-**API Endpoints:**
-- ✅ `GET /api/v1/ehr/patients/{patient_id}` - دریافت اطلاعات بیمار
-- ✅ `GET /api/v1/ehr/patients/{patient_id}/lab-results` - نتایج آزمایش
-- ✅ `GET /api/v1/ehr/patients/{patient_id}/medications` - داروها
-- ✅ `GET /api/v1/ehr/patients/{patient_id}/vital-signs` - علائم حیاتی
-- ✅ `POST /api/v1/ehr/patients/{patient_id}/sync` - همگام‌سازی
-- ✅ `POST /api/v1/ehr/patients/{patient_id}/predictions` - ارسال پیش‌بینی
+### 4. EHR/HIS Integration — partial
 
-**Features:**
-- REST API integration
-- Async HTTP requests
-- Error handling
-- Data synchronization
+- کلاینت REST با retry/timeout در `ehr_service.py`
+- بدون `EHR_API_URL` نباید موفقیت جعلی برگردانده شود
 
-### 4. Configuration
+### 5. Configuration
 
-**Environment Variables:**
-- ✅ `PACS_SERVER_URL` - PACS server URL
-- ✅ `PACS_AE_TITLE` - Application Entity Title
-- ✅ `EHR_API_URL` - EHR API endpoint
-- ✅ `EHR_API_KEY` - EHR API key
-- ✅ `HL7_FHIR_ENDPOINT` - FHIR server endpoint
-- ✅ `HL7_FHIR_BASE_URL` - FHIR base URL
+| Variable | Purpose |
+|----------|---------|
+| `PACS_SERVER_URL` / `PACS_AE_TITLE` | Remote PACS DIMSE peer |
+| `HL7_FHIR_ENDPOINT` | Remote FHIR base URL |
+| `HL7_FHIR_BASE_URL` | Local FHIR resource base for Bundle URLs |
+| `HL7_MLLP_HOST` / `HL7_MLLP_PORT` | HL7 v2 MLLP TCP send |
+| `HL7_SERVER_URL` | Optional legacy / destination override |
+| `EHR_API_URL` / `EHR_API_KEY` | EHR REST |
 
-### 5. Dependencies
+### 6. Dependencies
 
-**Added to requirements.txt:**
-- ✅ `pydicom==2.4.4` - DICOM support
-- ✅ `fhir.resources==7.0.0` - FHIR resources
-- ✅ `httpx==0.25.2` - HTTP client (already existed)
+- `pydicom` — DICOM local parse/validate
+- `fhir.resources` — FHIR resource models
+- `httpx` — remote FHIR/EHR HTTP
+- `pynetdicom` — **optional**, required for real DIMSE (not bundled by default)
 
 ---
 
-## 📋 وضعیت پیاده‌سازی
+## جدول وضعیت
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| HL7 FHIR API | ✅ Complete | All core resources implemented |
-| PACS Integration | ✅ Complete | DICOM operations supported |
-| EHR/HIS Integration | ✅ Complete | REST API integration ready |
-| Medical Devices | ⏳ Pending | Modality Worklist only |
-| HL7 v2 Support | ⏳ Pending | Planned for future |
-| Real-time Streaming | ⏳ Pending | Planned for future |
-
----
-
-## نحوه استفاده
-
-### FHIR Integration
-
-```python
-from app.services.integration.fhir_service import FHIRService
-
-fhir_service = FHIRService()
-patient = fhir_service.create_patient_resource(...)
-```
-
-### PACS Integration
-
-```python
-from app.services.integration.pacs_service import PACSService
-
-pacs_service = PACSService(pacs_server_url="...")
-studies = pacs_service.query_patient_studies(...)
-```
-
-### EHR Integration
-
-```python
-from app.services.integration.ehr_service import EHRService
-
-ehr_service = EHRService(ehr_api_url="...", api_key="...")
-patient_data = await ehr_service.get_patient_data(...)
-```
-
----
-
-## مستندات
-
-- `docs/INTEGRATION_GUIDE.md` - راهنمای کامل یکپارچه‌سازی
-- API Documentation در `/api/docs` (Swagger UI)
+| HL7 FHIR local (Patient/Obs/DR) | Partial | DB-backed read/search |
+| HL7 FHIR remote client | Partial | httpx when `HL7_FHIR_ENDPOINT` set |
+| ImagingStudy FHIR | Not implemented | 501 explicit |
+| PACS local validate/parse | Working | No remote needed |
+| PACS DIMSE | Scaffolding | 503/501 honest errors |
+| EHR/HIS | Partial | REST client; needs URL |
+| HL7 v2 build/parse | Working | Local only |
+| HL7 v2 MLLP send | Partial | Minimal TCP when host set |
+| Contract tests | Added | `tests/integration/test_integration_contracts.py` |
 
 ---
 
 ## نکات مهم
 
-1. **Authentication**: برای EHR integration از API keys استفاده کنید
-2. **Error Handling**: همیشه خطاها را handle کنید
-3. **Validation**: داده‌های دریافتی را validate کنید
-4. **Timeout**: برای درخواست‌های خارجی timeout تنظیم کنید
-5. **Security**: از HTTPS برای تمام ارتباطات استفاده کنید
+1. **هرگز به HTTP 200 خالی برای remote اعتماد نکنید** — وضعیت را از `status` / HTTP code بخوانید
+2. **Authentication** برای EHR از API keys
+3. **Timeout** برای درخواست‌های خارجی
+4. **Security** — HTTPS برای تمام peerهای production
 
 ---
 
 ## گام‌های بعدی
 
-1. ⏳ Medical Devices Integration (HL7 v2)
-2. ⏳ Real-time Data Streaming
-3. ⏳ Integration Testing
-4. ⏳ Performance Optimization
-5. ⏳ Advanced Error Recovery
-
----
-
-## پشتیبانی
-
-برای سوالات و مشکلات:
-- Integration Team: integration@neuropredict-ai.com
-- Technical Support: support@neuropredict-ai.com
-
+1. پیاده‌سازی کامل DIMSE با pynetdicom
+2. ACK کامل HL7 MLLP و retry
+3. ImagingStudy از ایندکس DICOM
+4. تست قرارداد با WireMock / شبیه‌ساز PACS
