@@ -35,12 +35,23 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         
-        # CSP Configuration - improved for production
-        # In production, switch from Report-Only to enforced CSP after testing
+        # CSP Configuration.
+        # This middleware only governs the backend's own responses (JSON API +,
+        # when settings.DEBUG is True, the Swagger/ReDoc docs pages). The React
+        # frontends are served by their own dev server/nginx and are not affected.
+        is_enforced = settings.ENVIRONMENT == "production" and settings.DEBUG is False
+
+        # Swagger UI / ReDoc (docs_url/redoc_url in main.py) require 'unsafe-inline'
+        # and 'unsafe-eval' to render, but those routes only exist when DEBUG is
+        # True — i.e. never in the enforced (production) tier. So the enforced
+        # policy can safely drop unsafe-* with no functional impact.
+        script_src = "script-src 'self'" if is_enforced else "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        style_src = "style-src 'self'" if is_enforced else "style-src 'self' 'unsafe-inline'"
+
         csp_policy = [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # TODO: Remove unsafe-* in production after code refactoring
-            "style-src 'self' 'unsafe-inline'",  # TODO: Remove unsafe-inline after moving to CSS modules
+            script_src,
+            style_src,
             "img-src 'self' data: blob: https:",
             "font-src 'self' data:",
             "connect-src 'self' " + " ".join(settings.CORS_ORIGINS),  # Allow API calls to same origin and CORS origins
@@ -54,9 +65,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "manifest-src 'self'",
             "report-uri /api/v1/security/csp/report",  # CSP violation reporting endpoint
         ]
-        
+
         # Use Report-Only in development, enforce in production (when ready)
-        if settings.ENVIRONMENT == "production" and settings.DEBUG is False:
+        if is_enforced:
             response.headers["Content-Security-Policy"] = "; ".join(csp_policy)
         else:
             response.headers["Content-Security-Policy-Report-Only"] = "; ".join(csp_policy)
