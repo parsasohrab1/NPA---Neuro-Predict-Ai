@@ -22,6 +22,15 @@
 - **عملیاتی و یکپارچگی (حداقلی)**
   - API مستند، لاگ سرور، مانیتورینگ سلامت سرویس، آماده‌سازی اتصال HIS/PACS.
 
+## ماژول‌های مبتنی بر کاربرد (Use-case driven)
+
+| ماژول | کاربر هدف |
+|---|---|
+| Early Risk Screening | کلینیک‌های عمومی |
+| Disease Progression Forecast | نورولوژیست |
+| Research Mode | دانشگاه و R&D |
+| Remote Monitoring | Telemedicine |
+
 
 ## خارج از محدوده MVP
 
