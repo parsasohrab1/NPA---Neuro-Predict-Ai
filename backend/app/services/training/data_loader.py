@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple, Dict, Optional
 import logging
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 import torch
 from torch.utils.data import Dataset, DataLoader as TorchDataLoader
@@ -62,6 +62,7 @@ class DataLoader:
         self.data_dir = Path(data_dir)
         self.scaler = StandardScaler()
         self.feature_names = []
+        self.last_patient_ids: Optional[np.ndarray] = None
         
     def load_from_csv(self, csv_path: Optional[str] = None) -> pd.DataFrame:
         """
@@ -98,7 +99,19 @@ class DataLoader:
             Tuple of (features, alzheimer_labels, parkinson_labels)
         """
         logger.info("Preprocessing data...")
-        
+
+        # Track patient_id (when present) so split_data() can split by patient
+        # instead of by row — a patient with multiple visits must land entirely
+        # in one split, or the model leaks identity-specific signal from
+        # train into test.
+        self.last_patient_ids = df['patient_id'].values if 'patient_id' in df.columns else None
+        if self.last_patient_ids is None:
+            logger.warning(
+                "No 'patient_id' column found. Falling back to row-level splitting, "
+                "which risks train/val/test leakage if any patient contributes more "
+                "than one row (e.g. multiple visits)."
+            )
+
         # Extract features (same as in ai_model_service.py)
         features_list = []
         
@@ -180,12 +193,13 @@ class DataLoader:
         return features, alzheimer_labels, parkinson_labels
     
     def split_data(self, features: np.ndarray, alzheimer_labels: np.ndarray,
-                   parkinson_labels: np.ndarray, 
+                   parkinson_labels: np.ndarray,
                    train_ratio: float = 0.7, val_ratio: float = 0.15,
-                   test_ratio: float = 0.15, random_state: int = 42) -> Dict:
+                   test_ratio: float = 0.15, random_state: int = 42,
+                   patient_ids: Optional[np.ndarray] = None) -> Dict:
         """
         Split data into train, validation, and test sets
-        
+
         Args:
             features: Feature matrix
             alzheimer_labels: Alzheimer's labels
@@ -194,28 +208,63 @@ class DataLoader:
             val_ratio: Ratio for validation set
             test_ratio: Ratio for test set
             random_state: Random seed
-        
+            patient_ids: Per-row patient identifier. If omitted, falls back to
+                self.last_patient_ids (set by preprocess_data). When available,
+                all rows for a given patient are kept in the same split — this
+                is a group split, not a per-row split.
+
         Returns:
             Dictionary with train, val, test splits
         """
         assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, "Ratios must sum to 1.0"
-        
+
         logger.info(f"Splitting data: Train={train_ratio}, Val={val_ratio}, Test={test_ratio}")
-        
-        # First split: train + val vs test
-        test_size = test_ratio
-        X_temp, X_test, y_alz_temp, y_alz_test, y_park_temp, y_park_test = train_test_split(
-            features, alzheimer_labels, parkinson_labels,
-            test_size=test_size, random_state=random_state, stratify=alzheimer_labels
-        )
-        
-        # Second split: train vs val
-        val_size = val_ratio / (train_ratio + val_ratio)
-        X_train, X_val, y_alz_train, y_alz_val, y_park_train, y_park_val = train_test_split(
-            X_temp, y_alz_temp, y_park_temp,
-            test_size=val_size, random_state=random_state, stratify=y_alz_temp
-        )
-        
+
+        if patient_ids is None:
+            patient_ids = self.last_patient_ids
+
+        if patient_ids is not None:
+            n_unique_patients = len(np.unique(patient_ids))
+            logger.info(f"Splitting by patient_id ({n_unique_patients} unique patients) to prevent leakage")
+
+            # First split: train + val vs test, grouped by patient
+            gss = GroupShuffleSplit(n_splits=1, test_size=test_ratio, random_state=random_state)
+            temp_idx, test_idx = next(gss.split(features, alzheimer_labels, groups=patient_ids))
+
+            # Second split: train vs val, grouped by patient (within the remaining group)
+            val_size = val_ratio / (train_ratio + val_ratio)
+            gss_val = GroupShuffleSplit(n_splits=1, test_size=val_size, random_state=random_state)
+            train_rel_idx, val_rel_idx = next(
+                gss_val.split(features[temp_idx], alzheimer_labels[temp_idx], groups=patient_ids[temp_idx])
+            )
+            train_idx = temp_idx[train_rel_idx]
+            val_idx = temp_idx[val_rel_idx]
+
+            assert set(np.unique(patient_ids[train_idx])).isdisjoint(patient_ids[val_idx]), \
+                "Patient leakage between train and val"
+            assert set(np.unique(patient_ids[train_idx])).isdisjoint(patient_ids[test_idx]), \
+                "Patient leakage between train and test"
+            assert set(np.unique(patient_ids[val_idx])).isdisjoint(patient_ids[test_idx]), \
+                "Patient leakage between val and test"
+
+            X_train, X_val, X_test = features[train_idx], features[val_idx], features[test_idx]
+            y_alz_train, y_alz_val, y_alz_test = alzheimer_labels[train_idx], alzheimer_labels[val_idx], alzheimer_labels[test_idx]
+            y_park_train, y_park_val, y_park_test = parkinson_labels[train_idx], parkinson_labels[val_idx], parkinson_labels[test_idx]
+        else:
+            # No patient identifier available — fall back to stratified row-level
+            # split (see the warning logged in preprocess_data about leakage risk).
+            test_size = test_ratio
+            X_temp, X_test, y_alz_temp, y_alz_test, y_park_temp, y_park_test = train_test_split(
+                features, alzheimer_labels, parkinson_labels,
+                test_size=test_size, random_state=random_state, stratify=alzheimer_labels
+            )
+
+            val_size = val_ratio / (train_ratio + val_ratio)
+            X_train, X_val, y_alz_train, y_alz_val, y_park_train, y_park_val = train_test_split(
+                X_temp, y_alz_temp, y_park_temp,
+                test_size=val_size, random_state=random_state, stratify=y_alz_temp
+            )
+
         # Normalize features
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_val_scaled = self.scaler.transform(X_val)
@@ -241,7 +290,9 @@ class DataLoader:
                 'alzheimer_labels': y_alz_test,
                 'parkinson_labels': y_park_test
             },
-            'scaler': self.scaler
+            'scaler': self.scaler,
+            'split_method': 'group_by_patient_id' if patient_ids is not None else 'row_level_fallback',
+            'random_state': random_state
         }
     
     def create_dataloaders(self, data_splits: Dict, batch_size: int = 32,

@@ -237,7 +237,17 @@ async def list_models(
     if ModelRegistry is None:
         return {"models": [], "current_model": None, "note": "ModelRegistry unavailable"}
     registry = ModelRegistry()
-    return {"models": registry.list_models(), "current_model": registry.get_active_model()}
+    active_model = registry.get_active_model()
+    return {
+        "models": registry.list_models(),
+        "current_model": active_model,
+        "warning": (
+            "Active model has no weight file on disk — predictions are served "
+            "from a randomly-initialized network, not the metrics shown above."
+            if active_model and not active_model.get("weights_available")
+            else None
+        ),
+    }
 
 
 class ActivateModelRequest(dict):

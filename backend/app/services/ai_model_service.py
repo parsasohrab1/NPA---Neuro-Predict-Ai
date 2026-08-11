@@ -74,6 +74,7 @@ class AIModelService:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
         self.feature_names = []
+        self.weights_loaded = False  # set True only if a real .pth checkpoint was loaded
         self._prediction_semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_PREDICTIONS)
         self._initialize_model()
     
@@ -100,9 +101,14 @@ class AIModelService:
             model_path = Path(settings.ENSEMBLE_MODEL_PATH)
             if model_path.exists():
                 self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+                self.weights_loaded = True
                 logger.info(f"Loaded pre-trained model from {model_path}")
             else:
-                logger.warning(f"No pre-trained model found at {model_path}. Using random initialization.")
+                logger.warning(
+                    f"No pre-trained model found at {model_path}. "
+                    "Predictions will come from a randomly-initialized network "
+                    "and must not be treated as clinically meaningful."
+                )
             
             self.model.to(self.device)
             self.model.eval()
@@ -325,6 +331,7 @@ class AIModelService:
             "recommendations": recommendations,
             "model_version": "1.0.0",
             "model_name": "MultiModalNeuralNetwork",
+            "weights_loaded": self.weights_loaded,
         }
 
     async def predict(self, patient_data: Dict) -> Dict:
@@ -385,7 +392,8 @@ class AIModelService:
                     'attention_scores': attention_scores,
                     'recommendations': recommendations,
                     'model_version': '1.0.0-mock',
-                    'model_name': 'MockPredictionModel'
+                    'model_name': 'MockPredictionModel',
+                    'weights_loaded': False,
                 }
 
             # Limit concurrent inferences to avoid overload (config: MAX_CONCURRENT_PREDICTIONS)
