@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'react-hot-toast'
@@ -49,6 +49,7 @@ import {
   type ReportRun,
   type ReportScheduleStatus,
   type ReportRunStatus,
+  type TimelineEvent,
 } from '../services/longitudinal'
 
 type MetricOption = {
@@ -189,7 +190,6 @@ export default function LongitudinalTrackingPage() {
     enabled: activePatientId !== null,
   })
 
-  const selectedEpisode = episodesQuery.data?.find((episode) => episode.id === selectedEpisodeId) ?? null
 
   const episodeDetailQuery = useQuery({
     queryKey: ['longitudinal', 'episode', selectedEpisodeId],
@@ -606,7 +606,7 @@ export default function LongitudinalTrackingPage() {
     try {
       setReportError(null)
       const response = await longitudinalService.downloadReport(report.id, variant)
-      const contentType = response.headers['content-type'] ?? 'application/octet-stream'
+      const contentType = String(response.headers['content-type'] ?? 'application/octet-stream')
       const blob = new Blob([response.data], { type: contentType })
       const url = window.URL.createObjectURL(blob)
       const extractName = (path: string | null | undefined) => {

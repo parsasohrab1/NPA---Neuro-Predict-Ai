@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { diseaseApi } from '../services/api';
 import {
@@ -160,7 +160,7 @@ export default function DiseaseProbability() {
                       nameKey="name"
                       label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
                     >
-                      {alzheimerPieData.map((entry, index) => (
+                      {alzheimerPieData.map((entry) => (
                         <Cell key={entry.level} fill={COLORS[entry.level as keyof typeof COLORS]} />
                       ))}
                     </Pie>
@@ -187,7 +187,7 @@ export default function DiseaseProbability() {
                       nameKey="name"
                       label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
                     >
-                      {parkinsonPieData.map((entry, index) => (
+                      {parkinsonPieData.map((entry) => (
                         <Cell key={entry.level} fill={COLORS[entry.level as keyof typeof COLORS]} />
                       ))}
                     </Pie>

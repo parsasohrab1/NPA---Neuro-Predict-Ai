@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dataApi } from '../services/api';
 import {
@@ -84,7 +83,7 @@ function CategorySection({ category }: { category: CategoryKey }) {
         {/* Metric summary cards */}
         {metrics.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {metrics.slice(0, 5).map((m: any, i: number) => (
+            {metrics.slice(0, 5).map((m: any) => (
               <div
                 key={m.metric_name}
                 className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-center"

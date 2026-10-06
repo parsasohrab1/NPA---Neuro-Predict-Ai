@@ -540,7 +540,7 @@ export default function ReportsPage() {
                 key={item.value}
                 className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 transition hover:border-sky-400 hover:text-sky-300"
                 onClick={() => handleExport(item.value)}
-                disabled={activeQuery.status === 'loading'}
+                disabled={activeQuery.status === 'pending'}
               >
                 <ArrowDownTrayIcon className="h-4 w-4" />
                 {item.label}

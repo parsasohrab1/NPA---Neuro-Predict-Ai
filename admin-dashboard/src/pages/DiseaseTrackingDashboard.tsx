@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   XAxis,
@@ -10,16 +8,10 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts'
 import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  InformationCircleIcon,
   PlusIcon,
   XMarkIcon,
   UserPlusIcon,
@@ -28,8 +20,6 @@ import {
 } from '@heroicons/react/24/outline'
 import diseaseTrackingApi, {
   PatientFeatures,
-  FutureRiskPrediction,
-  PatientRecommendations,
 } from '../services/diseaseTracking'
 import BrainVisualization3D from '../components/BrainVisualization3D'
 
@@ -1545,7 +1535,6 @@ function AddPatientForm({
 
 // Add Medical Data Form Component
 function AddMedicalDataForm({
-  patientId,
   onSubmit,
   onCancel,
   isLoading,
