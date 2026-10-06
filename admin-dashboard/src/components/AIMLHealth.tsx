@@ -1,10 +1,7 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { monitoringApi } from '../services/api';
 import { useWebSocket } from '../hooks/useWebSocket';
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -197,7 +194,7 @@ export default function AIMLHealth() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {confidenceData.map((entry, index) => (
+                  {confidenceData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

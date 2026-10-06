@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { monitoringApi, diseaseApi } from '../services/api';
 import {
@@ -28,11 +28,6 @@ export default function MultimodalAnalysis() {
   const { data: multimodalData } = useQuery({
     queryKey: ['multimodal-summary', hours],
     queryFn: () => monitoringApi.getMultimodalSummary(hours).then((res) => res.data),
-  });
-
-  const { data: modelPerf } = useQuery({
-    queryKey: ['model-performance', hours],
-    queryFn: () => monitoringApi.getModelPerformance(undefined, hours).then((res) => res.data),
   });
 
   const { data: patientsSummary } = useQuery({

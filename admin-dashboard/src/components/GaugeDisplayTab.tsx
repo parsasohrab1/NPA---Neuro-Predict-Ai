@@ -192,7 +192,7 @@ export default function GaugeDisplayTab() {
       </div>
 
       {/* Collapsible sections */}
-      <CollapsibleSection title="Vital Signs" icon={HeartIcon} defaultOpen>
+      <CollapsibleSection title="Vital Signs" icon={HeartIcon} open>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
           <MetricCard
             label="Temperature"

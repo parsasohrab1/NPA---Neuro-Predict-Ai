@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { patientsApi, predictionsApi, analyticsApi } from '../services/api'
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function PopulationAnalysisPage() {
   const { data: patients = [] } = useQuery({
@@ -110,7 +110,7 @@ export default function PopulationAnalysisPage() {
                       fill="#8884d8"
                       dataKey="count"
                     >
-                      {genderData.map((entry, index) => (
+                      {genderData.map((_entry: unknown, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>

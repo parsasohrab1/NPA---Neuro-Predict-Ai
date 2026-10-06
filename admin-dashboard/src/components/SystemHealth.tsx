@@ -1,19 +1,6 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { monitoringApi } from '../services/api';
 import { useWebSocket } from '../hooks/useWebSocket';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 
 export default function SystemHealth() {
   const { data: systemHealth, refetch: refetchHealth } = useQuery({

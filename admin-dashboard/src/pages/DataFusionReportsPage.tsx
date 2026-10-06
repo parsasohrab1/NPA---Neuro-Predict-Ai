@@ -22,17 +22,12 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   Cell,
-  PieChart,
-  Pie,
 } from 'recharts'
 
 const API_BASE = 'http://localhost:8001'
