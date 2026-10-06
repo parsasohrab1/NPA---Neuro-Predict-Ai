@@ -3,12 +3,20 @@ Tests for Cache functionality
 """
 import pytest
 from app.core.cache import (
+    cache_service,
+    _split_cache_key,
     generate_cache_key,
     get_cached_response,
     set_cached_response,
     invalidate_cache_pattern
 )
-from app.services.performance_service import PerformanceService
+
+
+async def _connect_cache():
+    """Connect the cache used by get/set_cached_response; skip when Redis is unavailable."""
+    await cache_service.connect()
+    if cache_service.redis_client is None:
+        pytest.skip("Redis not available")
 
 
 @pytest.mark.asyncio
@@ -28,7 +36,7 @@ async def test_generate_cache_key():
 async def test_cache_set_and_get():
     """Test setting and getting from cache"""
     # Ensure cache service is connected
-    await PerformanceService.cache_service.connect()
+    await _connect_cache()
     
     test_key = "test_cache_key_123"
     test_value = {"test": "data", "number": 42}
@@ -44,13 +52,13 @@ async def test_cache_set_and_get():
     assert cached["number"] == test_value["number"]
     
     # Cleanup
-    await PerformanceService.cache_service.delete(test_key)
+    await cache_service.delete(*_split_cache_key(test_key))
 
 
 @pytest.mark.asyncio
 async def test_cache_expiration():
     """Test that cache entries expire"""
-    await PerformanceService.cache_service.connect()
+    await _connect_cache()
     
     test_key = "test_expire_key"
     test_value = {"data": "test"}
@@ -75,7 +83,7 @@ async def test_cache_expiration():
 @pytest.mark.asyncio
 async def test_cache_invalidation():
     """Test cache pattern invalidation"""
-    await PerformanceService.cache_service.connect()
+    await _connect_cache()
     
     # Set multiple keys
     await set_cached_response("test:patient:1", {"data": 1})

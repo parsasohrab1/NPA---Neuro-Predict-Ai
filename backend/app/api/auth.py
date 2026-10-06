@@ -4,18 +4,19 @@ Authentication API Endpoints
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from datetime import datetime
 
 from ..db.session import get_db
 from ..models.user import User
-from ..schemas.user import UserCreate, UserResponse, Token
+from ..schemas.user import UserCreate, UserResponse, Token, RefreshRequest, AccessToken
 from ..core.security import (
     verify_password,
     get_password_hash,
     create_access_token,
     create_refresh_token,
-    get_current_user
+    get_current_user,
+    decode_token,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -67,9 +68,11 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     """Login and get access token"""
-    # Find user
+    # Find user (the login form's "username" field accepts a username or an email)
     result = await db.execute(
-        select(User).where(User.username == form_data.username)
+        select(User).where(
+            or_(User.username == form_data.username, User.email == form_data.username)
+        )
     )
     user = result.scalar_one_or_none()
     
@@ -98,6 +101,32 @@ async def login(
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer"
+    }
+
+
+@router.post("/refresh", response_model=AccessToken)
+async def refresh_access_token(
+    payload: RefreshRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Exchange a valid refresh token for a new access token"""
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    claims = decode_token(payload.refresh_token)
+    if claims.get("type") != "refresh" or claims.get("sub") is None:
+        raise invalid
+
+    result = await db.execute(select(User).where(User.id == int(claims["sub"])))
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise invalid
+
+    return {
+        "access_token": create_access_token(data={"sub": str(user.id)}),
+        "token_type": "bearer",
     }
 
 

@@ -21,13 +21,16 @@ from ..models.prediction import RiskLevel
 
 logger = logging.getLogger(__name__)
 
+# Fixed model input width (matches ModelTrainer.input_dim and trained checkpoints)
+FEATURE_DIM = 50
+
 
 class MultiModalNeuralNetwork(nn.Module):
     """
     Multi-modal deep learning model for Alzheimer's and Parkinson's prediction
     Combines imaging features, clinical data, biomarkers, and genetic information
     """
-    def __init__(self, input_dim: int = 50, hidden_dims: list = [256, 128, 64]):
+    def __init__(self, input_dim: int = FEATURE_DIM, hidden_dims: list = [256, 128, 64]):
         super(MultiModalNeuralNetwork, self).__init__()
         
         # Feature extraction layers
@@ -69,7 +72,7 @@ class AIModelService:
     """Service for AI-powered disease prediction"""
 
     def __init__(self):
-        self.use_mock = not TORCH_AVAILABLE
+        self.use_mock = not TORCH_AVAILABLE or torch is None
         if not self.use_mock:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
@@ -95,7 +98,7 @@ class AIModelService:
         
         try:
             # Initialize model architecture
-            self.model = MultiModalNeuralNetwork(input_dim=50)
+            self.model = MultiModalNeuralNetwork(input_dim=FEATURE_DIM)
             
             # Try to load pre-trained weights if available
             model_path = Path(settings.ENSEMBLE_MODEL_PATH)
@@ -179,8 +182,14 @@ class AIModelService:
         if len(imaging_features) != 32:
             imaging_features = np.zeros(32)
         features.extend(imaging_features.tolist())
-        
-        return np.array(features, dtype=np.float32)
+
+        # Pad to the model's fixed input width. The training pipeline
+        # (ModelTrainer.input_dim) and checkpoints use FEATURE_DIM inputs;
+        # the extra slot(s) are reserved and stay zero.
+        if len(features) < FEATURE_DIM:
+            features.extend([0.0] * (FEATURE_DIM - len(features)))
+
+        return np.array(features[:FEATURE_DIM], dtype=np.float32)
     
     def _determine_risk_level(self, risk_score: float) -> RiskLevel:
         """Determine risk level based on probability score"""
@@ -196,7 +205,7 @@ class AIModelService:
         Calculate confidence score based on probability
         Higher confidence when probability is close to 0 or 1
         """
-        return 1.0 - 2.0 * abs(probability - 0.5)
+        return 2.0 * abs(probability - 0.5)
     
     def _calculate_feature_importance(self, features: np.ndarray, 
                                      alzheimer_prob: float, 

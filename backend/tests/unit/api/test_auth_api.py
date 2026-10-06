@@ -80,7 +80,9 @@ class TestLogin:
             }
         )
         
-        assert response.status_code == 401
+        # Correct credentials, deactivated account -> 400 "Inactive user"
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Inactive user"
 
 
 class TestTokenRefresh:

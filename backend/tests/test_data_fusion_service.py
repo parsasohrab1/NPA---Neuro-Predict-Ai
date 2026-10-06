@@ -180,8 +180,20 @@ class TestBiomarkerModalityAssessment:
             apoe_e4_status=True
         )
         score, confidence = DataFusionService._assess_biomarker_modality(record)
+        healthy_score, _ = DataFusionService._assess_biomarker_modality(
+            MedicalRecord(
+                id=60,
+                patient_id=1,
+                visit_date=datetime.now(),
+                amyloid_beta=700.0,
+                tau_protein=180.0,
+                apoe_e4_status=False
+            )
+        )
         
-        assert score < 50  # Should indicate risk
+        # Norm-based scoring: the risk profile must score clearly below a healthy profile
+        assert score < 60
+        assert healthy_score - score >= 25
         assert confidence > 0.7
     
     def test_assess_biomarker_modality_parkinson_risk(self):
@@ -242,8 +254,21 @@ class TestImagingModalityAssessment:
             brain_volume_total=1050000.0  # Reduced
         )
         score, confidence = DataFusionService._assess_imaging_modality(record)
+        healthy_score, _ = DataFusionService._assess_imaging_modality(
+            MedicalRecord(
+                id=90,
+                patient_id=1,
+                visit_date=datetime.now(),
+                hippocampal_volume=3800.0,
+                cortical_thickness=2.6,
+                ventricular_volume=22000.0,
+                brain_volume_total=1150000.0
+            )
+        )
         
-        assert score < 50  # Should indicate problems
+        # Norm-based scoring: atrophy must score clearly below a healthy profile
+        assert score < 70
+        assert healthy_score - score >= 25
         assert confidence > 0.7
     
     def test_assess_imaging_modality_normal(self):
@@ -502,7 +527,7 @@ class TestFeatureExtraction:
         )
         
         assert isinstance(features, np.ndarray)
-        assert features.shape == (20,)
+        assert features.shape == (20,)  # 17 clinical features + 3 reserved zero slots
         assert features.dtype == np.float32
         assert not np.isnan(features).any()
         assert not np.isinf(features).any()

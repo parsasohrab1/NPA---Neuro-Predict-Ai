@@ -14,7 +14,8 @@ from ..core.security import get_current_user, require_role, get_password_hash
 router = APIRouter(prefix="/users", tags=["User Management"])
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
+@router.get("/", response_model=List[UserResponse], include_in_schema=False)
 async def get_users(
     skip: int = 0,
     limit: int = 100,
@@ -29,7 +30,8 @@ async def get_users(
     return users
 
 
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),

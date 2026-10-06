@@ -105,6 +105,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     DICOM_DIR: str = "uploads/dicom"
     MRI_DIR: str = "uploads/mri"
+    REPORTS_DIR: str = "reports"  # generated longitudinal report files (xlsx/pdf/heatmaps)
     
     # AI Model Paths
     MODELS_DIR: str = "models"
