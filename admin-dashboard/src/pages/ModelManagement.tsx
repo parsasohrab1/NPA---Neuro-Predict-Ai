@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowUpTrayIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import axios from '../config/api'
@@ -37,7 +37,6 @@ interface ModelsResponse {
 }
 
 export default function ModelManagement() {
-  const [selectedVersion, setSelectedVersion] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   // Fetch models from API

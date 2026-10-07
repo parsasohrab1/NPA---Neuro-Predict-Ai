@@ -71,7 +71,7 @@ export default function LongitudinalPage() {
           <div className="card mb-6">
             <h2 className="text-xl font-semibold mb-4">Progress Timeline</h2>
             <div className="relative">
-              {timelineData.map((item, index) => (
+              {timelineData.map((item: any, index: number) => (
                 <div key={index} className="flex items-start mb-6">
                   <div className="flex flex-col items-center mr-4">
                     <div className={`w-4 h-4 rounded-full ${

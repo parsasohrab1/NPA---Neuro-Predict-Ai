@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { monitoringApi } from '../services/api';
 import { useWebSocket } from '../hooks/useWebSocket';

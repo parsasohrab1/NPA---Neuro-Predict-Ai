@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -12,7 +11,7 @@ import {
   Area,
 } from 'recharts'
 import { BoltIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
-import monitoringApi, { HealthStatus, SystemMetrics, BusinessKPIs, ModelMetrics } from '../services/monitoring'
+import monitoringApi, { } from '../services/monitoring'
 
 interface Alert {
   id: string | number
@@ -36,7 +35,7 @@ export default function SystemOverview() {
   const [trendData, setTrendData] = useState<Array<{ timestamp: string; cpu: number; memory: number; latency: number }>>([])
 
   // Fetch system overview data
-  const { data: overview, isLoading, error } = useQuery({
+  const { data: overview, isLoading } = useQuery({
     queryKey: ['system-overview'],
     queryFn: async () => {
       try {

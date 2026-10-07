@@ -155,7 +155,7 @@ export const predictionsApi = {
   getAll: async (patientId?: number, skip = 0, limit = 100) => {
     if (USE_MOCK_DATA) {
       const data = await mockDataService.getPredictions(patientId)
-      return data.slice(skip, skip + limit) as Prediction[]
+      return data.slice(skip, skip + limit) as unknown as Prediction[]
     }
 
     try {
@@ -166,7 +166,7 @@ export const predictionsApi = {
     } catch (error) {
       console.error('Error fetching predictions:', error)
       const data = await mockDataService.getPredictions(patientId)
-      return data.slice(skip, skip + limit) as Prediction[]
+      return data.slice(skip, skip + limit) as unknown as Prediction[]
     }
   },
 
@@ -342,7 +342,7 @@ export const analyticsApi = {
 }
 
 export const usersApi = {
-  getAll: async (skip = 0, limit = 100) => {
+  getAll: async (_skip = 0, _limit = 100) => {
     if (USE_MOCK_DATA) {
       return await mockDataService.getUsers()
     }

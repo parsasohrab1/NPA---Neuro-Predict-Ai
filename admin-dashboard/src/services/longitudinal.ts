@@ -57,6 +57,7 @@ export type TimelineEvent = {
   label: string
   metrics: Metric[]
   progression_score?: number | null
+  imaging_available: boolean
 }
 
 export type TrendPoint = {

@@ -1,19 +1,6 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { monitoringApi } from '../services/api';
 import { useWebSocket } from '../hooks/useWebSocket';
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 
 export default function ClinicalMonitoring() {
   const { data: alerts, refetch: refetchAlerts } = useQuery({
@@ -35,9 +22,6 @@ export default function ClinicalMonitoring() {
     }
   });
 
-  const highSeverityAlerts = alerts?.alerts?.filter(
-    (a: any) => a.severity === 'high'
-  ) || [];
   const mediumSeverityAlerts = alerts?.alerts?.filter(
     (a: any) => a.severity === 'medium'
   ) || [];

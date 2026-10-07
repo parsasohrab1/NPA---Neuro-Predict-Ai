@@ -34,7 +34,7 @@ export default function DashboardPage() {
   })
 
   // Fetch reports data for charts
-  const { data: trendsData } = useQuery({
+  useQuery({
     queryKey: ['predictions-trend'],
     queryFn: () => reportsApi.getPredictionsTrend(7),
   })
