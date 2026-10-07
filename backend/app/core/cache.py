@@ -253,7 +253,7 @@ def generate_cache_key(prefix: str, **kwargs) -> str:
             key_parts.append(f"user:{v.id}")
         else:
             key_parts.append(f"{k}:{v}")
-    digest = hashlib.md5("|".join(key_parts).encode()).hexdigest()
+    digest = hashlib.md5("|".join(key_parts).encode(), usedforsecurity=False).hexdigest()
     return f"{prefix}:{digest}"
 
 

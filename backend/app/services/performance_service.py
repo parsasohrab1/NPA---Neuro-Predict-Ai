@@ -170,7 +170,7 @@ class CacheService:
             if v is not None:
                 key_parts.append(f"{k}:{v}")
         key_string = "|".join(key_parts)
-        return hashlib.md5(key_string.encode()).hexdigest()
+        return hashlib.md5(key_string.encode(), usedforsecurity=False).hexdigest()
 
 
 class PerformanceService:

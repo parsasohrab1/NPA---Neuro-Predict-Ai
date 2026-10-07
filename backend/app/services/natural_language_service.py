@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 try:
-    from jinja2 import Environment, FileSystemLoader, Template
+    from jinja2 import Environment, FileSystemLoader, Template, select_autoescape
     JINJA2_AVAILABLE = True
 except ImportError:
     JINJA2_AVAILABLE = False
@@ -36,7 +36,7 @@ class NaturalLanguageService:
             try:
                 self.jinja_env = Environment(
                     loader=FileSystemLoader(str(self.templates_dir)),
-                    autoescape=False,
+                    autoescape=select_autoescape(["html", "htm", "xml"]),
                     trim_blocks=True,
                     lstrip_blocks=True
                 )
