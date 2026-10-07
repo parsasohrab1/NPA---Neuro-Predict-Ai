@@ -63,6 +63,7 @@ psutil>=5.9.0,<8.0.0
 
 # Security Scanning
 bandit[toml]==1.7.5
+pbr>=5.11.1  # imported by bandit 1.7.5 at startup but not declared by it
 safety==2.3.5
 semgrep==1.45.0
 
