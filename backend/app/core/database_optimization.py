@@ -76,7 +76,7 @@ async def analyze_table(session: AsyncSession, table_name: str) -> Dict[str, Any
         Table statistics
     """
     try:
-        result = await session.execute(
+        await session.execute(
             text(f"ANALYZE {table_name}")
         )
         await session.commit()

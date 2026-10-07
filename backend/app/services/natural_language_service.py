@@ -290,8 +290,6 @@ CROSS-MODAL CORRELATIONS:
     def _generate_recommendations(self, context: Dict[str, Any]) -> str:
         """Generate clinical recommendations based on findings"""
         fusion_score = context['scores']['fusion']
-        interp = context['interpretation']
-        overall = interp.get('overall', 'NORMAL')
         
         recommendations = []
         

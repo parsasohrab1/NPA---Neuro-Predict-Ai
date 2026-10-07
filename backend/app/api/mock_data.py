@@ -135,10 +135,10 @@ MOCK_PATIENTS = [
 def generate_mock_predictions():
     """Generate mock predictions for all patients"""
     predictions = []
-    for i, patient in enumerate(MOCK_PATIENTS):
+    for _i, patient in enumerate(MOCK_PATIENTS):
         # Generate 1-3 predictions per patient
         num_preds = random.randint(1, 3)
-        for j in range(num_preds):
+        for _j in range(num_preds):
             age = (datetime.now().date() - datetime.fromisoformat(patient["date_of_birth"]).date()).days / 365.25
             
             # Calculate risk scores
@@ -430,4 +430,4 @@ async def load_sample_data_to_db(db: AsyncSession = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to load sample data: {str(e)}"
-        )
+        ) from e

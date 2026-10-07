@@ -56,7 +56,7 @@ try:
     _integration = (fhir, pacs, ehr, hl7v2, devices)
 except Exception as e:
     import warnings
-    warnings.warn(f"Integration routers (FHIR, PACS, EHR, HL7v2, devices) not loaded: {e}")
+    warnings.warn(f"Integration routers (FHIR, PACS, EHR, HL7v2, devices) not loaded: {e}", stacklevel=2)
 
 _realtime_router = None
 _realtime_service = None
@@ -67,7 +67,7 @@ try:
     _realtime_service = realtime_service
 except Exception as e:
     import warnings
-    warnings.warn(f"Streaming router not loaded: {e}")
+    warnings.warn(f"Streaming router not loaded: {e}", stacklevel=2)
 
 # integration.py conflicts with the integration/ package name — load hub router explicitly
 _integration_hub = None
@@ -82,7 +82,7 @@ try:
         _integration_hub = _hub_mod
 except Exception as e:
     import warnings
-    warnings.warn(f"Integration hub router not loaded: {e}")
+    warnings.warn(f"Integration hub router not loaded: {e}", stacklevel=2)
 
 # Configure logging
 logging.basicConfig(

@@ -88,13 +88,8 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         lines.append("# TYPE http_request_duration_seconds histogram")
         for key, durations in _metrics['http_request_duration_seconds'].items():
             if durations:
-                import statistics
                 count = len(durations)
                 total = sum(durations)
-                avg = statistics.mean(durations)
-                p50 = statistics.median(durations)
-                p95 = statistics.quantiles(durations, n=20)[18] if len(durations) >= 20 else max(durations)
-                p99 = statistics.quantiles(durations, n=100)[98] if len(durations) >= 100 else max(durations)
                 
                 method, path = key.rsplit('_', 1) if '_' not in key.split('_', 1)[1] else (key.split('_', 1)[0], key.split('_', 1)[1])
                 lines.append(f'http_request_duration_seconds_count{{method="{method}",path="{path}"}} {count}')

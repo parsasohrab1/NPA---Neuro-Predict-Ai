@@ -225,12 +225,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     await self.redis_client.incr(ip_key)
 
                 # User bucket (if authenticated)
-                user_remaining = None
                 if user_key:
                     user_count = await self.redis_client.get(user_key)
                     if user_count is None:
                         await self.redis_client.setex(user_key, self.user_window, 1)
-                        user_remaining = self.user_limit - 1
                     else:
                         user_count = int(user_count)
                         if user_count >= self.user_limit:
@@ -254,7 +252,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                                     "X-RateLimit-User-Remaining": "0",
                                 }
                             )
-                        user_remaining = max(0, self.user_limit - (user_count + 1))
                         await self.redis_client.incr(user_key)
             except Exception as e:
                 # If Redis fails, check fail-open setting

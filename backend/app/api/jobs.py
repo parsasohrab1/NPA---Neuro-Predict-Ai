@@ -26,7 +26,7 @@ async def enqueue_job(
         result = await JobQueueService.enqueue(req.job_type, req.payload, req.idempotency_key)
         return result
     except RuntimeError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
 
 
 @router.get("/stats")

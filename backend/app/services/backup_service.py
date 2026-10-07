@@ -31,7 +31,6 @@ class BackupService:
         
         # Extract database connection info from DATABASE_URL
         # Format: postgresql://user:password@host:port/database
-        db_url = settings.DATABASE_URL_SYNC
         # Parse URL (simplified - should use proper URL parsing)
         # For now, assuming standard format
         

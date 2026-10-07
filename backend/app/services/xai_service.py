@@ -281,7 +281,7 @@ class XAIService:
             current_input = torch.zeros_like(input_tensor)
             prev_pred = baseline
             
-            for i, feat_idx in enumerate(permutation):
+            for _i, feat_idx in enumerate(permutation):
                 # Add feature
                 current_input[0, feat_idx] = input_tensor[0, feat_idx]
                 
@@ -405,7 +405,7 @@ class XAIService:
             explanations['saliency_maps']['alzheimer'] = alz_saliency.tolist()
             
             # Top contributing features
-            feature_importance = dict(zip(feature_names, alz_saliency))
+            feature_importance = dict(zip(feature_names, alz_saliency, strict=False))
             explanations['feature_importance']['alzheimer'] = feature_importance
             top_features = sorted(feature_importance.items(), key=lambda x: abs(x[1]), reverse=True)[:10]
             explanations['top_contributing_features'].append({
@@ -423,7 +423,7 @@ class XAIService:
             explanations['saliency_maps']['parkinson'] = park_saliency.tolist()
             
             # Top contributing features
-            feature_importance = dict(zip(feature_names, park_saliency))
+            feature_importance = dict(zip(feature_names, park_saliency, strict=False))
             explanations['feature_importance']['parkinson'] = feature_importance
             top_features = sorted(feature_importance.items(), key=lambda x: abs(x[1]), reverse=True)[:10]
             explanations['top_contributing_features'].append({
@@ -464,7 +464,6 @@ class XAIService:
         
         if 'alzheimer' in prediction_result:
             conf = prediction_result['alzheimer'].get('confidence', 0)
-            risk = prediction_result['alzheimer'].get('risk_score', 0)
             if conf > 0.8:
                 explanations.append(f"High confidence in Alzheimer's assessment (confidence: {conf:.2%})")
             elif conf > 0.6:
@@ -474,7 +473,6 @@ class XAIService:
         
         if 'parkinson' in prediction_result:
             conf = prediction_result['parkinson'].get('confidence', 0)
-            risk = prediction_result['parkinson'].get('risk_score', 0)
             if conf > 0.8:
                 explanations.append(f"High confidence in Parkinson's assessment (confidence: {conf:.2%})")
             elif conf > 0.6:

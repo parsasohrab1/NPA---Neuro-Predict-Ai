@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.longitudinal import LongitudinalReport
 from ..models.patient import Patient
 from ..models.prediction import Prediction
 from ..models.privacy import DSRRequest, DSRStatus
@@ -52,7 +51,6 @@ class PrivacyService:
                 }
                 for p in preds.scalars().all()
             ]
-            reps = await db.execute(select(LongitudinalReport).where(LongitudinalReport.episode_id.in_([])))
             export["reports"] = []  # Placeholder; mapping episodes to patient can be added if needed
 
         file_path.write_text(json.dumps(export, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -1027,7 +1027,7 @@ async def load_all_datasets(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to save data: {str(e)}"
-        )
+        ) from e
     
     return {
         "message": f"Loaded {total_patients_processed} patients successfully!" if not errors else "Loaded with some errors",
@@ -1360,7 +1360,7 @@ async def load_sample_datasets(
             raise HTTPException(
                 status_code=500,
                 detail=error_detail
-            )
+            ) from e
     
         # Count categories from loaded rows
         normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'NORMAL'])
@@ -1395,7 +1395,7 @@ async def load_sample_datasets(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to load sample datasets: {str(e)}. Check backend logs for details."
-        )
+        ) from e
 
 
 @router.post("/clear-all-data")
@@ -1461,7 +1461,7 @@ async def clear_all_disease_tracking_data(
     except Exception as e:
         await db.rollback()
         logger.error(f"Error clearing data: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}") from e
 
 
 @router.post("/add-default-data")

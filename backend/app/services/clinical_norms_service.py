@@ -421,12 +421,6 @@ class ClinicalNormsService:
         normal_min = norms.get('normal_min', mean - 2 * std)
         normal_max = norms.get('normal_max', mean + 2 * std)
         
-        # Calculate z-score
-        if std > 0:
-            z_score = (value - mean) / std
-        else:
-            z_score = 0.0
-        
         # Convert to score (0-100)
         if higher_is_better:
             # Higher is better (e.g., hippocampal volume, cognitive scores)

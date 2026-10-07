@@ -31,8 +31,6 @@ class SupportService:
         kpis["mttr_minutes"] = round(mttr_sec / 60.0, 2) if mttr_sec > 0 else 0.0
 
         # Solved in first response proxy: resolved tickets with exactly 1 update
-        res_first = await db.execute(select(func.count()).select_from(SupportTicket).where(SupportTicket.resolved_at.isnot(None)))
-        total_resolved = int(res_first.scalar() or 0)
         # heuristic skipped for simplicity; could join with updates count
         kpis["first_contact_resolution_rate"] = None
 

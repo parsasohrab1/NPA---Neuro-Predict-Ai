@@ -470,7 +470,7 @@ class DataFusionService:
         
         # Weighted average
         total_weight = sum(weights)
-        cognitive_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        cognitive_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         
         # Confidence: average of individual confidences weighted by completeness
         if confidences:
@@ -517,7 +517,7 @@ class DataFusionService:
             return 50.0, 0.0
         
         total_weight = sum(weights)
-        cognitive_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        cognitive_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         confidence = len(scores) / 5.0
         
         return cognitive_score, confidence
@@ -605,7 +605,7 @@ class DataFusionService:
         
         # Weighted average
         total_weight = sum(weights)
-        biomarker_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        biomarker_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         
         # Confidence: average of individual confidences
         if confidences:
@@ -726,7 +726,7 @@ class DataFusionService:
         
         # Weighted average
         total_weight = sum(weights)
-        imaging_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        imaging_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         
         # Confidence: average of individual confidences
         if confidences:

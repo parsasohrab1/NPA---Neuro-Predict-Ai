@@ -112,7 +112,7 @@ async def create_prediction(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error during prediction: {str(e)}"
-        )
+        ) from e
     
     # Build clinical explainability (feature importance with clinical labels, cohort comparison, progression)
     try:

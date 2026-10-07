@@ -843,7 +843,7 @@ class LongitudinalTrackingService:
         buckets: Dict[str, Dict[str, List[float]]] = {}
         patient_set: set[int] = set()
 
-        for metric_key, metric_value, visit_date, patient_db_id, _, date_of_birth, gender, episode_db_id in rows:
+        for metric_key, metric_value, visit_date, patient_db_id, _, date_of_birth, _gender, _episode_db_id in rows:
             if metric_value is None:
                 continue
 

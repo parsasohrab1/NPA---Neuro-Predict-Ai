@@ -33,7 +33,7 @@ async def create_database_indexes(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating indexes: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/database/analyze/{table_name}")
@@ -60,7 +60,7 @@ async def analyze_database_table(
         raise HTTPException(
             status_code=500,
             detail=f"Error analyzing table: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/database/slow-queries")
@@ -88,7 +88,7 @@ async def get_slow_database_queries(
         raise HTTPException(
             status_code=500,
             detail=f"Error getting slow queries: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/database/optimize-query")
@@ -115,7 +115,7 @@ async def optimize_database_query(
         raise HTTPException(
             status_code=500,
             detail=f"Error optimizing query: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/cache/stats")
@@ -156,7 +156,7 @@ async def get_cache_statistics(
         raise HTTPException(
             status_code=500,
             detail=f"Error getting cache stats: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/cache/clear")
@@ -197,5 +197,5 @@ async def clear_cache(
         raise HTTPException(
             status_code=500,
             detail=f"Error clearing cache: {str(e)}"
-        )
+        ) from e
 

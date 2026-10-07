@@ -100,7 +100,7 @@ async def create_admit_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating admit message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/observation")
@@ -142,7 +142,7 @@ async def create_observation_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating observation message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/lab-result")
@@ -184,7 +184,7 @@ async def create_lab_result_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating lab result message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/vital-signs")
@@ -221,7 +221,7 @@ async def create_vital_signs_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating vital signs message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/parse")
@@ -263,7 +263,7 @@ async def parse_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error parsing HL7 v2 message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/send")
@@ -309,7 +309,7 @@ async def send_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error sending HL7 v2 message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/validate")
@@ -339,5 +339,5 @@ async def validate_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error validating HL7 v2 message: {str(e)}"
-        )
+        ) from e
 

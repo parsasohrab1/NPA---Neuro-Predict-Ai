@@ -87,7 +87,6 @@ class ModelEvaluator:
         tn, fp, fn, tp = confusion_matrix(true_labels, pred_binary).ravel()
         sensitivity = recall  # True Positive Rate
         specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0  # True Negative Rate
-        ppv = precision  # Positive Predictive Value
         npv = tn / (tn + fn) if (tn + fn) > 0 else 0.0  # Negative Predictive Value
         
         # AUC-ROC

@@ -183,7 +183,7 @@ def generate_surface_plot(rows) -> Dict[str, Any]:
     if rows:
         avg_volume = 0
         count = 0
-        for patient, medical_record, prediction in rows:
+        for _patient, medical_record, _prediction in rows:
             if medical_record and medical_record.hippocampal_volume:
                 avg_volume += medical_record.hippocampal_volume
                 count += 1

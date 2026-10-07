@@ -81,7 +81,7 @@ async def get_current_model_metrics(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving model metrics: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/training-history")
@@ -138,7 +138,7 @@ async def get_training_history(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving training history: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/summary")
@@ -178,5 +178,5 @@ async def get_model_summary(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving model summary: {str(e)}"
-        )
+        ) from e
 

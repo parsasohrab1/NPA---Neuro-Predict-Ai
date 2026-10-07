@@ -6,7 +6,7 @@ import json
 import logging
 import pickle
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -49,10 +49,10 @@ class ModelTrainer:
     
     def __init__(self, 
                  input_dim: int = 50,
-                 hidden_dims: List[int] = [256, 128, 64],
+                 hidden_dims: Sequence[int] = (256, 128, 64),
                  device: Optional[torch.device] = None):
         self.input_dim = input_dim
-        self.hidden_dims = hidden_dims
+        self.hidden_dims = list(hidden_dims)
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
         self.scaler = None

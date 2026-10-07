@@ -109,7 +109,7 @@ async def generate_fusion_report(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating fusion report: {error_detail}"
-        )
+        ) from e
 
 
 @router.get("/patient/{patient_id}", response_model=List[DataFusionReportResponse])

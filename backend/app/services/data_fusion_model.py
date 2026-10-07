@@ -3,7 +3,7 @@ Deep Learning Model for Data Fusion Scoring
 This model replaces manual score calculations with learned predictions
 """
 import logging
-from typing import Dict
+from typing import Dict, Sequence
 
 import numpy as np
 import torch
@@ -43,7 +43,7 @@ class DataFusionScoringModel(nn.Module):
     - confidences
     """
     
-    def __init__(self, input_dim: int = FUSION_FEATURE_DIM, hidden_dims: list = [128, 64, 32]):
+    def __init__(self, input_dim: int = FUSION_FEATURE_DIM, hidden_dims: Sequence[int] = (128, 64, 32)):
         super(DataFusionScoringModel, self).__init__()
         self.input_dim = input_dim
         

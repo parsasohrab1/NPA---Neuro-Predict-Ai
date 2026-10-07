@@ -152,7 +152,7 @@ class DataLoader:
         
         # Imaging features (placeholder - 32 features)
         # Add each imaging feature as a separate column
-        for i in range(32):
+        for _i in range(32):
             features_list.append(np.zeros(len(df)))
         
         # Stack all features

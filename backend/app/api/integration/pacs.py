@@ -51,7 +51,7 @@ async def query_studies(
         raise HTTPException(
             status_code=500,
             detail=f"Error querying PACS: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/studies/{study_instance_uid}")
@@ -79,7 +79,7 @@ async def get_study(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving study: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/upload")
@@ -157,7 +157,7 @@ async def upload_dicom(
         raise HTTPException(
             status_code=500,
             detail=f"Error uploading DICOM: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/worklist")
@@ -190,7 +190,7 @@ async def get_worklist(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving worklist: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/validate")
@@ -230,5 +230,5 @@ async def validate_dicom_file(
         raise HTTPException(
             status_code=500,
             detail=f"Error validating DICOM: {str(e)}"
-        )
+        ) from e
 

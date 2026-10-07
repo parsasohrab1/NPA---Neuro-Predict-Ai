@@ -158,7 +158,7 @@ class DataFusionXAIService:
         
         return {
             'attribution': attribution_np,
-            'feature_importance': dict(zip(self.FEATURE_NAMES, attribution_np)),
+            'feature_importance': dict(zip(self.FEATURE_NAMES, attribution_np, strict=False)),
             'method': 'integrated_gradients',
             'steps': steps
         }
@@ -200,7 +200,7 @@ class DataFusionXAIService:
         
         return {
             'saliency': saliency,
-            'feature_importance': dict(zip(self.FEATURE_NAMES, saliency)),
+            'feature_importance': dict(zip(self.FEATURE_NAMES, saliency, strict=False)),
             'method': 'gradient_saliency'
         }
     
@@ -327,7 +327,7 @@ class DataFusionXAIService:
         
         # Top contributing features
         top_features = sorted(
-            zip(self.FEATURE_NAMES, attributions),
+            zip(self.FEATURE_NAMES, attributions, strict=False),
             key=lambda x: abs(x[1]),
             reverse=True
         )[:10]
@@ -456,7 +456,7 @@ class DataFusionXAIService:
         
         # Identify key findings
         top_features = sorted(
-            zip(self.FEATURE_NAMES, attributions),
+            zip(self.FEATURE_NAMES, attributions, strict=False),
             key=lambda x: abs(x[1]),
             reverse=True
         )[:5]
@@ -519,7 +519,7 @@ class DataFusionXAIService:
         """
         return {
             'feature_attributions': {
-                name: float(attr) for name, attr in zip(self.FEATURE_NAMES, attributions)
+                name: float(attr) for name, attr in zip(self.FEATURE_NAMES, attributions, strict=False)
             },
             'anatomical_regions': self.map_to_anatomical_regions(attributions),
             'modality_heatmap': self._compute_modality_contributions(attributions),

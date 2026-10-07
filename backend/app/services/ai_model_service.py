@@ -13,7 +13,7 @@ except ImportError:
 import asyncio
 import logging
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Sequence
 
 import numpy as np
 
@@ -31,7 +31,7 @@ class MultiModalNeuralNetwork(nn.Module):
     Multi-modal deep learning model for Alzheimer's and Parkinson's prediction
     Combines imaging features, clinical data, biomarkers, and genetic information
     """
-    def __init__(self, input_dim: int = FEATURE_DIM, hidden_dims: list = [256, 128, 64]):
+    def __init__(self, input_dim: int = FEATURE_DIM, hidden_dims: Sequence[int] = (256, 128, 64)):
         super(MultiModalNeuralNetwork, self).__init__()
         
         # Feature extraction layers
@@ -219,7 +219,7 @@ class AIModelService:
         
         # Simple feature importance based on feature values and prediction
         # This is a placeholder - in production use proper explainability methods
-        for i, (feat_name, feat_value) in enumerate(zip(self.feature_names, features)):
+        for _i, (feat_name, feat_value) in enumerate(zip(self.feature_names, features, strict=False)):
             # Simple heuristic importance
             if 'alzheimer' in feat_name.lower() or feat_name in ['mmse_score', 'hippocampal_volume', 'tau_protein']:
                 importance[feat_name] = float(abs(feat_value - 0.5) * alzheimer_prob)

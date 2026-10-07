@@ -227,7 +227,7 @@ class CacheService:
         
         # Compute value
         if callable(callable_func):
-            value = await callable_func() if hasattr(callable_func, '__call__') else callable_func
+            value = await callable_func()
         else:
             value = callable_func
         
