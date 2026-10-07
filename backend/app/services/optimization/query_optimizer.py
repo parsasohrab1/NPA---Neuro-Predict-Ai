@@ -2,11 +2,12 @@
 Query Optimization Service
 سرویس بهینه‌سازی Query ها
 """
-from typing import List, Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload, joinedload
 import logging
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..core.cache import cache_service
 
@@ -40,7 +41,6 @@ class QueryOptimizer:
                 return cached
         
         from ...models.patient import Patient
-        from ...models.medical_record import MedicalRecord
         
         # Use eager loading to avoid N+1 queries
         result = await session.execute(

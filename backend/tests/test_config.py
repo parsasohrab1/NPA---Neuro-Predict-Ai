@@ -6,11 +6,11 @@ import os
 from app.core.config import Settings
 
 
-def test_settings_defaults():
+def test_settings_defaults(monkeypatch):
     """Test that settings have sensible defaults"""
-    # Note: This test may fail if SECRET_KEY is required
-    # In that case, set it in environment
-    os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing-only-minimum-32-chars")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-testing-only-minimum-32-chars")
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("DEBUG", "false")
     
     settings = Settings()
     
@@ -20,48 +20,51 @@ def test_settings_defaults():
     assert isinstance(settings.PORT, int)
 
 
-def test_environment_validation():
+def test_environment_validation(monkeypatch):
     """Test environment validation"""
-    os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing-only-minimum-32-chars")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-testing-only-minimum-32-chars")
     
     # Valid environment
-    os.environ["ENVIRONMENT"] = "development"
+    monkeypatch.setenv("ENVIRONMENT", "development")
     settings = Settings()
     assert settings.ENVIRONMENT == "development"
     
     # Invalid environment should raise error
-    os.environ["ENVIRONMENT"] = "invalid"
+    monkeypatch.setenv("ENVIRONMENT", "invalid")
     with pytest.raises(ValueError):
         Settings()
 
 
-def test_debug_production_validation():
+def test_debug_production_validation(monkeypatch):
     """Test that DEBUG=True is blocked in production"""
-    os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing-only-minimum-32-chars")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-testing-only-minimum-32-chars")
     
-    os.environ["ENVIRONMENT"] = "production"
-    os.environ["DEBUG"] = "True"
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("DEBUG", "True")
     
     with pytest.raises(ValueError, match="DEBUG=True is not allowed in production"):
         Settings()
 
 
-def test_secret_key_validation():
+def test_secret_key_validation(monkeypatch):
     """Test SECRET_KEY validation"""
+    # Isolate from any DEBUG/ENVIRONMENT left in the process environment
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("DEBUG", "false")
     # Test with insecure default
-    os.environ["SECRET_KEY"] = "your-secret-key-change-this-in-production"
+    monkeypatch.setenv("SECRET_KEY", "your-secret-key-change-this-in-production")
     
     with pytest.raises(ValueError, match="SECRET_KEY must be set"):
         Settings()
     
     # Test with short key
-    os.environ["SECRET_KEY"] = "short"
+    monkeypatch.setenv("SECRET_KEY", "short")
     
     with pytest.raises(ValueError, match="at least 32 characters"):
         Settings()
     
     # Test with valid key
-    os.environ["SECRET_KEY"] = "a-very-long-secure-secret-key-for-testing-purposes-only"
+    monkeypatch.setenv("SECRET_KEY", "a-very-long-secure-secret-key-for-testing-purposes-only")
     settings = Settings()
     assert len(settings.SECRET_KEY) >= 32
 

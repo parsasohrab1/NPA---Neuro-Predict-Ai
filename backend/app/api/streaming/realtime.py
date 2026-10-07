@@ -1,18 +1,16 @@
 """
 Real-time Streaming API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
-import uuid
 import json
+import uuid
+from typing import Any, Dict, List, Optional
 
-from ...services.streaming.realtime_service import (
-    realtime_service,
-    StreamType
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
+
 from ...core.security import get_current_user
 from ...models.user import User
+from ...services.streaming.realtime_service import StreamType, realtime_service
 
 router = APIRouter(prefix="/streaming", tags=["Real-time Streaming"])
 
@@ -156,7 +154,7 @@ async def broadcast_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error broadcasting message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/channels")
@@ -174,11 +172,11 @@ async def create_channel(
     try:
         try:
             stream_type = StreamType(request.stream_type)
-        except ValueError:
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid stream type: {request.stream_type}"
-            )
+            ) from exc
         
         channel = realtime_service.create_channel(
             channel_id=request.channel_id,
@@ -198,7 +196,7 @@ async def create_channel(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating channel: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/channels")
@@ -223,7 +221,7 @@ async def list_channels(
         raise HTTPException(
             status_code=500,
             detail=f"Error listing channels: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/channels/{channel_id}")
@@ -260,7 +258,7 @@ async def get_channel_stats(
         raise HTTPException(
             status_code=500,
             detail=f"Error getting channel stats: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/connections")
@@ -285,7 +283,7 @@ async def list_connections(
         raise HTTPException(
             status_code=500,
             detail=f"Error listing connections: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/connections/{connection_id}")
@@ -322,10 +320,11 @@ async def get_connection_stats(
         raise HTTPException(
             status_code=500,
             detail=f"Error getting connection stats: {str(e)}"
-        )
+        ) from e
 
 
 # Import logger
 import logging
+
 logger = logging.getLogger(__name__)
 

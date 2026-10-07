@@ -3,21 +3,20 @@ Disease Tracking API - Real-time feature monitoring for Alzheimer's and Parkinso
 """
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 logger = logging.getLogger(__name__)
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
-from ..core.security import require_role, get_current_user
-from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
-from ..models.prediction import Prediction, RiskLevel, DiseaseType
+from ..models.patient import Gender, Patient
+from ..models.prediction import DiseaseType, Prediction, RiskLevel
 from ..models.user import User, UserRole
-from ..services.ai_model_service import AIModelService
 
 router = APIRouter(prefix="/disease-tracking", tags=["Disease Tracking"])
 
@@ -852,7 +851,6 @@ async def load_all_datasets(
     """
     import random
     from datetime import timedelta
-    import logging
     
     logger = logging.getLogger(__name__)
     logger.info("=== Starting load_all_datasets - Processing DATABASE patients ===")
@@ -1028,7 +1026,7 @@ async def load_all_datasets(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to save data: {str(e)}"
-        )
+        ) from e
     
     return {
         "message": f"Loaded {total_patients_processed} patients successfully!" if not errors else "Loaded with some errors",
@@ -1053,11 +1051,10 @@ async def load_sample_datasets(
     - 40 Parkinson patients (20 synthetic + 20 real)
     Total: 100 synthetic + 100 real = 200 patients
     """
-    import random
-    from datetime import timedelta, date
-    import logging
-    import pandas as pd
+    from datetime import date
     from pathlib import Path
+
+    import pandas as pd
     
     logger = logging.getLogger(__name__)
     
@@ -1230,7 +1227,7 @@ async def load_sample_datasets(
                 
                     patient = Patient(
                         patient_id=patient_id,
-                        first_name=f"Patient",
+                        first_name="Patient",
                         last_name=patient_id.replace('PT_', ''),
                         date_of_birth=dob,
                         gender=gender,
@@ -1361,7 +1358,7 @@ async def load_sample_datasets(
             raise HTTPException(
                 status_code=500,
                 detail=error_detail
-            )
+            ) from e
     
         # Count categories from loaded rows
         normal_count = len([r for r in selected_rows if str(r.get('diagnosis', '')).upper() == 'NORMAL'])
@@ -1396,7 +1393,7 @@ async def load_sample_datasets(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to load sample datasets: {str(e)}. Check backend logs for details."
-        )
+        ) from e
 
 
 @router.post("/clear-all-data")
@@ -1408,7 +1405,7 @@ async def clear_all_disease_tracking_data(
     Clear all patients, medical records, predictions, and fusion reports from the disease tracking system.
     WARNING: This deletes ALL data!
     """
-    import logging
+
     from ..models.data_fusion_report import DataFusionReport
     
     logger = logging.getLogger(__name__)
@@ -1461,7 +1458,7 @@ async def clear_all_disease_tracking_data(
     except Exception as e:
         await db.rollback()
         logger.error(f"Error clearing data: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}") from e
 
 
 @router.post("/add-default-data")

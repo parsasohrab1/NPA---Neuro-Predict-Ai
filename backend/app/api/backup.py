@@ -1,12 +1,11 @@
 """
 Backup & Disaster Recovery API Endpoints
 """
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Dict, Any
 from pydantic import BaseModel
 
-from ..db.session import get_db
 from ..core.security import require_role
 from ..models.user import User
 from ..services.backup_service import BackupService

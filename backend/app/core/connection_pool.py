@@ -2,11 +2,9 @@
 Connection Pooling Configuration
 پیکربندی Connection Pooling
 """
-from sqlalchemy.pool import QueuePool, NullPool
-from sqlalchemy.engine import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from typing import Optional
 import logging
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from .config import settings
 

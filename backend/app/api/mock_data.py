@@ -2,16 +2,15 @@
 Mock Data API Endpoints for development/demo
 Returns sample data without requiring database
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List
-from datetime import datetime, timedelta, date
 import random
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
 from ..models.patient import Patient
-from ..models.medical_record import MedicalRecord
 
 router = APIRouter(prefix="/mock", tags=["Mock Data"])
 
@@ -136,10 +135,10 @@ MOCK_PATIENTS = [
 def generate_mock_predictions():
     """Generate mock predictions for all patients"""
     predictions = []
-    for i, patient in enumerate(MOCK_PATIENTS):
+    for _i, patient in enumerate(MOCK_PATIENTS):
         # Generate 1-3 predictions per patient
         num_preds = random.randint(1, 3)
-        for j in range(num_preds):
+        for _j in range(num_preds):
             age = (datetime.now().date() - datetime.fromisoformat(patient["date_of_birth"]).date()).days / 365.25
             
             # Calculate risk scores
@@ -431,4 +430,4 @@ async def load_sample_data_to_db(db: AsyncSession = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to load sample data: {str(e)}"
-        )
+        ) from e

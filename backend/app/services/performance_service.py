@@ -1,15 +1,15 @@
 """
 Performance Service - Caching, Query Optimization, Compression
 """
-import json
 import gzip
-import pickle
-from typing import Optional, Any, Dict
-from datetime import datetime, timedelta
-import redis.asyncio as redis
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 import hashlib
+import json
+import pickle
+from typing import Any, Dict, Optional
+
+import redis.asyncio as redis
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
 
@@ -170,7 +170,7 @@ class CacheService:
             if v is not None:
                 key_parts.append(f"{k}:{v}")
         key_string = "|".join(key_parts)
-        return hashlib.md5(key_string.encode()).hexdigest()
+        return hashlib.md5(key_string.encode(), usedforsecurity=False).hexdigest()
 
 
 class PerformanceService:

@@ -3,15 +3,14 @@ Data Lifecycle Service - Archiving and Retention
 """
 from __future__ import annotations
 
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-import shutil
+from typing import Any, Dict, List
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.config import settings
 from ..models.longitudinal import LongitudinalReport
 
 

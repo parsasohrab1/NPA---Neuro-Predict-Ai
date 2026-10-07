@@ -1,14 +1,15 @@
 """
 EHR/HIS Integration API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from ...services.integration.ehr_service import EHRService
-from ...core.security import get_current_user
 from ...core.config import settings
+from ...core.security import get_current_user
 from ...models.user import User
+from ...services.integration.ehr_service import EHRService
 
 router = APIRouter(prefix="/ehr", tags=["EHR"])
 
@@ -62,7 +63,7 @@ async def get_patient_from_ehr(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching patient from EHR: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/patients/{patient_id}/lab-results")
@@ -100,7 +101,7 @@ async def get_lab_results(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching lab results: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/patients/{patient_id}/medications")
@@ -130,7 +131,7 @@ async def get_medications(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching medications: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/patients/{patient_id}/vital-signs")
@@ -168,7 +169,7 @@ async def get_vital_signs(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching vital signs: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/patients/{patient_id}/sync")
@@ -202,7 +203,7 @@ async def sync_patient_data(
         raise HTTPException(
             status_code=500,
             detail=f"Error syncing patient data: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/patients/{patient_id}/predictions")
@@ -252,5 +253,5 @@ async def send_prediction_to_ehr(
         raise HTTPException(
             status_code=500,
             detail=f"Error sending prediction to EHR: {str(e)}"
-        )
+        ) from e
 

@@ -1,9 +1,10 @@
 """
 Jobs API - enqueue and inspect job queue
 """
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
 
 from ..core.security import require_role
 from ..services.job_queue_service import JobQueueService
@@ -25,7 +26,7 @@ async def enqueue_job(
         result = await JobQueueService.enqueue(req.job_type, req.payload, req.idempotency_key)
         return result
     except RuntimeError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
 
 
 @router.get("/stats")

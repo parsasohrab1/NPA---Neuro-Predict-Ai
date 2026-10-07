@@ -20,9 +20,11 @@ try:
 except ImportError:  # pragma: no cover - optional dependency guard
     letter = None
     canvas = None
+import logging
+
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 
 from ..core.config import settings
 from ..models.longitudinal import (
@@ -34,13 +36,12 @@ from ..models.longitudinal import (
     LongitudinalMetric,
     LongitudinalReport,
     LongitudinalReportFormat,
-    LongitudinalReportStatus,
     LongitudinalReportRun,
     LongitudinalReportRunStatus,
     LongitudinalReportSchedule,
     LongitudinalReportScheduleStatus,
+    LongitudinalReportStatus,
     LongitudinalVisit,
-    LongitudinalVisitType,
     MetricCategory,
 )
 from ..models.patient import Gender, Patient
@@ -51,8 +52,6 @@ from ..schemas.longitudinal import (
     ReportScheduleCreate,
 )
 from ..services.image_processing_service import image_processing_service
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +152,10 @@ class LongitudinalTrackingService:
         visit_result = await db.execute(visit_stmt)
         visit = visit_result.scalar_one()
         await self._evaluate_alerts_for_visit(db, visit, metric_entities)
+        # Load each metric's visit now: callers read metric.visit (episode id, visit date)
+        # outside the async session context, where lazy loading raises MissingGreenlet.
+        for entity in metric_entities:
+            await db.refresh(entity, attribute_names=["visit"])
         return metric_entities
 
     async def get_timeline(self, db: AsyncSession, episode_id: int) -> List[LongitudinalVisit]:
@@ -175,6 +178,7 @@ class LongitudinalTrackingService:
         stmt = (
             select(LongitudinalMetric)
             .join(LongitudinalVisit)
+            .options(selectinload(LongitudinalMetric.visit))
             .where(
                 LongitudinalVisit.episode_id == episode_id,
                 LongitudinalMetric.metric_key == metric_key,
@@ -352,7 +356,7 @@ class LongitudinalTrackingService:
     async def list_schedules(self, db: AsyncSession) -> List[LongitudinalReportSchedule]:
         stmt = (
             select(LongitudinalReportSchedule)
-            .options(joinedload(LongitudinalReportSchedule.runs))
+            .options(selectinload(LongitudinalReportSchedule.runs))
             .order_by(LongitudinalReportSchedule.created_at.desc())
         )
         result = await db.execute(stmt)
@@ -839,7 +843,7 @@ class LongitudinalTrackingService:
         buckets: Dict[str, Dict[str, List[float]]] = {}
         patient_set: set[int] = set()
 
-        for metric_key, metric_value, visit_date, patient_db_id, _, date_of_birth, gender, episode_db_id in rows:
+        for metric_key, metric_value, visit_date, patient_db_id, _, date_of_birth, _gender, _episode_db_id in rows:
             if metric_value is None:
                 continue
 

@@ -2,21 +2,20 @@
 Monitoring & Observability Service
 Prometheus metrics, Health checks, Logging
 """
+import json
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Tuple
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
 import psutil
 import redis.asyncio as redis
-import json
-from pathlib import Path
+from sqlalchemy import Integer, func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
-from ..db.session import get_db
-from ..models.security import UserSession, SecurityLog
 from ..models.prediction import Prediction
-from sqlalchemy import Integer
+from ..models.security import SecurityLog, UserSession
 
 
 class MonitoringService:

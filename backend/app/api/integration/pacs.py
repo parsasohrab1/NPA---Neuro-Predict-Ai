@@ -1,15 +1,16 @@
 """
 PACS Integration API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
-from typing import Optional, List
 import os
 from pathlib import Path
+from typing import Optional
 
-from ...services.integration.pacs_service import PACSService
-from ...core.security import get_current_user
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+
 from ...core.config import settings
+from ...core.security import get_current_user
 from ...models.user import User
+from ...services.integration.pacs_service import PACSService
 
 router = APIRouter(prefix="/pacs", tags=["PACS"])
 
@@ -50,7 +51,7 @@ async def query_studies(
         raise HTTPException(
             status_code=500,
             detail=f"Error querying PACS: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/studies/{study_instance_uid}")
@@ -78,7 +79,7 @@ async def get_study(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving study: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/upload")
@@ -156,7 +157,7 @@ async def upload_dicom(
         raise HTTPException(
             status_code=500,
             detail=f"Error uploading DICOM: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/worklist")
@@ -189,7 +190,7 @@ async def get_worklist(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving worklist: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/validate")
@@ -229,5 +230,5 @@ async def validate_dicom_file(
         raise HTTPException(
             status_code=500,
             detail=f"Error validating DICOM: {str(e)}"
-        )
+        ) from e
 

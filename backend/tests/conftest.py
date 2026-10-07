@@ -86,6 +86,11 @@ async def sample_patient(test_patient: Patient) -> Patient:
 
 
 @pytest.fixture
+async def sample_medical_record(test_medical_record: MedicalRecord) -> MedicalRecord:
+    return test_medical_record
+
+
+@pytest.fixture
 async def test_user(test_db: AsyncSession) -> User:
     """Create test user"""
     user = User(
@@ -129,6 +134,12 @@ def auth_headers(test_user: User) -> dict:
 
 
 @pytest.fixture
+def auth_token(test_user: User) -> str:
+    """Bearer token string for the test user"""
+    return create_access_token({"sub": str(test_user.id)})
+
+
+@pytest.fixture
 def admin_auth_headers(test_admin: User) -> dict:
     """Create auth headers for admin user"""
     token = create_access_token({"sub": str(test_admin.id)})
@@ -139,6 +150,7 @@ def admin_auth_headers(test_admin: User) -> dict:
 async def test_patient(test_db: AsyncSession, test_user: User) -> Patient:
     """Create test patient"""
     patient = Patient(
+        patient_id="TEST-0001",
         first_name="John",
         last_name="Doe",
         date_of_birth=date(1950, 1, 1),

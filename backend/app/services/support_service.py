@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from datetime import datetime
+from typing import Any, Dict
 
-from ..models.support import SupportTicket, SupportUpdate, TicketStatus
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.support import SupportTicket, TicketStatus
 
 
 class SupportService:
@@ -31,8 +31,6 @@ class SupportService:
         kpis["mttr_minutes"] = round(mttr_sec / 60.0, 2) if mttr_sec > 0 else 0.0
 
         # Solved in first response proxy: resolved tickets with exactly 1 update
-        res_first = await db.execute(select(func.count()).select_from(SupportTicket).where(SupportTicket.resolved_at.isnot(None)))
-        total_resolved = int(res_first.scalar() or 0)
         # heuristic skipped for simplicity; could join with updates count
         kpis["first_contact_resolution_rate"] = None
 

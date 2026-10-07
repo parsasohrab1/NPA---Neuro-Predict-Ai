@@ -1,16 +1,17 @@
 """
 Comments API - lightweight collaboration
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from typing import List
 
-from ..db.session import get_db
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.security import get_current_user
-from ..models.user import User
+from ..db.session import get_db
 from ..models.communication import Comment
+from ..models.user import User
 
 router = APIRouter(prefix="/comments", tags=["Comments"])
 

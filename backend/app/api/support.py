@@ -1,17 +1,18 @@
 """
 Support Playbook APIs
 """
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from datetime import datetime
+from typing import List, Optional
 
-from ..db.session import get_db
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.security import get_current_user, require_role
-from ..models.user import User
+from ..db.session import get_db
 from ..models.support import SupportTicket, SupportUpdate, TicketSeverity, TicketStatus
+from ..models.user import User
 from ..services.support_service import SupportService
 
 router = APIRouter(prefix="/support", tags=["Support"])

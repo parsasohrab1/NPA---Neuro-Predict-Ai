@@ -1,11 +1,10 @@
 """
 Application Configuration
 """
-from pydantic_settings import BaseSettings
+from typing import List, Optional
+
 from pydantic import Field, field_validator, model_validator
-from typing import Optional, List
-import os
-import secrets
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -105,6 +104,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     DICOM_DIR: str = "uploads/dicom"
     MRI_DIR: str = "uploads/mri"
+    REPORTS_DIR: str = "reports"  # generated longitudinal report files (xlsx/pdf/heatmaps)
     
     # AI Model Paths
     MODELS_DIR: str = "models"

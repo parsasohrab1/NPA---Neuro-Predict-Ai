@@ -2,22 +2,21 @@
 Model Training Service
 پیاده‌سازی کامل Training Pipeline برای آموزش مدل
 """
+import json
+import logging
+import pickle
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, random_split
-import numpy as np
-import pandas as pd
-from typing import Dict, List, Tuple, Optional
-import logging
-from pathlib import Path
-import json
-from datetime import datetime
-import pickle
-from sklearn.preprocessing import StandardScaler, RobustScaler
-from sklearn.model_selection import StratifiedKFold, GroupShuffleSplit, StratifiedGroupKFold
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold, StratifiedKFold
+from sklearn.preprocessing import RobustScaler
+from torch.utils.data import DataLoader, Dataset
 
 from ...core.config import settings
 from ..ai_model_service import MultiModalNeuralNetwork
@@ -50,10 +49,10 @@ class ModelTrainer:
     
     def __init__(self, 
                  input_dim: int = 50,
-                 hidden_dims: List[int] = [256, 128, 64],
+                 hidden_dims: Sequence[int] = (256, 128, 64),
                  device: Optional[torch.device] = None):
         self.input_dim = input_dim
-        self.hidden_dims = hidden_dims
+        self.hidden_dims = list(hidden_dims)
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
         self.scaler = None
@@ -353,7 +352,7 @@ class ModelTrainer:
                 all_parkinson_labels.extend(parkinson_labels.cpu().numpy())
         
         # Calculate metrics
-        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+        from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
         
         alzheimer_preds_binary = (np.array(all_alzheimer_preds) > 0.5).astype(int)
         parkinson_preds_binary = (np.array(all_parkinson_preds) > 0.5).astype(int)

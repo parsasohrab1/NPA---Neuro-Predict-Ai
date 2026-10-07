@@ -2,12 +2,11 @@
 Data Producers for Real-time Streaming
 تولیدکنندگان داده برای streaming
 """
-from typing import Dict, Any, Optional
-from datetime import datetime
 import asyncio
 import logging
+from typing import Any, Dict, Optional
 
-from .realtime_service import realtime_service, StreamType
+from .realtime_service import StreamType, realtime_service
 
 logger = logging.getLogger(__name__)
 

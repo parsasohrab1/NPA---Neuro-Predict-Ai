@@ -2,12 +2,13 @@
 Cache Middleware for API Responses
 Middleware برای cache کردن responses
 """
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
 import hashlib
 import json
 from typing import Callable
+
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 
 from ..core.cache import cache_service
 
@@ -40,8 +41,8 @@ class CacheMiddleware(BaseHTTPMiddleware):
     def _make_cache_key(self, request: Request) -> str:
         """Create cache key from request"""
         # Include path and query params
-        key_data = f"{request.method}:{request.url.path}:{request.url.query_string}"
-        key_hash = hashlib.md5(key_data.encode()).hexdigest()
+        key_data = f"{request.method}:{request.url.path}:{request.url.query}"
+        key_hash = hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
         return f"api:{key_hash}"
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

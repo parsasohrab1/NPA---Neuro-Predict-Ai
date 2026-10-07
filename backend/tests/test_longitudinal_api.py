@@ -212,7 +212,8 @@ async def test_longitudinal_episode_flow(tmp_path: Path):
         assert response.status_code == 200, response.text
         timeline = response.json()
         assert len(timeline) == 2
-        assert timeline[0]["metrics"][0]["metric_key"] == "mmse"
+        # Metrics are returned ordered by metric_key (see LongitudinalVisit.metrics)
+        assert [m["metric_key"] for m in timeline[0]["metrics"]] == ["amyloid_beta", "mmse"]
         assert timeline[0]["imaging_available"] is True
         assert timeline[1]["imaging_available"] is True
 

@@ -1,14 +1,15 @@
 """
 Maintenance API - trigger/inspect periodic maintenance tasks
 """
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any
 
-from ..db.session import get_db
 from ..core.security import require_role
-from ..services.maintenance_service import MaintenanceService
+from ..db.session import get_db
 from ..services.data_lifecycle_service import DataLifecycleService
+from ..services.maintenance_service import MaintenanceService
 
 router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
 

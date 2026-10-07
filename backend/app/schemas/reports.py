@@ -2,7 +2,8 @@
 Reporting Schemas
 """
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from ..models.prediction import DiseaseType, RiskLevel

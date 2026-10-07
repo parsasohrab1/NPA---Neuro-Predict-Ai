@@ -26,8 +26,8 @@ class TestCreatePrediction:
         data = response.json()
         assert "id" in data
         assert "patient_id" in data
-        assert "alzheimer" in data
-        assert "parkinson" in data
+        assert "alzheimer_prediction" in data
+        assert "parkinson_prediction" in data
         assert "feature_importance" in data
         assert "recommendations" in data
     
@@ -104,9 +104,9 @@ class TestGetPredictions:
         
         assert response.status_code == 200
         data = response.json()
-        assert "items" in data
-        assert "total" in data
-        assert isinstance(data["items"], list)
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert data[0]["id"] == test_prediction.id
     
     @pytest.mark.asyncio
     async def test_get_prediction_by_id(
@@ -122,7 +122,7 @@ class TestGetPredictions:
         data = response.json()
         assert data["id"] == test_prediction.id
         assert "patient_id" in data
-        assert "alzheimer" in data
+        assert "alzheimer_prediction" in data
     
     @pytest.mark.asyncio
     async def test_get_prediction_not_found(
@@ -149,7 +149,7 @@ class TestReviewPrediction:
             f"/api/v1/predictions/{test_prediction.id}/review",
             json={
                 "review_notes": "Reviewed and confirmed",
-                "is_reviewed": True
+                "approved": True
             },
             headers=auth_headers
         )
@@ -157,5 +157,6 @@ class TestReviewPrediction:
         assert response.status_code == 200
         data = response.json()
         assert data["is_reviewed"] is True
-        assert "review_notes" in data
+        assert data["reviewed_by"] is not None
+        assert data["reviewed_at"] is not None
 

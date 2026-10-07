@@ -1,14 +1,15 @@
 """
 HL7 v2 Integration API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 
-from ...services.integration.hl7v2_service import HL7v2Service, HL7v2Message
-from ...core.security import get_current_user
 from ...core.config import settings
+from ...core.security import get_current_user
 from ...models.user import User
+from ...services.integration.hl7v2_service import HL7v2Service
 
 router = APIRouter(prefix="/hl7v2", tags=["HL7 v2"])
 
@@ -99,7 +100,7 @@ async def create_admit_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating admit message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/observation")
@@ -141,7 +142,7 @@ async def create_observation_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating observation message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/lab-result")
@@ -183,7 +184,7 @@ async def create_lab_result_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating lab result message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/vital-signs")
@@ -220,7 +221,7 @@ async def create_vital_signs_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error creating vital signs message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/parse")
@@ -262,7 +263,7 @@ async def parse_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error parsing HL7 v2 message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/send")
@@ -308,7 +309,7 @@ async def send_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error sending HL7 v2 message: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/validate")
@@ -338,5 +339,5 @@ async def validate_message(
         raise HTTPException(
             status_code=500,
             detail=f"Error validating HL7 v2 message: {str(e)}"
-        )
+        ) from e
 

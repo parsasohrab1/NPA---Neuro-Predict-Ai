@@ -15,7 +15,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.patient import Patient
-from ..models.medical_record import MedicalRecord
 from ..models.prediction import Prediction
 
 logger = logging.getLogger(__name__)

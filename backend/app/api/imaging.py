@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..core.config import settings
-from ..core.security import require_role
 from ..db.session import get_db
 from ..models.imaging import ImagingModality, ImagingStudy
 from ..models.medical_record import MedicalRecord
@@ -233,11 +232,12 @@ async def get_study_preview(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and return preview image for an imaging study"""
-    from fastapi.responses import Response
-    from ..services.image_processing_service import image_processing_service
-    import base64
     import io
+
+    from fastapi.responses import Response
     from PIL import Image
+
+    from ..services.image_processing_service import image_processing_service
     
     result = await db.execute(select(ImagingStudy).where(ImagingStudy.id == study_id))
     study = result.scalar_one_or_none()
@@ -301,10 +301,12 @@ async def get_study_slice(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a specific slice from a DICOM study"""
-    from fastapi.responses import Response
-    from ..services.image_processing_service import image_processing_service
     import io
+
+    from fastapi.responses import Response
     from PIL import Image
+
+    from ..services.image_processing_service import image_processing_service
     
     result = await db.execute(select(ImagingStudy).where(ImagingStudy.id == study_id))
     study = result.scalar_one_or_none()

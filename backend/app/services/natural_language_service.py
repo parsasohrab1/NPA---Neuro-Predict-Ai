@@ -3,19 +3,19 @@ Natural Language Generation Service
 Handles report generation using templates and NLG patterns
 Separates report generation logic from core data fusion algorithm
 """
-from typing import Dict, Any, Optional
+import logging
 from datetime import datetime
 from pathlib import Path
-import logging
+from typing import Any, Dict, Optional
 
 try:
-    from jinja2 import Environment, FileSystemLoader, Template
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
     JINJA2_AVAILABLE = True
 except ImportError:
     JINJA2_AVAILABLE = False
-    Template = None
     Environment = None
     FileSystemLoader = None
+    select_autoescape = None
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class NaturalLanguageService:
             try:
                 self.jinja_env = Environment(
                     loader=FileSystemLoader(str(self.templates_dir)),
-                    autoescape=False,
+                    autoescape=select_autoescape(["html", "htm", "xml"]),
                     trim_blocks=True,
                     lstrip_blocks=True
                 )
@@ -290,8 +290,6 @@ CROSS-MODAL CORRELATIONS:
     def _generate_recommendations(self, context: Dict[str, Any]) -> str:
         """Generate clinical recommendations based on findings"""
         fusion_score = context['scores']['fusion']
-        interp = context['interpretation']
-        overall = interp.get('overall', 'NORMAL')
         
         recommendations = []
         

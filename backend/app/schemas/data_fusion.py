@@ -1,9 +1,10 @@
 """
 Data Fusion Report Schemas
 """
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Dict, Optional
+
+from pydantic import BaseModel, Field
 
 
 class FusionScoresResponse(BaseModel):

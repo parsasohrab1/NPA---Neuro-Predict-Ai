@@ -3,15 +3,16 @@ Data Monitoring API Endpoints
 Real-time monitoring of clinical data types for Alzheimer and Parkinson diagnosis
 """
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Dict, List, Optional
+
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from ..core.security import require_role
+
 from ..db.session import get_db
-from ..models.patient import Patient
 from ..models.medical_record import MedicalRecord
-from ..models.prediction import Prediction, DiseaseType
+from ..models.patient import Patient
+from ..models.prediction import DiseaseType, Prediction
 
 router = APIRouter(prefix="/data-monitoring", tags=["Data Monitoring"])
 
@@ -377,9 +378,10 @@ async def load_sample_data(
     Load sample data for all data monitoring categories
     This creates medical records with comprehensive data for testing
     """
-    from sqlalchemy import select
     import random
     from datetime import datetime, timedelta
+
+    from sqlalchemy import select
     
     # Get all patients
     result = await db.execute(select(Patient).limit(15))

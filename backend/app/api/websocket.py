@@ -2,13 +2,13 @@
 WebSocket Server for Real-Time Updates
 ارسال به‌روزرسانی‌های برخط به داشبورد
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
-from typing import Dict, List, Set
-import json
 import asyncio
+import json
 import logging
 from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Dict, Set
+
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from ..models.user import User
 
@@ -114,9 +114,10 @@ async def websocket_monitoring(
     
     try:
         # Verify token and get user
+        from sqlalchemy import select
+
         from ..core.security import decode_token
         from ..db.session import AsyncSessionLocal
-        from sqlalchemy import select
         
         try:
             payload = decode_token(token)

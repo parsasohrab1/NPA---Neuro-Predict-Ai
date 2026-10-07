@@ -2,25 +2,51 @@
 PATENT-PENDING: Data Fusion Report API Endpoints
 Multi-Modal Medical Data Fusion and Interpretation
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+import logging
 from typing import List
+
+import numpy as np
 import torch
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
-from ..models.user import User
-from ..models.patient import Patient
-from ..models.medical_record import MedicalRecord
 from ..models.data_fusion_report import DataFusionReport
-from ..schemas.data_fusion import (
-    DataFusionReportResponse,
-    DataFusionReportCreate
-)
+from ..models.medical_record import MedicalRecord
+from ..models.patient import Patient
+from ..schemas.data_fusion import DataFusionReportCreate, DataFusionReportResponse
+from ..services.data_fusion_model import FUSION_FEATURE_DIM, align_features
+from ..services.data_fusion_model_service import get_data_fusion_model_service
 from ..services.data_fusion_service import DataFusionService
 from ..services.data_fusion_xai_service import get_data_fusion_xai_service
-from ..services.data_fusion_model_service import get_data_fusion_model_service
-from ..core.security import get_current_user
+
+logger = logging.getLogger(__name__)
+
+
+def _to_jsonable(value):
+    """Recursively convert numpy/torch values (XAI output) into JSON-serializable types."""
+    if isinstance(value, dict):
+        return {str(k): _to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_to_jsonable(v) for v in value]
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu().tolist()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+# Numeric value for the stored FusionConfidence level, as XAI evidence expects a 0-1 float
+_FUSION_CONFIDENCE_VALUES = {
+    'very_low': 0.2,
+    'low': 0.4,
+    'moderate': 0.6,
+    'high': 0.8,
+    'very_high': 0.95,
+}
 
 router = APIRouter(prefix="/data-fusion", tags=["Data Fusion Reports"])
 
@@ -83,7 +109,7 @@ async def generate_fusion_report(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating fusion report: {error_detail}"
-        )
+        ) from e
 
 
 @router.get("/patient/{patient_id}", response_model=List[DataFusionReportResponse])
@@ -274,7 +300,9 @@ async def explain_fusion_report(
         'integrated_fusion_score': report.integrated_fusion_score,
         'alzheimer_fusion_score': report.alzheimer_fusion_score,
         'parkinson_fusion_score': report.parkinson_fusion_score,
-        'fusion_confidence': float(report.fusion_confidence.value) if hasattr(report.fusion_confidence, 'value') else 0.5
+        'fusion_confidence': _FUSION_CONFIDENCE_VALUES.get(
+            getattr(report.fusion_confidence, 'value', report.fusion_confidence), 0.5
+        )
     }
     
     # Generate dynamic evidence (PATENT CLAIM 3)
@@ -285,7 +313,7 @@ async def explain_fusion_report(
         method=method
     )
     
-    return evidence
+    return _to_jsonable(evidence)
 
 
 @router.get("/{report_id}/saliency-map", status_code=status.HTTP_200_OK)
@@ -352,6 +380,7 @@ async def get_saliency_map(
     # Extract features
     from ..services.data_fusion_service import DataFusionService
     features = DataFusionService._extract_features_for_model(medical_record, patient)
+    features = align_features(features, getattr(model_service.model, 'input_dim', FUSION_FEATURE_DIM))
     features_tensor = torch.FloatTensor(features).unsqueeze(0)
     
     # Compute saliency map
@@ -367,16 +396,18 @@ async def get_saliency_map(
         )
     
     # Get visual saliency data
-    attributions = result.get('attribution') or result.get('saliency')
+    attributions = result.get('attribution')
+    if attributions is None:
+        attributions = result.get('saliency')
     visual_data = xai_service._prepare_visual_saliency_data(attributions)
     
-    return {
+    return _to_jsonable({
         'report_id': report_id,
         'target_output': target_output,
         'method': method,
         'saliency_data': visual_data,
         'anatomical_regions': xai_service.map_to_anatomical_regions(attributions),
         'patent_claim_3_support': True
-    }
+    })
 
 

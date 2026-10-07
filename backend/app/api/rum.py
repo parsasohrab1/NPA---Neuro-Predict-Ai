@@ -2,13 +2,13 @@
 RUM & Feedback API
 """
 from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, conint
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
 from ..services.rum_service import RUMService
-from ..core.security import require_role
 
 router = APIRouter(prefix="/rum", tags=["RUM"])
 

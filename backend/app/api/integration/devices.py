@@ -1,13 +1,17 @@
 """
 Medical Devices Integration API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
-from typing import Optional, List
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
-from ...services.integration.device_streaming import DeviceStreamingService, DeviceType
 from ...core.security import get_current_user
 from ...models.user import User
+from ...services.integration.device_streaming import DeviceStreamingService, DeviceType
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/devices", tags=["Medical Devices"])
 
@@ -44,11 +48,11 @@ async def start_device_stream(
         # Convert device_type string to enum
         try:
             device_type_enum = DeviceType(request.device_type)
-        except ValueError:
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid device type: {request.device_type}"
-            )
+            ) from exc
         
         success = await device_service.start_stream(
             device_id=request.device_id,
@@ -75,7 +79,7 @@ async def start_device_stream(
         raise HTTPException(
             status_code=500,
             detail=f"Error starting device stream: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/stream/stop/{device_id}")
@@ -113,7 +117,7 @@ async def stop_device_stream(
         raise HTTPException(
             status_code=500,
             detail=f"Error stopping device stream: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/stream/status/{device_id}")
@@ -150,7 +154,7 @@ async def get_stream_status(
         raise HTTPException(
             status_code=500,
             detail=f"Error getting stream status: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/stream/list")
@@ -176,7 +180,7 @@ async def list_active_streams(
         raise HTTPException(
             status_code=500,
             detail=f"Error listing streams: {str(e)}"
-        )
+        ) from e
 
 
 @router.websocket("/stream/{device_id}")

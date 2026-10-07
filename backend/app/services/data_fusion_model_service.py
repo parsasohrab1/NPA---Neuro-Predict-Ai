@@ -1,16 +1,16 @@
 """
 Service for loading and using the trained Data Fusion Deep Learning Model
 """
-import torch
-import numpy as np
-from pathlib import Path
-from typing import Dict, Optional, Tuple
 import logging
 import pickle
+from pathlib import Path
+from typing import Dict, Optional
 
-from .data_fusion_model import DataFusionScoringModel
-from .data_fusion_xai_service import get_data_fusion_xai_service
+import numpy as np
+import torch
+
 from ..core.config import settings
+from .data_fusion_model import FUSION_FEATURE_DIM, DataFusionScoringModel, align_features
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class DataFusionModelService:
             checkpoint = torch.load(latest_model, map_location=self.device)
             
             # Initialize model
-            input_dim = checkpoint.get('input_dim', 20)
+            input_dim = checkpoint.get('input_dim', FUSION_FEATURE_DIM)
             self.model = DataFusionScoringModel(input_dim=input_dim)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.model.to(self.device)
@@ -92,6 +92,9 @@ class DataFusionModelService:
         """
         if not self._loaded or self.model is None:
             raise RuntimeError("Model not loaded. Cannot make predictions.")
+        
+        # Match the loaded model's input width (checkpoints may use 17 or 20 features)
+        features = align_features(features, getattr(self.model, 'input_dim', FUSION_FEATURE_DIM))
         
         # Normalize features if scaler is available
         if self.scaler is not None:

@@ -3,26 +3,24 @@ PATENT-PENDING: Data Fusion Service
 Multi-Modal Medical Data Fusion and Interpretation Algorithm
 Now uses Deep Learning model for score predictions
 """
-from typing import Dict, Any, Optional, List
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from datetime import datetime
-import time
-import numpy as np
 import logging
+import time
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from ..models.patient import Patient
+import numpy as np
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.data_fusion_report import DataFusionReport, FusionConfidence, FusionInterpretation
 from ..models.medical_record import MedicalRecord
-from ..models.data_fusion_report import (
-    DataFusionReport, 
-    FusionConfidence, 
-    FusionInterpretation
-)
+from ..models.patient import Patient
 
 logger = logging.getLogger(__name__)
+from .clinical_norms_service import get_clinical_norms_service
+from .data_fusion_model import FUSION_FEATURE_DIM
 from .data_fusion_model_service import get_data_fusion_model_service
 from .data_fusion_xai_service import get_data_fusion_xai_service
-from .clinical_norms_service import get_clinical_norms_service
 from .natural_language_service import get_natural_language_service
 
 
@@ -379,6 +377,9 @@ class DataFusionService:
         features.append(1.0 if patient.gender.value == 'male' else 0.0)
         features.append((patient.education_years or 12) / 20.0)  # Normalize education
         
+        # Reserved slots keep the vector at the model's default input width
+        features.extend([0.0] * (FUSION_FEATURE_DIM - len(features)))
+        
         return np.array(features, dtype=np.float32)
     
     # ========================================================================
@@ -469,7 +470,7 @@ class DataFusionService:
         
         # Weighted average
         total_weight = sum(weights)
-        cognitive_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        cognitive_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         
         # Confidence: average of individual confidences weighted by completeness
         if confidences:
@@ -516,7 +517,7 @@ class DataFusionService:
             return 50.0, 0.0
         
         total_weight = sum(weights)
-        cognitive_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        cognitive_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         confidence = len(scores) / 5.0
         
         return cognitive_score, confidence
@@ -604,7 +605,7 @@ class DataFusionService:
         
         # Weighted average
         total_weight = sum(weights)
-        biomarker_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        biomarker_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         
         # Confidence: average of individual confidences
         if confidences:
@@ -725,7 +726,7 @@ class DataFusionService:
         
         # Weighted average
         total_weight = sum(weights)
-        imaging_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        imaging_score = sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
         
         # Confidence: average of individual confidences
         if confidences:
@@ -1102,8 +1103,10 @@ class DataFusionService:
             confidence = 90.0
         
         # Adjust confidence based on cross-modal consistency
+        # A modality that disagrees with the others (any pair < 0.4) is a conflict even
+        # when the average correlation stays high.
         avg_corr = sum(correlations.values()) / len(correlations)
-        if avg_corr < 0.5:
+        if avg_corr < 0.5 or min(correlations.values()) < 0.4:
             confidence *= 0.7  # Reduce confidence if modalities conflict
         
         # Generate evidence from each modality

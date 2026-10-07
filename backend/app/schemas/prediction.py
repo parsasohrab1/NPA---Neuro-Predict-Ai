@@ -1,11 +1,12 @@
 """
 Prediction Schemas
 """
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
 from datetime import datetime
-from ..models.prediction import DiseaseType, RiskLevel
+from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
+
+from ..models.prediction import DiseaseType, RiskLevel
 
 # --- Clinical Explainability (Explainable AI for physicians) ---
 

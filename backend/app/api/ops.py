@@ -1,17 +1,17 @@
 """
 Operational (Runbook) APIs - admin-only helpers for incident response
 """
-from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from typing import Dict, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import main as app_module
+from ..core.config import settings
 from ..core.security import require_role
 from ..db.session import get_db
-from ..services.rum_service import RUMService
-from ..services.maintenance_service import MaintenanceService
 from ..services.backup_service import BackupService
-from ..core.config import settings
-from .. import main as app_module
+from ..services.rum_service import RUMService
 
 router = APIRouter(prefix="/ops", tags=["Operations"])
 
@@ -90,6 +90,7 @@ async def prometheus_metrics(
     Returns metrics in Prometheus text format
     """
     from fastapi.responses import Response
+
     from ..middleware.prometheus_middleware import get_prometheus_metrics
     
     metrics_text = get_prometheus_metrics()

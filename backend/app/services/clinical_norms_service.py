@@ -3,9 +3,8 @@ Clinical Norms Service
 Provides age and gender-specific normal ranges for medical assessments
 Replaces magic numbers with evidence-based clinical norms
 """
-from typing import Dict, Optional, Tuple
-from datetime import date
 import logging
+from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -421,12 +420,6 @@ class ClinicalNormsService:
         std = norms['std']
         normal_min = norms.get('normal_min', mean - 2 * std)
         normal_max = norms.get('normal_max', mean + 2 * std)
-        
-        # Calculate z-score
-        if std > 0:
-            z_score = (value - mean) / std
-        else:
-            z_score = 0.0
         
         # Convert to score (0-100)
         if higher_is_better:

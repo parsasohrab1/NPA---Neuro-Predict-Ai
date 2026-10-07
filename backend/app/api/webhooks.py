@@ -1,9 +1,10 @@
 """
 Webhooks Outbound API - enqueue reliable sends with HMAC and idempotency
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field, HttpUrl
-from typing import Dict, Any, Optional
 
 from ..core.security import require_role
 from ..services.job_queue_service import JobQueueService

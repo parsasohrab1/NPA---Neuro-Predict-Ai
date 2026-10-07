@@ -8,17 +8,16 @@ Patent Claim 3: System for generating explanations including:
 (c) Mapping attributions to anatomical brain regions
 (d) Visual display of saliency maps for medical interpretation
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-from typing import Dict, List, Tuple, Optional, Any
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from .data_fusion_model import DataFusionScoringModel
+import numpy as np
+import torch
+
 from ..models.medical_record import MedicalRecord
 from ..models.patient import Patient
+from .data_fusion_model import FUSION_FEATURE_DIM, DataFusionScoringModel, align_features
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +158,7 @@ class DataFusionXAIService:
         
         return {
             'attribution': attribution_np,
-            'feature_importance': dict(zip(self.FEATURE_NAMES, attribution_np)),
+            'feature_importance': dict(zip(self.FEATURE_NAMES, attribution_np, strict=False)),
             'method': 'integrated_gradients',
             'steps': steps
         }
@@ -201,7 +200,7 @@ class DataFusionXAIService:
         
         return {
             'saliency': saliency,
-            'feature_importance': dict(zip(self.FEATURE_NAMES, saliency)),
+            'feature_importance': dict(zip(self.FEATURE_NAMES, saliency, strict=False)),
             'method': 'gradient_saliency'
         }
     
@@ -282,6 +281,7 @@ class DataFusionXAIService:
         # Extract features
         from .data_fusion_service import DataFusionService
         features = DataFusionService._extract_features_for_model(medical_record, patient)
+        features = align_features(features, getattr(self.model, 'input_dim', FUSION_FEATURE_DIM))
         features_tensor = torch.FloatTensor(features).unsqueeze(0).to(self.device)
         
         # Compute attributions for key outputs
@@ -327,7 +327,7 @@ class DataFusionXAIService:
         
         # Top contributing features
         top_features = sorted(
-            zip(self.FEATURE_NAMES, attributions),
+            zip(self.FEATURE_NAMES, attributions, strict=False),
             key=lambda x: abs(x[1]),
             reverse=True
         )[:10]
@@ -456,7 +456,7 @@ class DataFusionXAIService:
         
         # Identify key findings
         top_features = sorted(
-            zip(self.FEATURE_NAMES, attributions),
+            zip(self.FEATURE_NAMES, attributions, strict=False),
             key=lambda x: abs(x[1]),
             reverse=True
         )[:5]
@@ -519,7 +519,7 @@ class DataFusionXAIService:
         """
         return {
             'feature_attributions': {
-                name: float(attr) for name, attr in zip(self.FEATURE_NAMES, attributions)
+                name: float(attr) for name, attr in zip(self.FEATURE_NAMES, attributions, strict=False)
             },
             'anatomical_regions': self.map_to_anatomical_regions(attributions),
             'modality_heatmap': self._compute_modality_contributions(attributions),

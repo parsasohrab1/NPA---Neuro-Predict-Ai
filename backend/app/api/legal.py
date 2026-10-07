@@ -3,13 +3,13 @@ Legal API: Terms of Use (FA) - fetch and accept
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import get_db
 from ..core.security import get_current_user
-from ..models.user import User
+from ..db.session import get_db
 from ..models.legal import UserTermsAcceptance
+from ..models.user import User
 
 router = APIRouter(prefix="/legal", tags=["Legal"])
 

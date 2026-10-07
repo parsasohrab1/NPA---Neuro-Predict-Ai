@@ -1,11 +1,10 @@
 """
 Prometheus Metrics for NeuroPredict-AI
 """
-from prometheus_client import Counter, Histogram, Gauge, Summary
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-from fastapi import Response
-from typing import Optional
 import time
+
+from fastapi import Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, Summary, generate_latest
 
 # HTTP Metrics
 http_requests_total = Counter(

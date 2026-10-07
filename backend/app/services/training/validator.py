@@ -2,22 +2,25 @@
 Clinical Validation Framework
 فریمورک اعتبارسنجی بالینی برای ارزیابی مدل
 """
-import torch
-import numpy as np
-import pandas as pd
-from typing import Dict, List, Tuple, Optional
-import logging
-from pathlib import Path
 import json
+import logging
 from datetime import datetime
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    roc_auc_score, roc_curve, precision_recall_curve,
-    confusion_matrix, classification_report
-)
-from sklearn.calibration import calibration_curve
+from typing import Dict, Optional
+
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+import torch
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +303,7 @@ class ClinicalValidator:
         report_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         report_lines.append("")
         
-        for disease, metrics in [('alzheimer', self.validation_results['alzheimer']),
+        for _disease, metrics in [('alzheimer', self.validation_results['alzheimer']),
                                  ('parkinson', self.validation_results['parkinson'])]:
             report_lines.append(f"\n{metrics['disease']} Disease Prediction")
             report_lines.append("-" * 80)
@@ -393,7 +396,7 @@ class ClinicalValidator:
         
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
         
-        for idx, (disease, metrics) in enumerate([('alzheimer', self.validation_results['alzheimer']),
+        for idx, (_disease, metrics) in enumerate([('alzheimer', self.validation_results['alzheimer']),
                                                    ('parkinson', self.validation_results['parkinson'])]):
             # Note: We need the actual predictions and labels for curves
             # This is a placeholder - in real implementation, store these during validation
@@ -430,7 +433,7 @@ class ClinicalValidator:
         
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
         
-        for idx, (disease, metrics) in enumerate([('alzheimer', self.validation_results['alzheimer']),
+        for idx, (_disease, metrics) in enumerate([('alzheimer', self.validation_results['alzheimer']),
                                                    ('parkinson', self.validation_results['parkinson'])]):
             cm = metrics['confusion_matrix']
             cm_array = np.array([[cm['tn'], cm['fp']],

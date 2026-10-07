@@ -2,13 +2,13 @@
 Caching Service for Performance Optimization
 سرویس Cache برای بهینه‌سازی عملکرد
 """
-from typing import Optional, Any, Union
-import json
-import pickle
 import hashlib
-from datetime import timedelta
-import redis.asyncio as redis
+import json
 import logging
+import pickle
+from typing import Any, Optional
+
+import redis.asyncio as redis
 
 from .config import settings
 
@@ -227,7 +227,7 @@ class CacheService:
         
         # Compute value
         if callable(callable_func):
-            value = await callable_func() if hasattr(callable_func, '__call__') else callable_func
+            value = await callable_func()
         else:
             value = callable_func
         
@@ -253,7 +253,7 @@ def generate_cache_key(prefix: str, **kwargs) -> str:
             key_parts.append(f"user:{v.id}")
         else:
             key_parts.append(f"{k}:{v}")
-    digest = hashlib.md5("|".join(key_parts).encode()).hexdigest()
+    digest = hashlib.md5("|".join(key_parts).encode(), usedforsecurity=False).hexdigest()
     return f"{prefix}:{digest}"
 
 

@@ -2,11 +2,12 @@
 AI Model Inference Optimization
 بهینه‌سازی استنتاج مدل AI
 """
-import torch
-import torch.nn as nn
-from typing import Dict, Any, Optional
 import logging
 from pathlib import Path
+from typing import Any, Dict
+
+import torch
+import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 

@@ -7,15 +7,15 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from ..models.longitudinal import (
-    LongitudinalEpisodeStatus,
-    LongitudinalVisitType,
-    MetricCategory,
     AlertSeverity,
     AlertType,
+    LongitudinalEpisodeStatus,
     LongitudinalReportFormat,
-    LongitudinalReportStatus,
-    LongitudinalReportScheduleStatus,
     LongitudinalReportRunStatus,
+    LongitudinalReportScheduleStatus,
+    LongitudinalReportStatus,
+    LongitudinalVisitType,
+    MetricCategory,
 )
 
 
@@ -227,41 +227,5 @@ class ReportScheduleUpdate(BaseModel):
     status: LongitudinalReportScheduleStatus
 
 
-class LongitudinalReportCreate(BaseModel):
-    from_date: Optional[datetime] = None
-    to_date: Optional[datetime] = None
-    format: LongitudinalReportFormat = LongitudinalReportFormat.PDF
-
-
-class LongitudinalReportResponse(BaseModel):
-    id: int
-    episode_id: int
-    created_by: Optional[int]
-    from_date: Optional[datetime]
-    to_date: Optional[datetime]
-    format: LongitudinalReportFormat
-    status: LongitudinalReportStatus
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class LongitudinalReportDetail(LongitudinalReportResponse):
     summary: Optional[dict]
-
-
-
-
-class ImagingComparisonResponse(BaseModel):
-    episode_id: int
-    visit_a_id: int
-    visit_b_id: int
-    overlay_image_a: str
-    overlay_image_b: str
-    diff_heatmap: str
-    diff_mask: str
-    metadata_a: Optional[dict] = None
-    metadata_b: Optional[dict] = None
-
-

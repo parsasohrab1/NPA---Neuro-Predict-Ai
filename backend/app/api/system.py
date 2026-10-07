@@ -1,9 +1,10 @@
 """
 System Architecture API - Context/Container summaries for UI/docs alignment
 """
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any
 
 from ..db.session import get_db
 from ..services.monitoring_service import MonitoringService
