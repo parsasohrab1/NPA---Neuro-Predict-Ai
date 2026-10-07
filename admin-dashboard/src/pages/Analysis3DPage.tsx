@@ -39,7 +39,7 @@ interface QualityControlData {
 }
 
 function QualityControlView({ data }: { data?: any }) {
-  const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null)
+  const [, setSelectedPipeline] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'detail'>('grid')
 
   if (!data?.qc_data) {

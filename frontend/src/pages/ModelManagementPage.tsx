@@ -11,7 +11,7 @@ export default function ModelManagementPage() {
     queryFn: () => modelsApi.getAll(),
   })
 
-  const { data: performanceData } = useQuery({
+  useQuery({
     queryKey: ['model-performance', selectedModel],
     queryFn: () => modelsApi.getPerformance(selectedModel),
     enabled: !!selectedModel,
@@ -36,7 +36,7 @@ export default function ModelManagementPage() {
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {models.map((model) => (
+          {models.map((model: any) => (
             <div
               key={model.id}
               onClick={() => setSelectedModel(model.id)}
