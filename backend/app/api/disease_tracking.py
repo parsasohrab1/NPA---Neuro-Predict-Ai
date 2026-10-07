@@ -849,7 +849,6 @@ async def load_all_datasets(
     Load medical records and predictions for ALL 500 existing patients in the database.
     This reads existing patients and creates medical records + predictions for those who don't have them.
     """
-    import logging
     import random
     from datetime import timedelta
     
@@ -1052,7 +1051,6 @@ async def load_sample_datasets(
     - 40 Parkinson patients (20 synthetic + 20 real)
     Total: 100 synthetic + 100 real = 200 patients
     """
-    import logging
     from datetime import date
     from pathlib import Path
 
@@ -1407,7 +1405,6 @@ async def clear_all_disease_tracking_data(
     Clear all patients, medical records, predictions, and fusion reports from the disease tracking system.
     WARNING: This deletes ALL data!
     """
-    import logging
 
     from ..models.data_fusion_report import DataFusionReport
     

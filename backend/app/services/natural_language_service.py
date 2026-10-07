@@ -9,13 +9,13 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 try:
-    from jinja2 import Environment, FileSystemLoader, Template, select_autoescape
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
     JINJA2_AVAILABLE = True
 except ImportError:
     JINJA2_AVAILABLE = False
-    Template = None
     Environment = None
     FileSystemLoader = None
+    select_autoescape = None
 
 logger = logging.getLogger(__name__)
 
