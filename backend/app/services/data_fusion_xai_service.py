@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime
 import logging
 
-from .data_fusion_model import DataFusionScoringModel
+from .data_fusion_model import DataFusionScoringModel, FUSION_FEATURE_DIM, align_features
 from ..models.medical_record import MedicalRecord
 from ..models.patient import Patient
 
@@ -282,6 +282,7 @@ class DataFusionXAIService:
         # Extract features
         from .data_fusion_service import DataFusionService
         features = DataFusionService._extract_features_for_model(medical_record, patient)
+        features = align_features(features, getattr(self.model, 'input_dim', FUSION_FEATURE_DIM))
         features_tensor = torch.FloatTensor(features).unsqueeze(0).to(self.device)
         
         # Compute attributions for key outputs

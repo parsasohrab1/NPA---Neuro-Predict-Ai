@@ -20,6 +20,7 @@ from ..models.data_fusion_report import (
 )
 
 logger = logging.getLogger(__name__)
+from .data_fusion_model import FUSION_FEATURE_DIM
 from .data_fusion_model_service import get_data_fusion_model_service
 from .data_fusion_xai_service import get_data_fusion_xai_service
 from .clinical_norms_service import get_clinical_norms_service
@@ -378,6 +379,9 @@ class DataFusionService:
         features.append(age / 100.0)  # Normalize age
         features.append(1.0 if patient.gender.value == 'male' else 0.0)
         features.append((patient.education_years or 12) / 20.0)  # Normalize education
+        
+        # Reserved slots keep the vector at the model's default input width
+        features.extend([0.0] * (FUSION_FEATURE_DIM - len(features)))
         
         return np.array(features, dtype=np.float32)
     
@@ -1102,8 +1106,10 @@ class DataFusionService:
             confidence = 90.0
         
         # Adjust confidence based on cross-modal consistency
+        # A modality that disagrees with the others (any pair < 0.4) is a conflict even
+        # when the average correlation stays high.
         avg_corr = sum(correlations.values()) / len(correlations)
-        if avg_corr < 0.5:
+        if avg_corr < 0.5 or min(correlations.values()) < 0.4:
             confidence *= 0.7  # Reduce confidence if modalities conflict
         
         # Generate evidence from each modality

@@ -1,7 +1,7 @@
 """
 Reports API Endpoints
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
@@ -10,10 +10,14 @@ from datetime import datetime, timedelta
 from ..db.session import get_db
 from ..models.user import User
 from ..models.patient import Patient
-from ..models.prediction import Prediction
-from ..core.security import get_current_user
+from ..models.prediction import DiseaseType, Prediction, RiskLevel
+from ..core.security import get_current_active_user, get_current_user
+from ..schemas.reports import ClinicalReport, ManagementReport, ResearchReport
+from ..services.reporting_service import ReportingService
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+reporting_service = ReportingService()
 
 
 @router.get("/summary")
@@ -137,3 +141,50 @@ async def get_risk_distribution(
         },
         "total": len(predictions)
     }
+
+
+@router.get("/clinical", response_model=ClinicalReport)
+async def get_clinical_report(
+    patient_id: int,
+    from_date: Optional[datetime] = Query(None, alias="from"),
+    to_date: Optional[datetime] = Query(None, alias="to"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Patient-centred clinical report: patient summary and latest predictions"""
+    try:
+        return await reporting_service.clinical_report(db, patient_id, from_date, to_date)
+    except ValueError as exc:
+        if str(exc) == "patient_not_found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Patient with ID {patient_id} not found",
+            ) from exc
+        raise
+
+
+@router.get("/research", response_model=ResearchReport)
+async def get_research_report(
+    from_date: Optional[datetime] = Query(None, alias="from"),
+    to_date: Optional[datetime] = Query(None, alias="to"),
+    risk_level: Optional[RiskLevel] = None,
+    disease_type: Optional[DiseaseType] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Aggregate research report over predictions (descriptive statistics by disease type)"""
+    return await reporting_service.research_report(
+        db, from_date, to_date, risk_level, disease_type
+    )
+
+
+@router.get("/management", response_model=ManagementReport)
+async def get_management_report(
+    model_version: Optional[str] = None,
+    from_date: Optional[datetime] = Query(None, alias="from"),
+    to_date: Optional[datetime] = Query(None, alias="to"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Management KPIs: prediction volume, review rate and model-version distribution"""
+    return await reporting_service.management_report(db, model_version, from_date, to_date)

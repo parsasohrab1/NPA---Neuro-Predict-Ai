@@ -282,6 +282,9 @@ async def create_report(
             start_date=payload.start_date,
             end_date=payload.end_date,
             report_format=payload.format,
+            report_type=payload.report_type,
+            cohort_filters=payload.cohort_filters,
+            comparison_filters=payload.comparison_filters,
         )
         return report
     except ValueError as exc:

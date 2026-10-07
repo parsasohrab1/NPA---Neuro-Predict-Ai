@@ -4,10 +4,29 @@ This model replaces manual score calculations with learned predictions
 """
 import torch
 import torch.nn as nn
+import numpy as np
 from typing import Dict, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Width of the feature vector produced by DataFusionService._extract_features_for_model:
+# 17 clinical features (cognitive 0-4, biomarker 5-8, imaging 9-13, demographics 14-16)
+# followed by reserved zero slots.
+FUSION_FEATURE_DIM = 20
+
+
+def align_features(features: np.ndarray, input_dim: int) -> np.ndarray:
+    """Pad with zeros or truncate a feature vector to a model's input width.
+
+    Checkpoints trained on the 17 clinical features have input_dim=17, while the
+    runtime vector is FUSION_FEATURE_DIM wide; the extra tail slots are reserved
+    zeros, so truncation loses nothing.
+    """
+    features = np.asarray(features, dtype=np.float32).reshape(-1)
+    if features.shape[0] >= input_dim:
+        return features[:input_dim]
+    return np.concatenate([features, np.zeros(input_dim - features.shape[0], dtype=np.float32)])
 
 
 class DataFusionScoringModel(nn.Module):
@@ -23,8 +42,9 @@ class DataFusionScoringModel(nn.Module):
     - confidences
     """
     
-    def __init__(self, input_dim: int = 20, hidden_dims: list = [128, 64, 32]):
+    def __init__(self, input_dim: int = FUSION_FEATURE_DIM, hidden_dims: list = [128, 64, 32]):
         super(DataFusionScoringModel, self).__init__()
+        self.input_dim = input_dim
         
         # Feature extraction layers
         layers = []

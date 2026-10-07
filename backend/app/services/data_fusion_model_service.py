@@ -8,7 +8,7 @@ from typing import Dict, Optional, Tuple
 import logging
 import pickle
 
-from .data_fusion_model import DataFusionScoringModel
+from .data_fusion_model import DataFusionScoringModel, FUSION_FEATURE_DIM, align_features
 from .data_fusion_xai_service import get_data_fusion_xai_service
 from ..core.config import settings
 
@@ -46,7 +46,7 @@ class DataFusionModelService:
             checkpoint = torch.load(latest_model, map_location=self.device)
             
             # Initialize model
-            input_dim = checkpoint.get('input_dim', 20)
+            input_dim = checkpoint.get('input_dim', FUSION_FEATURE_DIM)
             self.model = DataFusionScoringModel(input_dim=input_dim)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.model.to(self.device)
@@ -92,6 +92,9 @@ class DataFusionModelService:
         """
         if not self._loaded or self.model is None:
             raise RuntimeError("Model not loaded. Cannot make predictions.")
+        
+        # Match the loaded model's input width (checkpoints may use 17 or 20 features)
+        features = align_features(features, getattr(self.model, 'input_dim', FUSION_FEATURE_DIM))
         
         # Normalize features if scaler is available
         if self.scaler is not None:

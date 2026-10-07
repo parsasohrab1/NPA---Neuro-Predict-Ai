@@ -38,7 +38,8 @@ def _json_safe_metadata(obj: Any) -> Any:
     return obj
 
 
-@router.post("/", response_model=PredictionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PredictionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=PredictionResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_prediction(
     request: PredictionRequest,
     http_request: Request,
@@ -188,7 +189,8 @@ def _prediction_to_cache_dict(p: Prediction) -> dict:
     return resp.model_dump(mode="json")
 
 
-@router.get("/", response_model=List[PredictionResponse])
+@router.get("", response_model=List[PredictionResponse])
+@router.get("/", response_model=List[PredictionResponse], include_in_schema=False)
 async def get_predictions(
     patient_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),

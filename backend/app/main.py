@@ -171,6 +171,10 @@ app = FastAPI(
     openapi_url=openapi_url
 )
 
+# Security headers (X-Content-Type-Options, X-Frame-Options, CSP, HSTS)
+from .middleware.security_middleware import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware)
+
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,

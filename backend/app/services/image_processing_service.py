@@ -2,6 +2,7 @@
 Medical Image Processing Service
 Handles DICOM files, MRI preprocessing, and feature extraction
 """
+import base64
 import numpy as np
 import pydicom
 from pathlib import Path
@@ -53,6 +54,54 @@ class ImageProcessingService:
             logger.error(f"Error loading DICOM file {file_path}: {e}")
             raise
     
+    def compare_dicom_files(self, path_a: str, path_b: str) -> Dict:
+        """
+        Compare two DICOM images (e.g. baseline vs follow-up visit).
+
+        Both images are loaded and resized to a common grid, then the absolute
+        difference (scaled by their shared intensity range) is summarised and rendered as a colour-mapped PNG heatmap.
+
+        Returns:
+            Dict with mean/max absolute difference (0-1 scale), the heatmap as a
+            ``data:image/png;base64,...`` URI and metadata for both images.
+        """
+        image_a, meta_a = self.load_dicom(path_a)
+        image_b, meta_b = self.load_dicom(path_b)
+
+        # Multi-frame / volumetric data: compare the middle slice
+        if image_a.ndim > 2:
+            image_a = image_a[image_a.shape[0] // 2]
+        if image_b.ndim > 2:
+            image_b = image_b[image_b.shape[0] // 2]
+
+        target = (min(image_a.shape[1], image_b.shape[1]), min(image_a.shape[0], image_b.shape[0]))
+        size = (max(target[0], 1), max(target[1], 1))  # cv2.resize takes (width, height)
+
+        def _resize(image: np.ndarray) -> np.ndarray:
+            return cv2.resize(image.astype(np.float32), size, interpolation=cv2.INTER_AREA)
+
+        resized_a, resized_b = _resize(image_a), _resize(image_b)
+
+        # Use one shared intensity range so real brightness changes between visits are
+        # preserved (normalising each image separately would hide them).
+        low = float(min(resized_a.min(), resized_b.min()))
+        high = float(max(resized_a.max(), resized_b.max()))
+        span = max(high - low, 1e-8)
+        diff = np.abs(resized_a - resized_b) / span
+
+        heat = cv2.applyColorMap((diff * 255).astype(np.uint8), cv2.COLORMAP_JET)
+        success, encoded = cv2.imencode(".png", heat)
+        if not success:
+            raise RuntimeError("heatmap_encoding_failed")
+        heatmap = "data:image/png;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
+
+        return {
+            "mean_absolute_difference": float(diff.mean()),
+            "max_absolute_difference": float(diff.max()),
+            "heatmap": heatmap,
+            "metadata": {"visit_a": meta_a, "visit_b": meta_b},
+        }
+
     def normalize_image(self, image: np.ndarray) -> np.ndarray:
         """
         Normalize image intensity to 0-1 range

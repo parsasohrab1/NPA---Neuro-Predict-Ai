@@ -18,7 +18,8 @@ from ..core.security import get_current_user, require_role
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
 
-@router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_patient(
     patient_data: PatientCreate,
     db: AsyncSession = Depends(get_db),
@@ -46,7 +47,8 @@ async def create_patient(
     return new_patient
 
 
-@router.get("/", response_model=List[PatientResponse])
+@router.get("", response_model=List[PatientResponse])
+@router.get("/", response_model=List[PatientResponse], include_in_schema=False)
 async def get_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

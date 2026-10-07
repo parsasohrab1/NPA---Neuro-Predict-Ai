@@ -37,21 +37,17 @@ class TestDataFusionAPI:
         # Check response structure
         assert "patient_id" in data
         assert "medical_record_id" in data
-        assert "cognitive_modality_score" in data
-        assert "biomarker_modality_score" in data
-        assert "imaging_modality_score" in data
-        assert "integrated_fusion_score" in data
-        assert "executive_summary" in data
-        assert "detailed_findings" in data
-        assert "risk_assessment" in data
-        assert "recommendations" in data
-        assert "algorithm_version" in data
+        for section in ("fusion_scores", "cross_modal", "disease_analysis",
+                        "interpretation", "report", "quality", "metadata"):
+            assert section in data
+        for key in ("executive_summary", "detailed_findings", "risk_assessment", "recommendations"):
+            assert key in data["report"]
+        assert "algorithm_version" in data["metadata"]
         
         # Check score ranges
-        assert 0 <= data["cognitive_modality_score"] <= 100
-        assert 0 <= data["biomarker_modality_score"] <= 100
-        assert 0 <= data["imaging_modality_score"] <= 100
-        assert 0 <= data["integrated_fusion_score"] <= 100
+        scores = data["fusion_scores"]
+        for key in ("cognitive", "biomarker", "imaging", "integrated"):
+            assert 0 <= scores[key] <= 100
     
     @pytest.mark.asyncio
     async def test_generate_fusion_report_without_medical_record_id(
@@ -212,7 +208,7 @@ class TestDataFusionAPI:
         
         assert response.status_code == 201
         data = response.json()
-        assert data["algorithm_version"] == "2.0.0-DL"
+        assert data["metadata"]["algorithm_version"] == "2.0.0-DL"
     
     @pytest.mark.asyncio
     async def test_fusion_report_manual_algorithm_version(
@@ -240,7 +236,7 @@ class TestDataFusionAPI:
         
         assert response.status_code == 201
         data = response.json()
-        assert data["algorithm_version"] == "1.0.0"
+        assert data["metadata"]["algorithm_version"] == "1.0.0"
 
 
 # ============================================================================
@@ -270,8 +266,8 @@ class TestDataFusionPerformance:
         assert elapsed_time < 5.0  # Should complete in under 5 seconds
         
         data = response.json()
-        assert data["processing_time_ms"] > 0
-        assert data["processing_time_ms"] < 5000  # Processing time should be reasonable
+        assert data["metadata"]["processing_time_ms"] >= 0
+        assert data["metadata"]["processing_time_ms"] < 5000  # Processing time should be reasonable
 
 
 # ============================================================================

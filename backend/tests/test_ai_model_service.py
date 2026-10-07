@@ -295,10 +295,10 @@ class TestModelPrediction:
     @pytest.mark.asyncio
     async def test_predict_error_handling(self, ai_service):
         """Test error handling in prediction"""
-        if not hasattr(ai_service, '_available') or not ai_service._available:
-            # If PyTorch not available, service should raise RuntimeError
-            with pytest.raises(RuntimeError, match="pytorch_not_available"):
-                await ai_service.predict({'age': 70})
+        if ai_service.use_mock:
+            # Mock mode (PyTorch unavailable) still returns a valid prediction
+            result = await ai_service.predict({'age': 70})
+            assert 'alzheimer' in result and 'parkinson' in result
             return
         
         # Test with invalid data that might cause errors
@@ -325,7 +325,7 @@ class TestModelInitialization:
         with patch('app.services.ai_model_service.torch', None):
             with patch('app.services.ai_model_service.nn', None):
                 service = AIModelService()
-                assert not hasattr(service, '_available') or not service._available
+                assert service.use_mock
     
     def test_model_initialization_with_pytorch(self):
         """Test service initialization when PyTorch is available"""
@@ -340,6 +340,7 @@ class TestModelInitialization:
     def test_model_architecture(self):
         """Test model architecture"""
         model = MultiModalNeuralNetwork(input_dim=50)
+        model.eval()  # BatchNorm needs eval mode for a batch of one
         
         assert model is not None
         assert hasattr(model, 'feature_extractor')

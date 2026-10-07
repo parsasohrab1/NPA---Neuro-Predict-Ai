@@ -40,7 +40,7 @@ class CacheMiddleware(BaseHTTPMiddleware):
     def _make_cache_key(self, request: Request) -> str:
         """Create cache key from request"""
         # Include path and query params
-        key_data = f"{request.method}:{request.url.path}:{request.url.query_string}"
+        key_data = f"{request.method}:{request.url.path}:{request.url.query}"
         key_hash = hashlib.md5(key_data.encode()).hexdigest()
         return f"api:{key_hash}"
     
