@@ -1,16 +1,16 @@
 """
 Service for loading and using the trained Data Fusion Deep Learning Model
 """
-import torch
-import numpy as np
-from pathlib import Path
-from typing import Dict, Optional, Tuple
 import logging
 import pickle
+from pathlib import Path
+from typing import Dict, Optional
 
-from .data_fusion_model import DataFusionScoringModel, FUSION_FEATURE_DIM, align_features
-from .data_fusion_xai_service import get_data_fusion_xai_service
+import numpy as np
+import torch
+
 from ..core.config import settings
+from .data_fusion_model import FUSION_FEATURE_DIM, DataFusionScoringModel, align_features
 
 logger = logging.getLogger(__name__)
 

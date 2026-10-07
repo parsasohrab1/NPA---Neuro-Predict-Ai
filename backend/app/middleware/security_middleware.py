@@ -1,22 +1,18 @@
 """
 Security Middleware - IP Whitelist, Rate Limiting, Security Headers
 """
-from fastapi import Request, HTTPException, status
+import logging
+import time
+import uuid
+from typing import Optional
+
+import redis.asyncio as redis
+from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.types import ASGIApp
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-from datetime import datetime, timedelta
-import time
-import redis.asyncio as redis
-from typing import Optional
-import uuid
-import logging
 
 from ..core.config import settings
-from ..db.session import get_db
-from ..models.security import IPWhitelist, SecurityLog
 from ..services.security_service import SecurityService
 
 # Initialize logger at module level
@@ -94,10 +90,11 @@ class IPWhitelistMiddleware(BaseHTTPMiddleware):
         if authorization and authorization.startswith("Bearer "):
             token = authorization.split(" ", 1)[1]
             try:
+                from sqlalchemy import select
+
                 from ..core.security import decode_token
                 from ..db.session import get_db
                 from ..models.user import User
-                from sqlalchemy import select
                 
                 # Decode token to get user_id
                 payload = decode_token(token)
@@ -242,7 +239,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                                 user_id=None,
                                 event_type="rate_limit_exceeded_user",
                                 severity="warning",
-                                description=f"User rate limit exceeded",
+                                description="User rate limit exceeded",
                                 ip_address=client_ip,
                                 request_path=request.url.path
                             )

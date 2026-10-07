@@ -3,27 +3,24 @@ PATENT-PENDING: Data Fusion Service
 Multi-Modal Medical Data Fusion and Interpretation Algorithm
 Now uses Deep Learning model for score predictions
 """
-from typing import Dict, Any, Optional, List
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from datetime import datetime
-import time
-import numpy as np
 import logging
+import time
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from ..models.patient import Patient
+import numpy as np
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.data_fusion_report import DataFusionReport, FusionConfidence, FusionInterpretation
 from ..models.medical_record import MedicalRecord
-from ..models.data_fusion_report import (
-    DataFusionReport, 
-    FusionConfidence, 
-    FusionInterpretation
-)
+from ..models.patient import Patient
 
 logger = logging.getLogger(__name__)
+from .clinical_norms_service import get_clinical_norms_service
 from .data_fusion_model import FUSION_FEATURE_DIM
 from .data_fusion_model_service import get_data_fusion_model_service
 from .data_fusion_xai_service import get_data_fusion_xai_service
-from .clinical_norms_service import get_clinical_norms_service
 from .natural_language_service import get_natural_language_service
 
 

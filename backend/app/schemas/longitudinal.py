@@ -7,15 +7,15 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from ..models.longitudinal import (
-    LongitudinalEpisodeStatus,
-    LongitudinalVisitType,
-    MetricCategory,
     AlertSeverity,
     AlertType,
+    LongitudinalEpisodeStatus,
     LongitudinalReportFormat,
-    LongitudinalReportStatus,
-    LongitudinalReportScheduleStatus,
     LongitudinalReportRunStatus,
+    LongitudinalReportScheduleStatus,
+    LongitudinalReportStatus,
+    LongitudinalVisitType,
+    MetricCategory,
 )
 
 

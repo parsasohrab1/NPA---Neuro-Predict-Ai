@@ -1,31 +1,36 @@
 """
 Security Service - MFA, Password Policies, IP Whitelist, Session Management
 """
+import base64
+import io
+import secrets
+import time
+from datetime import datetime, timedelta
+from ipaddress import ip_network
+from typing import Optional, Tuple
+
 import pyotp
 import qrcode
-import io
-import base64
-from datetime import datetime, timedelta
-from typing import Optional, List, Tuple
-from ipaddress import ip_address, ip_network
+import redis.asyncio as redis
+from fastapi import HTTPException, Request, status
+from jose import jwt as jose_jwt
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, delete
-from fastapi import HTTPException, status, Request
-import secrets
-import hashlib
 
+from ..core.config import settings
+from ..core.crypto import decrypt_text, encrypt_text
+from ..core.security import verify_password
 from ..models.security import (
-    MFASecret, MFAMethod, UserSession, IPWhitelist,
-    PasswordPolicy, PasswordHistory, SecurityLog, FailedLoginAttempt
+    FailedLoginAttempt,
+    IPWhitelist,
+    MFAMethod,
+    MFASecret,
+    PasswordHistory,
+    PasswordPolicy,
+    SecurityLog,
+    UserSession,
 )
 from ..models.user import User
-from ..core.security import get_password_hash, verify_password
-from ..core.config import settings
-from ..core.crypto import encrypt_text, decrypt_text
-import jwt as pyjwt
-from jose import jwt as jose_jwt
-import redis.asyncio as redis
-import time
 
 
 class SecurityService:

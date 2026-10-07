@@ -1,14 +1,15 @@
 """
 EHR/HIS Integration API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from ...services.integration.ehr_service import EHRService
-from ...core.security import get_current_user
 from ...core.config import settings
+from ...core.security import get_current_user
 from ...models.user import User
+from ...services.integration.ehr_service import EHRService
 
 router = APIRouter(prefix="/ehr", tags=["EHR"])
 

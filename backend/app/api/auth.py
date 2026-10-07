@@ -1,23 +1,24 @@
 """
 Authentication API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, select
 from datetime import datetime
 
-from ..db.session import get_db
-from ..models.user import User
-from ..schemas.user import UserCreate, UserResponse, Token, RefreshRequest, AccessToken
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.security import (
-    verify_password,
-    get_password_hash,
     create_access_token,
     create_refresh_token,
-    get_current_user,
     decode_token,
+    get_current_user,
+    get_password_hash,
+    verify_password,
 )
+from ..db.session import get_db
+from ..models.user import User
+from ..schemas.user import AccessToken, RefreshRequest, Token, UserCreate, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -149,8 +150,8 @@ async def create_test_admin(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a test admin user (Development only)"""
-    from ..models.user import UserRole
     from ..core.config import settings
+    from ..models.user import UserRole
     
     if not settings.DEBUG:
         raise HTTPException(

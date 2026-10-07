@@ -5,16 +5,15 @@ Implements routine tasks per MAINTENANCE_AND_UPDATE_PLAN_FA.md
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
 from pathlib import Path
-import shutil
+from typing import Any, Dict
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select, func
 
 from ..core.config import settings
-from .monitoring_service import MonitoringService
 from .backup_service import BackupService
+from .monitoring_service import MonitoringService
 
 
 class MaintenanceService:

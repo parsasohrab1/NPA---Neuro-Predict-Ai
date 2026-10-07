@@ -1,8 +1,9 @@
 """
 Imaging Schemas
 """
-from typing import Dict, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
 
 from ..models.imaging import ImagingModality

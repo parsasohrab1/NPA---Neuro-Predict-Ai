@@ -3,10 +3,9 @@ Structured JSON logging configuration and PII masking utilities.
 """
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from pythonjsonlogger import jsonlogger
-
 
 EMAIL_PATTERN = re.compile(r"([a-zA-Z0-9_.+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)")
 PHONE_PATTERN = re.compile(r"(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}")
@@ -61,8 +60,8 @@ def setup_json_logging(service_name: str, environment: str, level: str = "INFO")
     # Add default contextual data via a custom filter
     class ContextDefaults(logging.Filter):
         def filter(self, record: logging.LogRecord) -> bool:
-            setattr(record, "service", getattr(record, "service", service_name))
-            setattr(record, "env", getattr(record, "env", environment))
+            record.service = getattr(record, "service", service_name)
+            record.env = getattr(record, "env", environment)
             # Ensure all expected fields exist to keep schema stable
             for key, default in [
                 ("request_id", None),

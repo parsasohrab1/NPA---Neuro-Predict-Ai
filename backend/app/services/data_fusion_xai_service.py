@@ -8,17 +8,16 @@ Patent Claim 3: System for generating explanations including:
 (c) Mapping attributions to anatomical brain regions
 (d) Visual display of saliency maps for medical interpretation
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-from typing import Dict, List, Tuple, Optional, Any
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from .data_fusion_model import DataFusionScoringModel, FUSION_FEATURE_DIM, align_features
+import numpy as np
+import torch
+
 from ..models.medical_record import MedicalRecord
 from ..models.patient import Patient
+from .data_fusion_model import FUSION_FEATURE_DIM, DataFusionScoringModel, align_features
 
 logger = logging.getLogger(__name__)
 

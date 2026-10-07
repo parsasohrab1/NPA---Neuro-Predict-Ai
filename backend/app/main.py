@@ -2,56 +2,57 @@
 NeuroPredict-AI Main Application
 FastAPI Backend for Alzheimer's and Parkinson's Disease Prediction
 """
-from fastapi import FastAPI, Request, status, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from .core.config import settings
-from .db.session import init_db, close_db
-from .core.cache import cache_service
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from .api import (
+    admin,
+    analysis_3d,
+    analytics,
     auth,
+    backup,
+    comments,
+    data_fusion,
+    data_monitoring,
+    disease_tracking,
+    imaging,
+    jobs,
+    legal,
+    longitudinal,
+    maintenance,
+    mock_data,
+    model_metrics,
+    models,
+    monitoring,
+    notifications,
+    ops,
+    optimization,
     patients,
     predictions,
-    reports,
-    models,
-    model_metrics,
-    analytics,
-    users,
-    mock_data,
-    monitoring,
-    websocket,
-    optimization,
-    disease_tracking,
-    data_monitoring,
-    admin,
-    longitudinal,
-    data_fusion,
-    imaging,
-    analysis_3d,
-    backup,
     privacy,
-    security,
-    ops,
-    webhooks,
-    notifications,
-    jobs,
-    maintenance,
-    legal,
     products,
-    support,
+    reports,
     rum,
-    comments,
+    security,
+    support,
     system,
+    users,
+    webhooks,
+    websocket,
 )
+from .core.cache import cache_service
+from .core.config import settings
+from .db.session import close_db, init_db
 
 # Optional integration routers (FHIR etc. may require extra deps / Pydantic compatibility)
 _integration = None
 try:
-    from .api.integration import fhir, pacs, ehr, hl7v2, devices
+    from .api.integration import devices, ehr, fhir, hl7v2, pacs
     _integration = (fhir, pacs, ehr, hl7v2, devices)
 except Exception as e:
     import warnings
@@ -173,6 +174,7 @@ app = FastAPI(
 
 # Security headers (X-Content-Type-Options, X-Frame-Options, CSP, HSTS)
 from .middleware.security_middleware import SecurityHeadersMiddleware
+
 app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS Middleware
@@ -186,14 +188,17 @@ app.add_middleware(
 
 # Compression Middleware for performance
 from fastapi.middleware.gzip import GZipMiddleware
+
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Cache Middleware for GET responses (patients, predictions, analytics)
 from .middleware.cache_middleware import CacheMiddleware
+
 app.add_middleware(CacheMiddleware, cache_ttl=300)
 
 # Rate limiting for sensitive endpoints (POST /predictions, POST /auth)
 from .middleware.rate_limit_middleware import RateLimitMiddleware
+
 app.add_middleware(RateLimitMiddleware)
 
 # Metrics Middleware (for Prometheus)
@@ -243,6 +248,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def health_check():
     """Health check: verifies PostgreSQL and Redis. Returns 503 if DB or Redis is down."""
     from sqlalchemy import text
+
     from .db.session import engine
 
     db_ok = False

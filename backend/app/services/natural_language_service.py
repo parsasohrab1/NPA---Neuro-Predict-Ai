@@ -3,10 +3,10 @@ Natural Language Generation Service
 Handles report generation using templates and NLG patterns
 Separates report generation logic from core data fusion algorithm
 """
-from typing import Dict, Any, Optional
+import logging
 from datetime import datetime
 from pathlib import Path
-import logging
+from typing import Any, Dict, Optional
 
 try:
     from jinja2 import Environment, FileSystemLoader, Template

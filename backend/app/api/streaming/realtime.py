@@ -1,18 +1,16 @@
 """
 Real-time Streaming API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
-import uuid
 import json
+import uuid
+from typing import Any, Dict, List, Optional
 
-from ...services.streaming.realtime_service import (
-    realtime_service,
-    StreamType
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
+
 from ...core.security import get_current_user
 from ...models.user import User
+from ...services.streaming.realtime_service import StreamType, realtime_service
 
 router = APIRouter(prefix="/streaming", tags=["Real-time Streaming"])
 
@@ -327,5 +325,6 @@ async def get_connection_stats(
 
 # Import logger
 import logging
+
 logger = logging.getLogger(__name__)
 

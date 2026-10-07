@@ -3,28 +3,23 @@ PATENT-PENDING: Data Fusion Report API Endpoints
 Multi-Modal Medical Data Fusion and Interpretation
 """
 import logging
-
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
 from typing import List
+
 import numpy as np
 import torch
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
-from ..models.user import User
-from ..models.patient import Patient
-from ..models.medical_record import MedicalRecord
 from ..models.data_fusion_report import DataFusionReport
-from ..schemas.data_fusion import (
-    DataFusionReportResponse,
-    DataFusionReportCreate
-)
-from ..services.data_fusion_service import DataFusionService
+from ..models.medical_record import MedicalRecord
+from ..models.patient import Patient
+from ..schemas.data_fusion import DataFusionReportCreate, DataFusionReportResponse
 from ..services.data_fusion_model import FUSION_FEATURE_DIM, align_features
-from ..services.data_fusion_xai_service import get_data_fusion_xai_service
 from ..services.data_fusion_model_service import get_data_fusion_model_service
-from ..core.security import get_current_user
+from ..services.data_fusion_service import DataFusionService
+from ..services.data_fusion_xai_service import get_data_fusion_xai_service
 
 logger = logging.getLogger(__name__)
 

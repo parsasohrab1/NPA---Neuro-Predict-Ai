@@ -3,9 +3,8 @@ Clinical Norms Service
 Provides age and gender-specific normal ranges for medical assessments
 Replaces magic numbers with evidence-based clinical norms
 """
-from typing import Dict, Optional, Tuple
-from datetime import date
 import logging
+from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 

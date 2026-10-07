@@ -9,26 +9,26 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
-from ..models.longitudinal import MetricCategory, LongitudinalReportScheduleStatus
+from ..models.longitudinal import MetricCategory
 from ..schemas.longitudinal import (
+    ImagingComparisonResponse,
+    LongitudinalAlertResponse,
     LongitudinalEpisodeCreate,
     LongitudinalEpisodeDetail,
     LongitudinalEpisodeSummary,
     LongitudinalMetricCreate,
-    LongitudinalVisitCreate,
-    LongitudinalVisitResponse,
-    ImagingComparisonResponse,
-    TimelineEvent,
-    TrendPoint,
-    LongitudinalAlertResponse,
     LongitudinalProgressionSummary,
-    ProgressionMetricSummary,
     LongitudinalReportCreate,
     LongitudinalReportResponse,
+    LongitudinalVisitCreate,
+    LongitudinalVisitResponse,
+    ProgressionMetricSummary,
+    ReportRunResponse,
     ReportScheduleCreate,
     ReportScheduleResponse,
-    ReportRunResponse,
     ReportScheduleUpdate,
+    TimelineEvent,
+    TrendPoint,
 )
 from ..services.longitudinal_service import longitudinal_service
 
@@ -558,18 +558,20 @@ async def load_sample_data(
     Load sample episodes, visits, and metrics for longitudinal tracking testing.
     Creates data for existing patients in the database.
     """
+    import random
+    from datetime import datetime, timedelta
+
     from sqlalchemy import select
-    from ..models.patient import Patient
+
     from ..models.longitudinal import (
         LongitudinalEpisode,
-        LongitudinalVisit,
-        LongitudinalMetric,
         LongitudinalEpisodeStatus,
+        LongitudinalMetric,
+        LongitudinalVisit,
         LongitudinalVisitType,
         MetricCategory,
     )
-    from datetime import datetime, timedelta
-    import random
+    from ..models.patient import Patient
     
     # Get all patients
     result = await db.execute(select(Patient).limit(10))

@@ -2,14 +2,12 @@
 Real-time Data Streaming Service
 سرویس برای streaming داده‌های real-time
 """
-from typing import Optional, Dict, Any, List, Callable, Set
-from datetime import datetime
 import asyncio
-import json
 import logging
-from enum import Enum
-from collections import defaultdict
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 

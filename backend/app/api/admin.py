@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.security import get_current_user, require_role
 from ..db.session import get_db
 from ..models.audit import AuditLog
 from ..models.security import PasswordPolicy, SecurityLog

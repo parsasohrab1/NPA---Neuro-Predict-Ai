@@ -2,13 +2,18 @@
 Model Evaluator for Clinical Validation
 Calculates clinical metrics including sensitivity, specificity, AUC, etc.
 """
-import numpy as np
-from typing import Dict, Tuple, List
 import logging
+from typing import Dict, List
+
+import numpy as np
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    roc_auc_score, confusion_matrix, classification_report,
-    precision_recall_curve, roc_curve
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
 )
 
 logger = logging.getLogger(__name__)

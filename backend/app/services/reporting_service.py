@@ -2,23 +2,24 @@
 Reporting Service
 """
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from ..models.patient import Patient
 from ..models.medical_record import MedicalRecord
-from ..models.prediction import Prediction, DiseaseType, RiskLevel
+from ..models.patient import Patient
+from ..models.prediction import DiseaseType, Prediction, RiskLevel
 from ..schemas.reports import (
-    ClinicalReport,
     ClinicalPatientSummary,
     ClinicalPredictionSummary,
-    ResearchReport,
-    ResearchAggregation,
-    ManagementReport,
-    ManagementKpi,
+    ClinicalReport,
     ManagementAlert,
+    ManagementKpi,
+    ManagementReport,
+    ResearchAggregation,
+    ResearchReport,
 )
 
 

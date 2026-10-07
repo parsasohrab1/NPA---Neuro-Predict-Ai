@@ -1,22 +1,19 @@
 """
 Security API Endpoints - MFA, Password Management, IP Whitelist, Sessions
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr
 
-from ..db.session import get_db
-from ..models.user import User
-from ..models.security import (
-    MFASecret, MFAMethod, UserSession, IPWhitelist,
-    PasswordPolicy, SecurityLog
-)
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.security import get_current_user, get_password_hash, verify_password
+from ..db.session import get_db
+from ..models.security import IPWhitelist, MFAMethod, MFASecret, SecurityLog, UserSession
+from ..models.user import User
 from ..services.security_service import SecurityService
-from ..core.config import settings
 
 router = APIRouter(prefix="/security", tags=["Security"])
 

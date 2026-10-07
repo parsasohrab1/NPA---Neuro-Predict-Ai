@@ -1,19 +1,19 @@
 """
 Patient Management API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from typing import List, Optional
 
-from ..db.session import get_db
-from ..models.user import User
-from ..models.patient import Patient
-from ..models.medical_record import MedicalRecord
-from ..schemas.patient import PatientCreate, PatientUpdate, PatientResponse
-from ..schemas.medical_record import MedicalRecordCreate, MedicalRecordResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.security import get_current_user, require_role
+from ..db.session import get_db
+from ..models.medical_record import MedicalRecord
+from ..models.patient import Patient
+from ..models.user import User
+from ..schemas.medical_record import MedicalRecordCreate, MedicalRecordResponse
+from ..schemas.patient import PatientCreate, PatientResponse, PatientUpdate
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 

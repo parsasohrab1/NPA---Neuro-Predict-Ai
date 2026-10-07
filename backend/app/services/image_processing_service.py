@@ -3,12 +3,13 @@ Medical Image Processing Service
 Handles DICOM files, MRI preprocessing, and feature extraction
 """
 import base64
+import logging
+from pathlib import Path
+from typing import Dict, Tuple
+
+import cv2
 import numpy as np
 import pydicom
-from pathlib import Path
-import logging
-from typing import Dict, Tuple, Optional
-import cv2
 from scipy import ndimage
 
 logger = logging.getLogger(__name__)

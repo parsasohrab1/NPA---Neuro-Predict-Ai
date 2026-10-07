@@ -1,22 +1,23 @@
 """
 AI Prediction API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 import logging
-from typing import List, Optional, Any
 from datetime import date, datetime
+from typing import Any, List, Optional
 
-from ..db.session import get_db
-from ..models.user import User
-from ..models.patient import Patient
-from ..models.medical_record import MedicalRecord
-from ..models.prediction import Prediction, DiseaseType
-from ..models.audit import AuditLog
-from ..schemas.prediction import PredictionRequest, PredictionResponse, PredictionReview
-from ..core.security import get_current_user, require_role
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.cache import cache_service
+from ..core.security import get_current_user, require_role
+from ..db.session import get_db
+from ..models.audit import AuditLog
+from ..models.medical_record import MedicalRecord
+from ..models.patient import Patient
+from ..models.prediction import Prediction
+from ..models.user import User
+from ..schemas.prediction import PredictionRequest, PredictionResponse, PredictionReview
 from ..services.ai_model_service import ai_model_service
 from ..services.clinical_explainability_service import clinical_explainability_service
 

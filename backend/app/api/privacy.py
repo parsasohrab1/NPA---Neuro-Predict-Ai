@@ -1,16 +1,17 @@
 """
 Privacy & DSR API
 """
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import get_db
 from ..core.security import get_current_user, require_role
+from ..db.session import get_db
+from ..models.privacy import DSRRequest, DSRStatus, DSRType
 from ..models.user import User
-from ..models.privacy import DSRRequest, DSRType, DSRStatus
 from ..services.privacy_service import PrivacyService
 
 router = APIRouter(prefix="/privacy", tags=["Privacy"])

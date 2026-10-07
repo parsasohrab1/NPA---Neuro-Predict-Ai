@@ -4,11 +4,9 @@ Exposes metrics in Prometheus format for monitoring
 """
 import time
 from typing import Callable
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response as StarletteResponse
-
-from ..core.config import settings
 
 # In-memory metrics storage (in production, use Prometheus client library)
 _metrics = {

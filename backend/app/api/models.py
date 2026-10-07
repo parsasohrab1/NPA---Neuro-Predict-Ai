@@ -1,14 +1,13 @@
 """
 Model Management API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
-from datetime import datetime
 
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.security import get_current_user, require_role
 from ..db.session import get_db
 from ..models.user import User
-from ..core.security import get_current_user, require_role
 
 router = APIRouter(prefix="/models", tags=["Model Management"])
 

@@ -2,14 +2,13 @@
 Model Metrics API Endpoints
 API for retrieving model training and validation metrics
 """
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any, Optional
-from pathlib import Path
 import json
 import logging
+from pathlib import Path
+from typing import Any, Dict
 
-from ..db.session import get_db
+from fastapi import APIRouter, Depends, HTTPException
+
 from ..core.security import require_role
 
 logger = logging.getLogger(__name__)

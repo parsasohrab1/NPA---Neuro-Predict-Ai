@@ -1,17 +1,13 @@
 """
 Middleware for Metrics Collection
 """
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
 import time
 from typing import Callable
 
-from ..core.metrics import (
-    http_requests_total,
-    http_request_duration_seconds,
-    errors_total
-)
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from ..core.metrics import errors_total, http_request_duration_seconds, http_requests_total
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):

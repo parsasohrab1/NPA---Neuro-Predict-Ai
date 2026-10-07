@@ -2,24 +2,23 @@
 Real-Time Monitoring API Endpoints
 برای مانیتورینگ برخط AI/ML، کلینیکی، سیستم و امنیتی
 """
-from fastapi import APIRouter, Depends, Query, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc, text
-from typing import Optional, List, Dict
-from datetime import datetime, timedelta
-from collections import defaultdict
 import statistics
-import json
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, desc, func, or_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.metrics import get_metrics_response
+from ..core.security import get_current_user, require_role
 from ..db.session import get_db
-from ..models.user import User, UserRole
+from ..models.audit import AuditLog
+from ..models.medical_record import MedicalRecord
 from ..models.patient import Patient
 from ..models.prediction import Prediction, RiskLevel
-from ..models.medical_record import MedicalRecord
-from ..models.audit import AuditLog
-from ..core.security import get_current_user, require_role
-from ..services.ai_model_service import ai_model_service
-from ..core.metrics import get_metrics_response
+from ..models.user import User, UserRole
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 

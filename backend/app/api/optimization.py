@@ -1,17 +1,12 @@
 """
 Performance Optimization API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any, List
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.security import get_current_user, require_role
-from ..core.database_optimization import (
-    create_indexes,
-    analyze_table,
-    get_slow_queries,
-    optimize_query
-)
+from ..core.database_optimization import analyze_table, create_indexes, get_slow_queries, optimize_query
+from ..core.security import require_role
 from ..db.session import get_db
 from ..models.user import User
 

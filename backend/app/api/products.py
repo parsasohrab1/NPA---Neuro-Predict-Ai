@@ -2,16 +2,17 @@
 Product Management API Endpoints
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from ..db.session import get_db
-from ..models.user import User
-from ..models.product import Product
-from ..schemas.product import ProductCreate, ProductUpdate, ProductResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.cache import generate_cache_key, get_cached_response, invalidate_product_cache, set_cached_response
 from ..core.security import get_current_user, require_role
-from ..core.cache import generate_cache_key, get_cached_response, set_cached_response, invalidate_product_cache
+from ..db.session import get_db
+from ..models.product import Product
+from ..models.user import User
+from ..schemas.product import ProductCreate, ProductResponse, ProductUpdate
 
 router = APIRouter(prefix="/products", tags=["Products"])
 

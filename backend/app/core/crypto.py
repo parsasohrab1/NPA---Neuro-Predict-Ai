@@ -1,7 +1,8 @@
-from typing import Optional
-from cryptography.fernet import Fernet, InvalidToken
 import base64
 import hashlib
+from typing import Optional
+
+from cryptography.fernet import Fernet, InvalidToken
 
 from .config import settings
 

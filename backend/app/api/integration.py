@@ -2,19 +2,14 @@
 Integration API Endpoints - PACS/EHR/HL7/FHIR
 """
 import logging
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 
-from ..db.session import get_db
-from ..core.security import require_role, get_current_user
+from ..core.security import get_current_user, require_role
 from ..models.user import User
-from ..services.integration_service import (
-    IntegrationService,
-    HL7Message,
-    FHIRResource
-)
+from ..services.integration_service import FHIRResource, HL7Message, IntegrationService
 
 logger = logging.getLogger(__name__)
 

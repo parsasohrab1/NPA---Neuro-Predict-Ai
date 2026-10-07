@@ -3,10 +3,10 @@ Lightweight Job Queue using Redis (MVP)
 """
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, Tuple
 import json
 import time
 import uuid
+from typing import Any, Dict, Optional
 
 import redis.asyncio as redis
 

@@ -2,16 +2,15 @@
 Mock Data API Endpoints for development/demo
 Returns sample data without requiring database
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List
-from datetime import datetime, timedelta, date
 import random
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
 from ..models.patient import Patient
-from ..models.medical_record import MedicalRecord
 
 router = APIRouter(prefix="/mock", tags=["Mock Data"])
 

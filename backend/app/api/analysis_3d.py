@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from typing import Dict, Any, List, Optional
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from ..core.security import require_role
+import numpy as np
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..db.session import get_db
-from ..models.patient import Patient, Gender
 from ..models.medical_record import MedicalRecord
-from ..models.prediction import Prediction, DiseaseType, RiskLevel
+from ..models.patient import Patient
+from ..models.prediction import DiseaseType, Prediction, RiskLevel
 
 router = APIRouter(prefix="/analysis-3d", tags=["3D Analysis"])
 

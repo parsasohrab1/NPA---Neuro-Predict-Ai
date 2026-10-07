@@ -1,12 +1,13 @@
 """
 Metrics Middleware - request latency buckets, request/error counters
 """
+import time
+from typing import List, Optional
+
+import redis.asyncio as redis
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-import time
-from typing import Optional, List
-import redis.asyncio as redis
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):

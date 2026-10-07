@@ -20,6 +20,8 @@ try:
 except ImportError:  # pragma: no cover - optional dependency guard
     letter = None
     canvas = None
+import logging
+
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -34,13 +36,12 @@ from ..models.longitudinal import (
     LongitudinalMetric,
     LongitudinalReport,
     LongitudinalReportFormat,
-    LongitudinalReportStatus,
     LongitudinalReportRun,
     LongitudinalReportRunStatus,
     LongitudinalReportSchedule,
     LongitudinalReportScheduleStatus,
+    LongitudinalReportStatus,
     LongitudinalVisit,
-    LongitudinalVisitType,
     MetricCategory,
 )
 from ..models.patient import Gender, Patient
@@ -51,8 +52,6 @@ from ..schemas.longitudinal import (
     ReportScheduleCreate,
 )
 from ..services.image_processing_service import image_processing_service
-
-import logging
 
 logger = logging.getLogger(__name__)
 

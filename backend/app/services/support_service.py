@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from datetime import datetime
+from typing import Any, Dict
 
-from ..models.support import SupportTicket, SupportUpdate, TicketStatus
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.support import SupportTicket, TicketStatus
 
 
 class SupportService:

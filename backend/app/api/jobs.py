@@ -1,9 +1,10 @@
 """
 Jobs API - enqueue and inspect job queue
 """
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
 
 from ..core.security import require_role
 from ..services.job_queue_service import JobQueueService

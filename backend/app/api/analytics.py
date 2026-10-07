@@ -1,17 +1,17 @@
 """
 Analytics API Endpoints
 """
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.security import get_current_user
 from ..db.session import get_db
-from ..models.user import User
 from ..models.patient import Patient
 from ..models.prediction import Prediction
-from ..core.security import get_current_user
+from ..models.user import User
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 

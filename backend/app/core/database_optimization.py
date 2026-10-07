@@ -2,10 +2,11 @@
 Database Optimization Utilities
 ابزارهای بهینه‌سازی دیتابیس
 """
+import logging
+from typing import Any, Dict, List
+
 from sqlalchemy import Index, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Dict, Any
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ async def analyze_table(session: AsyncSession, table_name: str) -> Dict[str, Any
         
         # Get table statistics
         stats_result = await session.execute(
-            text(f"""
+            text("""
                 SELECT 
                     schemaname,
                     tablename,

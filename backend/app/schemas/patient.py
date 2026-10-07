@@ -2,12 +2,12 @@
 Patient Schemas
 """
 import re
+from datetime import date, datetime
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
-from datetime import date, datetime
-from ..models.patient import Gender
 
+from ..models.patient import Gender
 
 # Person names: letters (any script), digits, spaces and . ' ’ - only.
 # Rejects markup/script payloads (<, >, :, (, ", =, ...) at the API boundary.

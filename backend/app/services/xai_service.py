@@ -2,9 +2,10 @@
 Explainable AI (XAI) Service
 Advanced interpretability methods including Saliency Maps, Integrated Gradients, and SHAP values
 """
-import numpy as np
-from typing import Dict, List, Tuple, Optional
 import logging
+from typing import Dict, List, Optional
+
+import numpy as np
 
 try:
     import torch
@@ -17,7 +18,6 @@ except ImportError:
     nn = None
     F = None
 
-from ..models.prediction import RiskLevel
 
 logger = logging.getLogger(__name__)
 
@@ -470,7 +470,7 @@ class XAIService:
             elif conf > 0.6:
                 explanations.append(f"Moderate confidence in Alzheimer's assessment (confidence: {conf:.2%})")
             else:
-                explanations.append(f"Low confidence in Alzheimer's assessment - consider additional testing")
+                explanations.append("Low confidence in Alzheimer's assessment - consider additional testing")
         
         if 'parkinson' in prediction_result:
             conf = prediction_result['parkinson'].get('confidence', 0)
@@ -480,7 +480,7 @@ class XAIService:
             elif conf > 0.6:
                 explanations.append(f"Moderate confidence in Parkinson's assessment (confidence: {conf:.2%})")
             else:
-                explanations.append(f"Low confidence in Parkinson's assessment - consider additional testing")
+                explanations.append("Low confidence in Parkinson's assessment - consider additional testing")
         
         return " ".join(explanations)
 

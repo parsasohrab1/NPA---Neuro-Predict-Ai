@@ -2,17 +2,18 @@
 Privacy Service - handle DSR requests (export/erasure stubs)
 """
 from __future__ import annotations
-from pathlib import Path
-from typing import Dict, Any, Optional
+
 import json
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.privacy import DSRRequest, DSRStatus, DSRType
+from ..models.longitudinal import LongitudinalReport
 from ..models.patient import Patient
 from ..models.prediction import Prediction
-from ..models.longitudinal import LongitudinalReport
+from ..models.privacy import DSRRequest, DSRStatus
 
 
 class PrivacyService:

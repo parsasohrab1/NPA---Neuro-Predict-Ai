@@ -1,11 +1,10 @@
 """
 Application Configuration
 """
-from pydantic_settings import BaseSettings
+from typing import List, Optional
+
 from pydantic import Field, field_validator, model_validator
-from typing import Optional, List
-import os
-import secrets
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):

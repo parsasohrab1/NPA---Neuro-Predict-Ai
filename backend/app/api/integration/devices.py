@@ -1,13 +1,14 @@
 """
 Medical Devices Integration API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
-from typing import Optional, List
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
-from ...services.integration.device_streaming import DeviceStreamingService, DeviceType
 from ...core.security import get_current_user
 from ...models.user import User
+from ...services.integration.device_streaming import DeviceStreamingService, DeviceType
 
 router = APIRouter(prefix="/devices", tags=["Medical Devices"])
 

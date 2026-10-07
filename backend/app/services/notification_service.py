@@ -2,12 +2,12 @@
 Notification Service - email/SMS/in-app dispatch (stubs for Phase 3)
 """
 from __future__ import annotations
-from typing import Optional, Dict, Any
 
 import asyncio
+from typing import Any, Dict, Optional
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.communication import NotificationPreference
 

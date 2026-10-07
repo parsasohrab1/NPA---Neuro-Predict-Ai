@@ -1,15 +1,16 @@
 """
 PACS Integration API Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
-from typing import Optional, List
 import os
 from pathlib import Path
+from typing import Optional
 
-from ...services.integration.pacs_service import PACSService
-from ...core.security import get_current_user
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+
 from ...core.config import settings
+from ...core.security import get_current_user
 from ...models.user import User
+from ...services.integration.pacs_service import PACSService
 
 router = APIRouter(prefix="/pacs", tags=["PACS"])
 

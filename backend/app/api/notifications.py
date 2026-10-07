@@ -1,13 +1,14 @@
 """
 Notifications API - preferences and test sends
 """
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import get_db
 from ..core.security import get_current_user, require_role
+from ..db.session import get_db
 from ..models.user import User
 from ..services.notification_service import NotificationService
 

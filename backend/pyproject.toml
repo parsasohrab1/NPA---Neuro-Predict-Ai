@@ -21,6 +21,8 @@ select = ["E9", "F", "B", "I"]
 ignore = [
   # Allow long lines for now; we'll tighten in a follow-up sprint.
   "E501",
+  # FastAPI idiom: Depends()/Query()/File() as parameter defaults.
+  "B008",
 ]
 per-file-ignores = { "tests/*" = ["F401", "F811"] }
 

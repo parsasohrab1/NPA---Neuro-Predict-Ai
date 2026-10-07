@@ -2,10 +2,9 @@
 HL7 v2 Integration Service
 سرویس برای یکپارچه‌سازی با دستگاه‌های پزشکی با استفاده از HL7 v2
 """
-from typing import Optional, List, Dict, Any, Tuple
-from datetime import datetime
-import re
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

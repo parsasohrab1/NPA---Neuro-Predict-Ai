@@ -11,10 +11,11 @@ except ImportError:
     nn = None
 
 import asyncio
-import numpy as np
-from typing import Dict, Tuple, Optional
 import logging
 from pathlib import Path
+from typing import Dict
+
+import numpy as np
 
 from ..core.config import settings
 from ..models.prediction import RiskLevel
